@@ -165,10 +165,24 @@ class Qwen3_5MoeTextRotaryEmbedding(nn.Module):
         returns:
             x_t: (bs, seq_len, head_dim // 2)
         """
-        freqs_t = freqs[0]  # just overwrite the first dimension T
-        for dim, offset in enumerate((1, 2), start=1):  # H, W
+        # 1. 降维的根本原因：
+        # 我们创建了一个新的变量 freqs_t，它等于 freqs[0]。
+        # freqs 的形状是 (3, bs, seq_len, head_dim // 2)。
+        # freqs[0] 取出了第 0 个维度（即时间维度 T 的频率），
+        # 因此，freqs_t 的形状就自然降维成了 (bs, seq_len, head_dim // 2)。
+        freqs_t = freqs[0]  # 初始取 T 的频率，这不仅去掉了最外层的 3，还作为后续替换的"底板"
+        
+        # 遍历 H (dim=1, offset=1) 和 W (dim=2, offset=2)
+        for dim, offset in enumerate((1, 2), start=1):
+            # 获取需要交错的最大长度 (mrope_section 存储了 T,H,W 各自的基础维度划分)
             length = mrope_section[dim] * 3
+            # 以 3 为步长，分别从 1 (H) 或 2 (W) 开始，生成交错切片索引
+            # 最终在特征维度上的排列为：T, H, W, T, H, W, T, H, W ...
             idx = slice(offset, length, 3)
+            # 2. 替换操作：
+            # 在 freqs_t 这个 (bs, seq_len, head_dim // 2) 的底板上，
+            # 我们直接修改它在最后个维度（head_dim // 2）上特定索引的值。
+            # freqs[1] 和 freqs[2] 并没有拼接进来，而是覆盖了 freqs_t 里的部分内容。
             freqs_t[..., idx] = freqs[dim, ..., idx]
         return freqs_t
 
