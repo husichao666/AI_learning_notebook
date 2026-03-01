@@ -138,7 +138,32 @@ freqs = freqs.transpose(2, 3)
 *   中间 21 个维度：直接使用 `freqs[1]`（高度 H 的频率）
 *   最后 22 个维度：直接使用 `freqs[2]`（宽度 W 的频率）
 
----
+### 补充：Partial RoPE (部分旋转)
+
+值得注意的是，在计算 `inv_freq` 时，模型配置中可能包含一个 `partial_rotary_factor` 参数（默认为 1.0）。
+这意味着，模型可能**不会对整个 `head_dim` 进行旋转**，而是只对前一部分特征进行旋转。
+例如，如果 `head_dim = 128`，`partial_rotary_factor = 0.5`，那么 `dim` 就只有 64。
+此时生成的 `cos` 和 `sin` 的最后一维大小只有 64。
+
+在最终应用到 Q 和 K 时（`apply_rotary_pos_emb` 函数中）：
+```python
+# 获取需要旋转的维度大小 (比如 64)
+rotary_dim = cos.shape[-1]
+
+# 将 Q 和 K 切分为“需要旋转的部分”和“不需要旋转的部分”
+q_rot, q_pass = q[..., :rotary_dim], q[..., rotary_dim:]
+k_rot, k_pass = k[..., :rotary_dim], k[..., rotary_dim:]
+
+# 只对前半部分应用旋转
+q_embed = (q_rot * cos) + (rotate_half(q_rot) * sin)
+k_embed = (k_rot * cos) + (rotate_half(k_rot) * sin)
+
+# 最后再把不需要旋转的部分拼回去
+q_embed = torch.cat([q_embed, q_pass], dim=-1)
+k_embed = torch.cat([k_embed, k_pass], dim=-1)
+```
+
+这种设计允许模型在保留绝对特征（不旋转部分）的同时，利用部分维度（旋转部分）来感知相对位置。
 
 ## 第三部分：Qwen3.5 的魔法：M-RoPE Interleaved
 
