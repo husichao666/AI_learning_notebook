@@ -4,6 +4,7 @@
 
 参考资料：
 - [NeurIPS 最佳论文：Qwen 门控注意力Gated Attention](https://zhuanlan.zhihu.com/p/1978860775281009311)
+- [原论文](https://neurips.cc/virtual/2025/loc/san-diego/poster/120216)
 
 ## 实验设置与结论
 
