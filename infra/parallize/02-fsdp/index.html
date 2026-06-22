@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M2 · FSDP / ZeRO</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 2 · FSDP / ZeRO</span>
+  <h1>把模型状态也切开：ZeRO 与 FSDP</h1>
+  <p class="lead">DP 让每张卡冗余存了 N 份模型状态。ZeRO 的洞察是：这些状态在每张卡上各存一份纯属浪费——把优化器状态、梯度、参数依次切到各卡，用时再临时聚合。ZeRO-3 就是 FSDP。</p>
+  <div class="meta-row">
+    <span class="tag">📦 ZeRO 1/2/3 三阶段</span>
+    <span class="tag">🔄 all-gather 参数 + reduce-scatter 梯度</span>
+    <span class="tag">📉 显存降到 1/N</span>
+    <span class="tag">🟠 torchtitan FSDP2</span>
+    <span class="tag">🟢 Megatron DistributedOptimizer</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="motivation"><span class="num">01</span>动机：DP 的冗余</h2>
+<p>上一章的结论：纯 DDP 下每张卡都存<strong>完整的</strong>参数（$2P$）、梯度（$2P$）、优化器状态（$12P$），共 $16P$ 字节，完全不随卡数下降。但仔细想——这 N 份副本<strong>内容完全相同</strong>，为什么每张卡都要存一整份？</p>
+<p>ZeRO（Zero Redundancy Optimizer）的答案：<strong>不存了，切开</strong>。每张卡只持有 $1/N$ 的模型状态，需要完整参数时临时用 <code>all-gather</code> 拼起来，用完即丢。这样显存随卡数线性下降，代价只是多一点通信。</p>
+
+<h2 class="section" id="stages"><span class="num">02</span>ZeRO 三阶段：一刀一刀往下切</h2>
+<p>按「切得越来越多」排序，先切最大的那块（优化器状态占了 75%）：</p>
+<table>
+<thead><tr><th>阶段</th><th>切什么</th><th>每卡模型状态显存</th><th>对应实现</th></tr></thead>
+<tbody>
+<tr><td>baseline DDP</td><td>啥都不切</td><td>$2P + 2P + 12P = 16P$</td><td>普通 DP</td></tr>
+<tr><td><strong>ZeRO-1</strong></td><td>切<strong>优化器状态</strong></td><td>$2P + 2P + 12P/N$</td><td>Megatron <code>DistributedOptimizer</code></td></tr>
+<tr><td><strong>ZeRO-2</strong></td><td>再切<strong>梯度</strong></td><td>$2P + (2P + 12P)/N$</td><td>—</td></tr>
+<tr><td><strong>ZeRO-3</strong></td><td>再切<strong>参数</strong></td><td>$(2P+2P+12P)/N = 16P/N$</td><td><strong>FSDP</strong>（torchtitan FSDP2）</td></tr>
+</tbody>
+</table>
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="ZeRO 三阶段每卡显存递减">
+  <text x="20" y="24" fill="#eaeefb" font-size="14" font-weight="600">每卡模型状态显存（N=8 示意，蓝=参数 绿=梯度 橙=优化器状态）</text>
+  <!-- scale: 16P -> 360px wide -->
+  <g font-size="11">
+    <!-- DDP -->
+    <text x="20" y="62" fill="#9aa3b2">DDP</text>
+    <rect x="80"  y="48" width="45"  height="22" fill="rgba(124,147,255,0.25)" stroke="#7c93ff"/>
+    <rect x="125" y="48" width="45"  height="22" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/>
+    <rect x="170" y="48" width="270" height="22" fill="rgba(255,138,76,0.18)" stroke="#ff8a4c"/>
+    <text x="455" y="64" fill="#9aa3b2">16P</text>
+    <!-- ZeRO-1 -->
+    <text x="20" y="100" fill="#9aa3b2">ZeRO-1</text>
+    <rect x="80"  y="86" width="45" height="22" fill="rgba(124,147,255,0.25)" stroke="#7c93ff"/>
+    <rect x="125" y="86" width="45" height="22" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/>
+    <rect x="170" y="86" width="34" height="22" fill="rgba(255,138,76,0.18)" stroke="#ff8a4c"/>
+    <text x="214" y="102" fill="#9aa3b2">4P + 12P/8 = 5.5P</text>
+    <!-- ZeRO-2 -->
+    <text x="20" y="138" fill="#9aa3b2">ZeRO-2</text>
+    <rect x="80"  y="124" width="45" height="22" fill="rgba(124,147,255,0.25)" stroke="#7c93ff"/>
+    <rect x="125" y="124" width="6"  height="22" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/>
+    <rect x="131" y="124" width="34" height="22" fill="rgba(255,138,76,0.18)" stroke="#ff8a4c"/>
+    <text x="175" y="140" fill="#9aa3b2">2P + 14P/8 = 3.75P</text>
+    <!-- ZeRO-3 / FSDP -->
+    <text x="20" y="176" fill="#4ade80" font-weight="700">ZeRO-3 = FSDP</text>
+    <rect x="80"  y="162" width="6"  height="22" fill="rgba(124,147,255,0.25)" stroke="#7c93ff"/>
+    <rect x="86"  y="162" width="6"  height="22" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/>
+    <rect x="92"  y="162" width="33" height="22" fill="rgba(255,138,76,0.18)" stroke="#ff8a4c"/>
+    <text x="135" y="178" fill="#86efac" font-weight="700">16P/8 = 2P　（降到 1/8）</text>
+  </g>
+  <text x="20" y="218" fill="#fbbf24" font-size="12">越往下，单卡常驻显存越少；代价是用到完整参数时要临时 all-gather（见下一节）。</text>
+  <text x="20" y="238" fill="#9aa3b2" font-size="12">注：激活值不在此图；FSDP 还有一个峰值开销 = 当前正在用的那一层 all-gather 后的完整参数。</text>
+</svg>
+<div class="cap">ZeRO 一刀一刀往下切，N 越大单卡省得越多。Megatron 的分布式优化器停在 ZeRO-1，FSDP 直接做到 ZeRO-3。</div>
+</div>
+
+<h2 class="section" id="flow"><span class="num">03</span>FSDP（=ZeRO-3）的前向/反向通信流</h2>
+<p>FSDP 的核心节奏：<strong>参数平时是切碎的，用到哪层才把那层 all-gather 成完整，算完立刻丢回切片态</strong>。</p>
+<div class="diagram">
+<svg viewBox="0 0 820 230" role="img" aria-label="FSDP 一层的前向反向通信序列">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="20" y="24" fill="#aab6ff" font-size="13" font-weight="700">前向</text>
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="20"  y="36" width="120" height="40" rx="7" fill="#161922" stroke="#475569"/><text x="80" y="54" fill="#d7dbe4">参数分片</text><text x="80" y="70" fill="#9aa3b2">1/N 常驻</text>
+    <rect x="170" y="36" width="130" height="40" rx="7" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="235" y="54" fill="#cdd5ff">all-gather</text><text x="235" y="70" fill="#9aa3b2">拼成完整参数</text>
+    <rect x="330" y="36" width="110" height="40" rx="7" fill="#161922" stroke="#475569"/><text x="385" y="58" fill="#d7dbe4">前向计算</text>
+    <rect x="470" y="36" width="150" height="40" rx="7" fill="rgba(251,191,36,0.14)" stroke="#fbbf24"/><text x="545" y="54" fill="#fde68a">reshard 丢弃</text><text x="545" y="70" fill="#9aa3b2">只留分片</text>
+    <line x1="140" y1="56" x2="166" y2="56" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="300" y1="56" x2="326" y2="56" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="440" y1="56" x2="466" y2="56" stroke="#64748b" marker-end="url(#a)"/>
+  </g>
+  <text x="20" y="120" fill="#aab6ff" font-size="13" font-weight="700">反向</text>
+  <g font-size="11.5" text-anchor="middle">
+    <rect x="20"  y="132" width="130" height="40" rx="7" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="85" y="150" fill="#cdd5ff">all-gather</text><text x="85" y="166" fill="#9aa3b2">再拼完整参数</text>
+    <rect x="180" y="132" width="120" height="40" rx="7" fill="#161922" stroke="#475569"/><text x="240" y="154" fill="#d7dbe4">算梯度</text>
+    <rect x="330" y="132" width="160" height="40" rx="7" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="410" y="150" fill="#bbf7d0">reduce-scatter</text><text x="410" y="166" fill="#9aa3b2">每卡只留 1/N 梯度</text>
+    <rect x="520" y="132" width="150" height="40" rx="7" fill="#161922" stroke="#475569"/><text x="595" y="150" fill="#d7dbe4">step 更新</text><text x="595" y="166" fill="#9aa3b2">各管各的 1/N</text>
+    <line x1="150" y1="152" x2="176" y2="152" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="300" y1="152" x2="326" y2="152" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="490" y1="152" x2="516" y2="152" stroke="#64748b" marker-end="url(#a)"/>
+  </g>
+  <text x="20" y="208" fill="#9aa3b2" font-size="12">每张卡只用自己那 1/N 的梯度更新自己 1/N 的参数和优化器状态——优化器 step 也是分片的。</text>
+</svg>
+<div class="cap">FSDP 一个 FSDP unit（通常一层）的通信序列：前向 all-gather→算→reshard，反向 all-gather→算→reduce-scatter。</div>
+</div>
+
+<h2 class="section" id="titan"><span class="num">04</span>torchtitan：FSDP2 = per-parameter DTensor 分片</h2>
+<p>torchtitan 用 PyTorch 原生的 <code>fully_shard</code>（FSDP2）。它逐个 TransformerBlock 调用 <code>fully_shard</code>，每个 block 成为一个独立的通信单元（all-gather/reduce-scatter 的粒度），最后对整个 model 再包一层：</p>
+<div class="code-label">torchtitan · models/llama3/parallelize.py:163（apply_fsdp 核心）</div>
+<pre><code class="language-python">mp_policy = MixedPrecisionPolicy(
+    param_dtype=param_dtype,       # 计算用 bf16
+    reduce_dtype=reduce_dtype,     # 梯度归约用 fp32
+    cast_forward_inputs=False,
+)
+fsdp_config = {"mesh": dp_mesh, "mp_policy": mp_policy}
+reshard_after_forward = get_fsdp_reshard_after_forward_policy(reshard_after_forward_policy, pp_enabled)
+
+for layer_id, transformer_block in model.layers.items():
+    fully_shard(transformer_block, **fsdp_config, reshard_after_forward=reshard_after_forward)
+fully_shard(model, **fsdp_config)</code></pre>
+<p><code>reshard_after_forward</code> 控制「前向后是否立刻丢弃完整参数」——用通信换显存。PP 场景下默认不 reshard，避免每个 micro-batch 重复 all-gather：</p>
+<div class="code-label">torchtitan · distributed/fsdp.py:28</div>
+<pre><code class="language-python">match reshard_after_forward_policy:
+    case "always": return True
+    case "never":  return False
+    case "default":
+        # PP 下不 reshard，避免每 micro-batch 重复且无法重叠的 all-gather
+        return not pp_enabled</code></pre>
+<div class="callout">
+<p><span class="label">💡 FSDP2 vs FSDP1</span> FSDP1 把一整个单元的参数压成一个大 flat buffer 再切；<strong>FSDP2 是 per-parameter 分片</strong>——每个参数独立成为沿 dim-0 切分的 <code>DTensor</code>（<code>distribute_tensor(param, mesh, [Shard(0)])</code>）。这让混合精度、<code>reshard_after_forward</code>、与 TP/PP/EP 的组合都更干净，也是 torchtitan 选 FSDP2 的原因。</p>
+</div>
+
+<h2 class="section" id="megatron"><span class="num">05</span>Megatron：DistributedOptimizer 停在 ZeRO-1</h2>
+<p>Megatron 的路线不同：它不切常驻参数，只把<strong>优化器状态</strong>按 DP rank 切分（ZeRO-1），梯度走 reduce-scatter。先看它如何把梯度 buffer 平均切给每个 rank：</p>
+<div class="code-label">Megatron-LM · optimizer/distrib_optimizer.py:188（_build_model_gbuf_range）</div>
+<pre><code class="language-python">gbuf_size = bucket.grad_data.numel()
+max_gbuf_range_size = gbuf_size // data_parallel_world_size   # 平均切成 N 段
+# 第 r 段归 rank r “拥有”：它只 reduce 这段梯度、只为这段建 fp32 master + Adam 状态
+gbuf_world_range = gbuf_world_all_ranges[data_parallel_rank]</code></pre>
+<p>每个 rank 只为自己那段建 fp32 master 参数和优化器状态——这就是优化器状态降到 $1/N$ 的地方：</p>
+<div class="code-label">Megatron-LM · optimizer/distrib_optimizer.py:388（只为本 rank 的 shard 建 master）</div>
+<pre><code class="language-python">shard_model_param = model_param.detach().view(-1)[param_range.start : param_range.end]
+shard_main_param  = shard_model_param.clone().float()   # 只覆盖本 rank 的 shard → 状态 1/N</code></pre>
+<p>梯度归约用 reduce-scatter（每 rank 只收到自己 shard 的梯度），更新后再 all-gather 把完整参数拼回供下次前向：</p>
+<div class="code-label">Megatron-LM · distributed/param_and_grad_buffer.py:617 / :420</div>
+<pre><code class="language-python"># 反向：开启 distributed optimizer → reduce-scatter（否则退化成 DDP 的 all-reduce）
+grad_reduce_handle = dist_reduce_scatter_func(local_data_view, bucket.grad_data, ...)
+# step 后：每 rank 只更新了自己 shard 的参数，再 all-gather 拼回完整 param_data
+dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=async_op)</code></pre>
+<div class="callout warn">
+<p><span class="label">⚠️ 关键区别</span> Megatron <code>DistributedOptimizer</code> <strong>保留完整参数副本</strong>（只切优化器状态），所以它是 ZeRO-1，不等价于 FSDP/ZeRO-3。它通信更省，但显存降幅小于 FSDP（少降了参数和梯度那两块 $2P$）。</p>
+</div>
+
+<h2 class="section" id="comm"><span class="num">06</span>通信量：为什么 FSDP ≈ DP 的 1.5×</h2>
+<p>回忆 M0 的恒等式 <strong>all-reduce = reduce-scatter + all-gather</strong>，每个的通信量都是 $P$ 量级：</p>
+<ul>
+<li><strong>DDP</strong>：每 step 一次梯度 all-reduce ≈ $2P$（reduce-scatter $P$ + all-gather $P$）。</li>
+<li><strong>FSDP / ZeRO-3</strong>：前向 all-gather 参数（$P$）+ 反向 all-gather 参数（$P$）+ 反向 reduce-scatter 梯度（$P$）= $3P$。</li>
+</ul>
+<p>$3P / 2P = 1.5$。<strong>多出的那 0.5× 是前向那次额外的参数 all-gather</strong>，换来的是参数、梯度、优化器状态全部降到 $1/N$。在显存吃紧时这笔交易非常划算——而且这些 all-gather 可以靠<strong>预取（prefetch）</strong>与计算重叠，实际墙钟开销远小于 1.5×。</p>
+
+<h2 class="section" id="equiv"><span class="num">07</span>FSDP ≡ ZeRO-3</h2>
+<p>两者算法<strong>完全等价</strong>：参数、梯度、优化器状态全部沿 DP 维切成 $1/N$；用到完整参数时临时 all-gather、用完丢弃；梯度 reduce-scatter 后各管各的 shard。差异只在实现：</p>
+<table>
+<thead><tr><th></th><th>DeepSpeed ZeRO-3</th><th>PyTorch FSDP2（torchtitan）</th></tr></thead>
+<tbody>
+<tr><td>分片粒度</td><td>参数 flat partition + hook</td><td>per-parameter <code>DTensor</code>（<code>Shard(0)</code>）</td></tr>
+<tr><td>通信单元</td><td>参数分组</td><td><code>fully_shard(module)</code> 决定</td></tr>
+<tr><td>混合精度</td><td>ZeRO config</td><td><code>MixedPrecisionPolicy</code></td></tr>
+</tbody>
+</table>
+
+<h2 class="section" id="compare"><span class="num">08</span>对比与启用</h2>
+<div class="two-col">
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span> FSDP2（ZeRO-3）</h4>
+    <ul>
+      <li>切参数 + 梯度 + 优化器状态 → $16P/N$</li>
+      <li>per-parameter DTensor 分片</li>
+      <li><code>--parallelism.data_parallel_shard_degree N</code></li>
+      <li>配 <code>replicate_degree>1</code> = HSDP</li>
+    </ul>
+  </div>
+  <div class="card mega"><h4><span class="badge mega">Megatron</span> DistributedOptimizer（ZeRO-1）</h4>
+    <ul>
+      <li>只切优化器状态 → $4P + 12P/N$</li>
+      <li>梯度 reduce-scatter，参数仍完整</li>
+      <li><code>--use-distributed-optimizer</code></li>
+      <li><code>--overlap-grad-reduce</code> / <code>--overlap-param-gather</code></li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. ZeRO-1/2/3 分别切什么？为什么先切优化器状态？<br>
+2. FSDP 前向为什么用完参数要立刻 reshard 丢弃？省的是什么显存？<br>
+3. 为什么 FSDP 通信量约是 DDP 的 1.5×？多出来的 0.5× 是哪一步？<br>
+4. Megatron 的 <code>DistributedOptimizer</code> 和 FSDP 等价吗？差在哪一块显存？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/dp';return false;"><div class="nl">← 上一章</div><div class="nt">M1 · 数据并行 DP</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/tp';return false;"><div class="nl">下一章 →</div><div class="nt">M3 · 张量并行 TP + SP</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M2 FSDP / ZeRO · <code>infra/parallize/02-fsdp</code></p>
+  <p class="footnote">显存系数为标准混合精度 + Adam 估算；代码片段引自 torchtitan 与 Megatron-LM 真实源码。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

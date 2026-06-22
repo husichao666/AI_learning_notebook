@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M0 · 基础铺垫：显存账本 + 通信原语</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 0 · 基础铺垫</span>
+  <h1>显存花在哪、卡之间怎么传数据</h1>
+  <p class="lead">在学任何一种并行之前，先建立两块地基：一次训练 step 的<strong>显存账本</strong>，以及卡间通信的<strong>集合通信原语</strong>。后面 DP / FSDP / TP / PP / CP / EP 全是在这两件事上做文章。</p>
+  <div class="meta-row">
+    <span class="tag">🧮 16 字节/参数</span>
+    <span class="tag">🔁 all-reduce = reduce-scatter + all-gather</span>
+    <span class="tag">🔌 NVLink vs InfiniBand</span>
+    <span class="tag">📊 MFU / bubble / overlap</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="why"><span class="num">01</span>为什么需要并行：两堵墙</h2>
+<p>单卡训练大模型会撞上两堵墙：</p>
+<ul>
+<li><strong>显存墙</strong>：模型参数、梯度、优化器状态、激活值加起来远超单卡显存（H100 也只有 80GB）。一个 7B 模型光优化器状态就要 ~84GB——单卡装不下。</li>
+<li><strong>算力墙</strong>：就算装得下，单卡算几万亿 token 要几十年。必须用成百上千张卡同时算。</li>
+</ul>
+<p>并行的本质就是：<strong>把「模型状态」和「计算」拆开，摊到多张卡上</strong>。拆什么、怎么拆、拆完怎么把结果对齐——就是整本手册的内容。要理解拆什么，先看清显存到底花在哪。</p>
+
+<h2 class="section" id="memory"><span class="num">02</span>显存账本：一次训练 step 的显存去向</h2>
+<p>训练时显存由四部分构成，记参数量为 $P$：</p>
+<table>
+<thead><tr><th>组成</th><th>是什么</th><th>混合精度 + Adam 下的大小</th></tr></thead>
+<tbody>
+<tr><td><strong>参数 weights</strong></td><td>前向用的模型权重（bf16/fp16）</td><td>$2P$ 字节</td></tr>
+<tr><td><strong>梯度 gradients</strong></td><td>反向算出的梯度（bf16/fp16）</td><td>$2P$ 字节</td></tr>
+<tr><td><strong>优化器状态 optimizer states</strong></td><td>fp32 master 权重 + Adam 一阶 $m$ + 二阶 $v$</td><td>$4P + 4P + 4P = 12P$ 字节</td></tr>
+<tr><td><strong>激活值 activations</strong></td><td>前向中间结果，反向要用</td><td>单独计算，∝ batch × seq × 层数</td></tr>
+</tbody>
+</table>
+
+<p>把前三项（<em>模型状态</em>）加起来，每个参数要 <strong>16 字节</strong>：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 150" role="img" aria-label="混合精度 Adam 下每参数 16 字节的构成">
+  <text x="20" y="30" fill="#eaeefb" font-size="14" font-weight="600">每个参数的「模型状态」开销 = 16 字节</text>
+  <!-- bar segments, total width 760 for 16 bytes => 47.5/byte -->
+  <g font-size="12.5" text-anchor="middle">
+    <rect x="20"  y="48" width="95"  height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="67"  y="70" fill="#cdd5ff">fp16 权重</text><text x="67"  y="86" fill="#9aa3b2">2B</text>
+    <rect x="117" y="48" width="95"  height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="164" y="70" fill="#cdd5ff">fp16 梯度</text><text x="164" y="86" fill="#9aa3b2">2B</text>
+    <rect x="214" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="309" y="70" fill="#bbf7d0">fp32 master 权重</text><text x="309" y="86" fill="#86efac">4B</text>
+    <rect x="406" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="501" y="70" fill="#bbf7d0">Adam 一阶 m</text><text x="501" y="86" fill="#86efac">4B</text>
+    <rect x="598" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="693" y="70" fill="#bbf7d0">Adam 二阶 v</text><text x="693" y="86" fill="#86efac">4B</text>
+  </g>
+  <text x="20" y="120" fill="#9aa3b2" font-size="12.5">└─ 参数 2B + 梯度 2B ─┘</text>
+  <text x="214" y="120" fill="#86efac" font-size="12.5">└──────────── 优化器状态 12B（最大头）────────────┘</text>
+  <text x="20" y="142" fill="#fbbf24" font-size="12">激活值不在此图内，单独占显存，且随 batch×seq 增长——长序列训练的另一大头。</text>
+</svg>
+<div class="cap">7B 模型：模型状态 = 7e9 × 16B ≈ <strong>112 GB</strong>，单卡放不下。注意「优化器状态」占了 12/16 = 75%——这正是 ZeRO/FSDP 第一刀切它的原因。</div>
+</div>
+
+<div class="callout key">
+<p><span class="label">🔑 记住这张账本</span></p>
+<p>后面每种并行都对应「切账本里的某一项」：<strong>FSDP/ZeRO 切模型状态</strong>（参数+梯度+优化器状态）；<strong>TP/PP 切参数与对应计算</strong>；<strong>SP/CP 切激活值</strong>（按序列维）。看不懂某个并行省了什么时，回来对照这张表。</p>
+</div>
+
+<h2 class="section" id="collective"><span class="num">03</span>通信原语：并行的「语言」</h2>
+<p>多卡协作靠<strong>集合通信（collective communication）</strong>。理解下面 6 个原语，后面所有并行的通信都能看懂。设有 4 张卡，每卡持有一份数据：</p>
+
+<table>
+<thead><tr><th>原语</th><th>做什么</th><th>典型用途</th></tr></thead>
+<tbody>
+<tr><td><code>all-reduce</code></td><td>各卡数据按元素求和（或取 max），结果<strong>每卡都得到完整一份</strong></td><td>DP 梯度同步、TP 行切层输出合并</td></tr>
+<tr><td><code>reduce-scatter</code></td><td>求和后<strong>每卡只保留 1/N 分片</strong></td><td>FSDP 梯度归约、SP 输出</td></tr>
+<tr><td><code>all-gather</code></td><td>把各卡的分片<strong>拼成完整一份，每卡都有</strong></td><td>FSDP 还原参数、SP 还原激活</td></tr>
+<tr><td><code>broadcast</code></td><td>一张卡的数据复制到所有卡</td><td>初始化、PP 传 token 数</td></tr>
+<tr><td><code>all-to-all</code></td><td>每卡把自己的数据按目标切块，<strong>互相交换</strong>（转置）</td><td>MoE 专家并行 dispatch/combine、Ulysses CP</td></tr>
+<tr><td><code>send / recv</code></td><td>点对点，一张卡发给另一张卡</td><td>PP 跨 stage 传激活/梯度</td></tr>
+</tbody>
+</table>
+
+<div class="callout key">
+<p><span class="label">🔑 最重要的恒等式</span></p>
+<p style="margin:8px 0 0"><strong>all-reduce = reduce-scatter + all-gather</strong></p>
+<p>这就是为什么 FSDP（reduce-scatter 梯度 + all-gather 参数）的通信量大约是 DDP（一次 all-reduce）的 1.5×——它把 all-reduce 拆成两半，中间插入了「只持有分片」的省显存窗口。后面会反复用到这个关系。</p>
+</div>
+
+<div class="diagram">
+<svg viewBox="0 0 820 300" role="img" aria-label="all-reduce / reduce-scatter / all-gather 三个原语示意">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <!-- all-reduce -->
+  <text x="135" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-reduce</text>
+  <g font-size="11" text-anchor="middle">
+    <rect x="40"  y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="60"  y="55" fill="#d7dbe4">a₀</text>
+    <rect x="90"  y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="110" y="55" fill="#d7dbe4">a₁</text>
+    <rect x="140" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="160" y="55" fill="#d7dbe4">a₂</text>
+    <rect x="190" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="210" y="55" fill="#d7dbe4">a₃</text>
+    <line x1="135" y1="68" x2="135" y2="92" stroke="#64748b" marker-end="url(#a)"/>
+    <rect x="40"  y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="60"  y="113" fill="#cdd5ff">Σ</text>
+    <rect x="90"  y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="110" y="113" fill="#cdd5ff">Σ</text>
+    <rect x="140" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="160" y="113" fill="#cdd5ff">Σ</text>
+    <rect x="190" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="210" y="113" fill="#cdd5ff">Σ</text>
+  </g>
+  <text x="135" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">每卡都得到全和 Σ</text>
+  <!-- reduce-scatter -->
+  <text x="410" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">reduce-scatter</text>
+  <g font-size="11" text-anchor="middle">
+    <rect x="315" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="335" y="55" fill="#d7dbe4">a₀</text>
+    <rect x="365" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="385" y="55" fill="#d7dbe4">a₁</text>
+    <rect x="415" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="435" y="55" fill="#d7dbe4">a₂</text>
+    <rect x="465" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="485" y="55" fill="#d7dbe4">a₃</text>
+    <line x1="410" y1="68" x2="410" y2="92" stroke="#64748b" marker-end="url(#a)"/>
+    <rect x="315" y="96" width="40" height="26" rx="4" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="335" y="113" fill="#bbf7d0">Σ₀</text>
+    <rect x="365" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="385" y="113" fill="#4b5468">·</text>
+    <rect x="415" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="435" y="113" fill="#4b5468">·</text>
+    <rect x="465" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="485" y="113" fill="#4b5468">·</text>
+  </g>
+  <text x="410" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">每卡只留自己那 1/N 分片的和</text>
+  <!-- all-gather -->
+  <text x="685" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-gather</text>
+  <g font-size="11" text-anchor="middle">
+    <rect x="590" y="38" width="40" height="26" rx="4" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="610" y="55" fill="#bbf7d0">b₀</text>
+    <rect x="640" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="660" y="55" fill="#4b5468">·</text>
+    <rect x="690" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="710" y="55" fill="#4b5468">·</text>
+    <rect x="740" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="760" y="55" fill="#4b5468">·</text>
+    <line x1="685" y1="68" x2="685" y2="92" stroke="#64748b" marker-end="url(#a)"/>
+    <rect x="590" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="610" y="113" fill="#cdd5ff">b₀</text>
+    <rect x="640" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="660" y="113" fill="#cdd5ff">b₁</text>
+    <rect x="690" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="710" y="113" fill="#cdd5ff">b₂</text>
+    <rect x="740" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="760" y="113" fill="#cdd5ff">b₃</text>
+  </g>
+  <text x="685" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">各卡分片拼成完整，每卡都有</text>
+  <!-- identity -->
+  <rect x="120" y="178" width="580" height="44" rx="10" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
+  <text x="410" y="205" text-anchor="middle" fill="#bbf7d0" font-size="14" font-weight="700">all-reduce ≡ reduce-scatter ∘ all-gather</text>
+  <text x="410" y="250" text-anchor="middle" fill="#9aa3b2" font-size="12">先 reduce-scatter 把和切成分片（每卡省显存），再 all-gather 拼回完整——这就是 FSDP 的核心。</text>
+</svg>
+<div class="cap">三个最常用的归约/聚合原语，以及把它们联系起来的恒等式。</div>
+</div>
+
+<p>这些原语在两个框架里都有最薄的封装。比如 Megatron 的 TP all-reduce 就是一行：</p>
+<div class="code-label">Megatron-LM · megatron/core/tensor_parallel/mappings.py:22</div>
+<pre><code class="language-python">def _reduce(input_, group):
+    """All-reduce the input tensor across model parallel group."""
+    if group.size() == 1:
+        return input_
+    torch.distributed.all_reduce(input_.contiguous(), group=group)
+    return input_</code></pre>
+<p>torchtitan 则把 loss 的归约包成 DTensor 友好的工具（注意它用的就是 functional collective 的 <code>all_reduce</code>）：</p>
+<div class="code-label">torchtitan · torchtitan/distributed/utils.py:30</div>
+<pre><code class="language-python">def _dist_reduce(x, reduceOp, mesh, extra_pg):
+    if isinstance(x, DTensor):
+        # functional collectives 不支持 DTensor 输入，先取本地张量
+        x = x.to_local()
+    return float(funcol.all_reduce(x, reduceOp=reduceOp, group=mesh).item())</code></pre>
+
+<h2 class="section" id="hardware"><span class="num">04</span>硬件拓扑：带宽决定「谁放哪」</h2>
+<p>卡间带宽分层级，差距极大，这直接决定每种并行该放在哪一层：</p>
+<table>
+<thead><tr><th>层级</th><th>互连</th><th>量级带宽</th><th>适合放</th></tr></thead>
+<tbody>
+<tr><td>单机内（intra-node）</td><td>NVLink / NVSwitch</td><td>数百 GB/s ~ TB/s</td><td><strong>TP / EP</strong>（通信最密，每层都通信）</td></tr>
+<tr><td>跨机（inter-node）</td><td>InfiniBand / RoCE</td><td>数十 ~ 数百 GB/s（远低于 NVLink）</td><td><strong>PP / DP / FSDP</strong>（通信稀疏或可与计算重叠）</td></tr>
+</tbody>
+</table>
+<div class="callout">
+<p><span class="label">💡 核心放置直觉</span> 通信越频繁、越在关键路径上的并行（TP），越要放进高带宽的 NVLink 域（典型 TP≤8，正好一台机器）；通信稀疏、能和计算重叠的（PP / DP），可以容忍跨机的低带宽。这条原则会在 <strong>M7 nD 组合</strong> 里反复出现。</p>
+</div>
+
+<h2 class="section" id="metrics"><span class="num">05</span>衡量指标：怎么判断快不快</h2>
+<ul>
+<li><strong>吞吐 throughput</strong>：每秒处理多少 token（tokens/s）。最终目标。</li>
+<li><strong>MFU（Model FLOPs Utilization）</strong>：实际算力利用率 = 实测 FLOPs / 硬件峰值 FLOPs。40~50% 算不错，越高越好。</li>
+<li><strong>气泡 bubble</strong>：流水线并行里 GPU 干等的空闲时间占比（M4 详谈）。</li>
+<li><strong>通信-计算重叠 overlap</strong>：让集合通信和计算同时进行，把通信时间「藏」在计算后面。这是所有高效并行实现的命脉——后面会看到 FSDP 预取参数、DP 反向边算边 all-reduce、PP 用异步 p2p，全是为了 overlap。</li>
+</ul>
+
+<h2 class="section" id="map"><span class="num">06</span>本手册地图：每种并行切账本里的什么</h2>
+<p>有了显存账本和通信原语，整本手册可以一句话概括成「<strong>切账本里的不同项，用不同原语对齐结果</strong>」：</p>
+<table>
+<thead><tr><th>模块</th><th>切账本里的</th><th>主要通信原语</th></tr></thead>
+<tbody>
+<tr><td>M1 DP</td><td>切数据（模型状态不切，冗余）</td><td>all-reduce（梯度）</td></tr>
+<tr><td>M2 FSDP/ZeRO</td><td>切模型状态（参数+梯度+优化器状态）</td><td>all-gather + reduce-scatter</td></tr>
+<tr><td>M3 TP+SP</td><td>切层内参数与计算；SP 切激活</td><td>all-reduce / all-gather+reduce-scatter</td></tr>
+<tr><td>M4 PP</td><td>切层（不同层放不同卡）</td><td>send / recv</td></tr>
+<tr><td>M5 CP</td><td>切序列维的激活</td><td>ring p2p / all-to-all</td></tr>
+<tr><td>M6 EP</td><td>切专家（MoE）</td><td>all-to-all</td></tr>
+</tbody>
+</table>
+<p>接下来从最简单的 <strong>M1 数据并行</strong> 开始，它是后面一切的起点。</p>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/foundations';return false;">　</a>
+  <a class="next" href="#" onclick="parent.location.hash='#/dp';return false;"><div class="nl">下一章 →</div><div class="nt">M1 · 数据并行 DP</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M0 基础铺垫 · <code>infra/parallize/00-foundations</code></p>
+  <p class="footnote">显存账本为标准混合精度 + Adam 估算；代码片段引自 Megatron-LM 与 torchtitan 真实源码。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

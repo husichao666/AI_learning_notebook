@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M1 · 数据并行 DP</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 1 · 数据并行</span>
+  <h1>数据并行 DP：复制模型，切数据</h1>
+  <p class="lead">最简单的并行：每张卡放一份完整模型，把 batch 切成多份各算各的，再用一次 all-reduce 把梯度平均。它只解决「算得慢」，不解决「装不下」——但理解它是理解后面一切的起点。</p>
+  <div class="meta-row">
+    <span class="tag">🔁 梯度 all-reduce</span>
+    <span class="tag">🪣 bucket + 反向重叠</span>
+    <span class="tag">🚫 省不了显存</span>
+    <span class="tag">🟢 Megatron DDP</span>
+    <span class="tag">🟠 torchtitan</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="idea"><span class="num">01</span>核心思想</h2>
+<p>数据并行（Data Parallel, DP）的设定：<strong>模型放得下单卡，但想用 N 张卡加速</strong>。做法三步：</p>
+<ol>
+<li><strong>复制</strong>：每张卡持有一份完整、相同的模型（参数、梯度、优化器状态都各存一份）。</li>
+<li><strong>切数据</strong>：把一个 global batch 切成 N 个 micro-shard，每卡喂自己那份，独立做前向+反向。</li>
+<li><strong>同步梯度</strong>：各卡算出的梯度不同，用一次 <code>all-reduce</code> 求平均，使所有卡的梯度一致 → 优化器更新后模型仍然完全相同。</li>
+</ol>
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="数据并行流程：复制模型、切数据、all-reduce 梯度">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="60" y="28" fill="#9aa3b2" font-size="12">global batch</text>
+  <rect x="40" y="36" width="120" height="30" rx="5" fill="#1c2030" stroke="#475569"/><text x="100" y="56" text-anchor="middle" fill="#d7dbe4" font-size="12">B 条样本</text>
+  <line x1="100" y1="66" x2="100" y2="86" stroke="#64748b" marker-end="url(#a)"/>
+  <text x="100" y="82" text-anchor="middle" fill="#9aa3b2" font-size="10">切 N 份</text>
+  <!-- two GPU lanes -->
+  <g>
+    <rect x="40" y="92" width="142" height="58" rx="8" fill="#161922" stroke="#5b6bb0"/>
+    <text x="111" y="112" text-anchor="middle" fill="#aab6ff" font-size="12" font-weight="600">GPU 0</text>
+    <text x="111" y="130" text-anchor="middle" fill="#9aa3b2" font-size="11">完整模型 · batch[0]</text>
+    <text x="111" y="144" text-anchor="middle" fill="#9aa3b2" font-size="11">→ 局部梯度 g₀</text>
+    <rect x="198" y="92" width="142" height="58" rx="8" fill="#161922" stroke="#5b6bb0"/>
+    <text x="269" y="112" text-anchor="middle" fill="#aab6ff" font-size="12" font-weight="600">GPU 1</text>
+    <text x="269" y="130" text-anchor="middle" fill="#9aa3b2" font-size="11">完整模型 · batch[1]</text>
+    <text x="269" y="144" text-anchor="middle" fill="#9aa3b2" font-size="11">→ 局部梯度 g₁</text>
+  </g>
+  <!-- all-reduce -->
+  <line x1="350" y1="121" x2="396" y2="121" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="400" y="98" width="180" height="46" rx="9" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/>
+  <text x="490" y="118" text-anchor="middle" fill="#cdd5ff" font-size="12.5" font-weight="600">all-reduce 梯度</text>
+  <text x="490" y="135" text-anchor="middle" fill="#fff" font-size="12">ḡ = (g₀+g₁)/N</text>
+  <line x1="580" y1="121" x2="626" y2="121" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="630" y="98" width="160" height="46" rx="9" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/>
+  <text x="710" y="118" text-anchor="middle" fill="#bbf7d0" font-size="12.5" font-weight="600">各卡用 ḡ 更新</text>
+  <text x="710" y="135" text-anchor="middle" fill="#86efac" font-size="11">模型保持一致</text>
+  <text x="40" y="185" fill="#fbbf24" font-size="12">关键：all-reduce 后每张卡拿到的是<tspan font-weight="700"> 完整且相同 </tspan>的平均梯度 → 更新后模型不发散。</text>
+  <text x="40" y="212" fill="#9aa3b2" font-size="12">等价于：N 卡 DP 跑 batch=B，相当于单卡跑 batch=N×B（global batch 放大 N 倍）。</text>
+</svg>
+<div class="cap">DP 的一个训练 step：复制 → 切数据 → all-reduce 梯度 → 同步更新。</div>
+</div>
+
+<h2 class="section" id="bucket"><span class="num">02</span>Megatron-LM：手写 DDP 的 bucket 与反向重叠</h2>
+<p>Megatron 自己实现了一套经典 DDP，是把机制讲透的最佳样本。它的精髓不在「all-reduce 梯度」这句话，而在<strong>怎么把通信藏进反向计算里</strong>。三个关键设计：</p>
+
+<h3>① 连续梯度 buffer + bucket 分桶</h3>
+<p>所有参数的梯度不是各自为政，而是预分配进<strong>一整块连续显存</strong>，每个 <code>param.main_grad</code> 指向其中一段切片。再把参数按<strong>反向传播的逆序</strong>切成若干 bucket：</p>
+<div class="code-label">Megatron-LM · param_and_grad_buffer.py（连续 buffer 分配 :1068）</div>
+<pre><code class="language-python">self.grad_data = torch.zeros(self.numel, dtype=self.grad_dtype,
+    device=torch.cuda.current_device(), requires_grad=False)
+# 之后每个 param.main_grad 被重指向 grad_data 的一段切片</code></pre>
+<p>为什么逆序分桶？反向传播从最后一层往前算，<strong>先算完的层先组成 bucket、就能先发起通信</strong>，而更前面的层还在计算——通信和计算因此能重叠。</p>
+
+<h3>② 梯度算完即标记 ready，bucket 满即异步通信</h3>
+<p>每个参数挂一个 backward post-hook：梯度一算完就累加进连续 buffer，并标记该参数 ready。当一个 bucket 内所有参数都 ready，立刻发起<strong>异步</strong> all-reduce（或 reduce-scatter）：</p>
+<div class="code-label">Megatron-LM · param_and_grad_buffer.py:753（register_grad_ready）+ :538（start_grad_sync）</div>
+<pre><code class="language-python">def register_grad_ready(self, param, force_all_reduce=False):
+    if self.is_last_microbatch:
+        self.per_param_grad_ready_counts[param] += 1
+        # 本 bucket 所有 param 都 ready → 立即发起通信
+        if self.per_param_grad_ready_counts == self.golden_per_param_grad_ready_counts:
+            self.start_grad_sync(force_all_reduce=force_all_reduce)
+
+# start_grad_sync 内的核心分支：
+if self.ddp_config.use_distributed_optimizer and not force_all_reduce:
+    grad_reduce_handle = dist_reduce_scatter_func(   # = reduce_scatter_tensor (ZeRO 风格)
+        local_data_view, bucket.grad_data, op=reduce_op,
+        group=communication_group, async_op=async_op)
+else:
+    torch.distributed.all_reduce(                    # 经典 DDP：完整梯度
+        bucket.grad_data, op=reduce_op, group=communication_group, async_op=async_op)</code></pre>
+<div class="callout key">
+<p><span class="label">🔑 这就是 overlap</span> <code>async_op=True</code> 让 all-reduce 在 NCCL stream 上异步进行，与<strong>更前面层仍在做的反向计算</strong>并行。等所有反向结束，再 <code>wait()</code> 收尾。理想情况下通信时间被计算完全掩盖。这也解释了为什么纯 DP 是「省不了显存但很能加速」的并行。</p>
+</div>
+
+<h3>③ 梯度累积时用 no_sync 跳过通信</h3>
+<p>做梯度累积（多个 micro-batch 攒一次更新）时，前面的 micro-batch 不需要通信，只在最后一个才发一次：</p>
+<div class="code-label">Megatron-LM · distributed_data_parallel.py:463</div>
+<pre><code class="language-python">@contextmanager
+def no_sync(self):
+    for bucket_group in self.bucket_groups + self.expert_parallel_bucket_groups:
+        bucket_group.is_last_microbatch = False   # 关闭通信
+    try:
+        yield
+    finally:
+        for bucket_group in self.bucket_groups + self.expert_parallel_bucket_groups:
+            bucket_group.is_last_microbatch = True</code></pre>
+
+<h2 class="section" id="titan"><span class="num">03</span>torchtitan：DP 已被「收编」进 FSDP2</h2>
+<div class="callout warn">
+<p><span class="label">📝 一个会让初学者意外的事实</span> torchtitan 当前版本里<strong>没有独立的 DDP / replicate 代码</strong>。「数据复制」被表达为 device mesh 的一个轴 <code>dp_replicate</code>，由 FSDP2 在该轴上做 <code>Replicate</code> 放置来实现——当分片度 <code>dp_shard=1</code> 时，分片是 no-op，整体就退化为纯 DDP 的复制语义。</p>
+</div>
+<p>它用 <code>ParallelDims</code> 把 <code>dp_replicate</code> 和 <code>dp_shard</code> 放进同一个 mesh，应用入口按是否启用复制轴来决定传 1D 还是 2D mesh：</p>
+<div class="code-label">torchtitan · models/llama3/parallelize.py:96</div>
+<pre><code class="language-python"># dp_replicate>1 → 传 2D mesh（HSDP）；否则只用 fsdp 轴
+names = ["dp_replicate", "fsdp"] if parallel_dims.dp_replicate_enabled else ["fsdp"]
+dp_mesh = parallel_dims.get_mesh(names)
+apply_fsdp(model, dp_mesh, ...)
+if parallel_dims.dp_replicate_enabled:
+    logger.info("Applied HSDP to the model")   # replicate + shard
+else:
+    logger.info("Applied FSDP to the model")
+# dp_shard == 1 时，fsdp 轴上分片为 no-op → 行为等同纯 DDP</code></pre>
+<p>由于走的是 FSDP2 的归约通路，torchtitan 只需关掉 FSDP 默认的 1/N 梯度除法，自己按全局有效 token 数来缩放 loss：</p>
+<div class="code-label">torchtitan · distributed/fsdp.py:11</div>
+<pre><code class="language-python">def disable_fsdp_gradient_division(model):
+    for module in model.modules():
+        if isinstance(module, FSDPModule):
+            module.set_gradient_divide_factor(1.0)</code></pre>
+<p>配置上，两个 degree 字段就涵盖了 DDP / FSDP / HSDP 三种形态：</p>
+<div class="code-label">torchtitan · config/configs.py</div>
+<pre><code class="language-python">data_parallel_replicate_degree: int = 1   # >1 → 复制；与 shard>1 同开 = HSDP
+data_parallel_shard_degree: int = -1      # >1 → 分片(FSDP)；1 = 关闭分片(纯 DDP)；-1 = 吃掉剩余 rank
+# 纯 DDP：  --parallelism.data_parallel_replicate_degree N --parallelism.data_parallel_shard_degree 1
+# 纯 FSDP： --parallelism.data_parallel_shard_degree N</code></pre>
+
+<h2 class="section" id="nomem"><span class="num">04</span>为什么 DP 省不了显存</h2>
+<p>这是 DP 最重要的局限，也是后面所有「切模型状态」并行存在的理由。在纯 DDP 下，每张卡都持有<strong>完整的</strong>：参数（$2P$）、梯度（$2P$）、优化器状态（$12P$）。all-reduce 只是让梯度数值一致，并没有让任何一张卡少存东西：</p>
+<div class="code-label">Megatron-LM · param_and_grad_buffer.py:1068（grad buffer 按整模型 numel 分配）</div>
+<pre><code class="language-python"># grad_data 的大小 = 整个模型的参数量，每张卡都分配这么大
+self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
+# all_reduce 后每 rank 仍持有完整梯度，参数/优化器状态也不分片</code></pre>
+<div class="callout warn">
+<p><span class="label">⚠️ 结论</span> N 卡 DP 的<strong>单卡显存 = 单卡训练的显存</strong>（约 $16P$ 字节模型状态 + 激活），完全不随 N 下降。DP 切的是<em>数据和计算</em>，不切<em>模型状态</em>。想让 $16P$ 也摊薄到 $16P/N$，就得进入下一章——把优化器状态、梯度、参数也切开（FSDP / ZeRO）。</p>
+</div>
+
+<h2 class="section" id="compare"><span class="num">05</span>两套实现对比</h2>
+<div class="two-col">
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 手写 DDP</h4>
+    <ul>
+      <li>连续 grad buffer + 逆序 bucket</li>
+      <li>backward post-hook → 异步 all-reduce</li>
+      <li>通信与反向计算显式重叠</li>
+      <li><code>no_sync()</code> 处理梯度累积</li>
+      <li>机制透明，最适合学习</li>
+    </ul>
+  </div>
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span> 收编进 FSDP2</h4>
+    <ul>
+      <li>无独立 DDP，<code>dp_replicate</code> = mesh 一个轴</li>
+      <li>FSDP2 在该轴做 <code>Replicate</code>（dp_shard=1 即纯复制）</li>
+      <li><code>disable_fsdp_gradient_division</code> + 按 token 缩放</li>
+      <li>DDP / FSDP / HSDP 用两个 degree 字段统一表达</li>
+      <li>组合性强（与 TP/PP/CP 经 DTensor 拼装）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. DP 为什么省不了显存？all-reduce 之后每张卡持有的梯度是完整的还是分片的？<br>
+2. Megatron 为什么把参数按反向<strong>逆序</strong>分 bucket？这对 overlap 有什么帮助？<br>
+3. 8 卡 DP、每卡 batch=4，global batch 是多少？<br>
+4. torchtitan 里 <code>data_parallel_shard_degree=1</code> 配 <code>data_parallel_replicate_degree=8</code> 等价于什么并行？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/foundations';return false;"><div class="nl">← 上一章</div><div class="nt">M0 · 基础铺垫</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/fsdp';return false;"><div class="nl">下一章 →</div><div class="nt">M2 · FSDP / ZeRO</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M1 数据并行 DP · <code>infra/parallize/01-dp</code></p>
+  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码，行号见各 <code>code-label</code>；为讲解做了精简。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

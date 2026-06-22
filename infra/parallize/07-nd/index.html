@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M7 · nD 组合并行 + 工程调优</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 7 · nD 组合 + 工程</span>
+  <h1>把它们拼起来：nD 并行与选型</h1>
+  <p class="lead">真实的大模型训练从来不是单一并行，而是 DP × FSDP × TP × PP × CP × EP 的<strong>组合</strong>。一个多维 DeviceMesh 描述 GPU 布局，一套放置原则决定谁放最内、谁放最外。这是全手册的收束。</p>
+  <div class="meta-row">
+    <span class="tag">🗺️ DeviceMesh / parallel_state</span>
+    <span class="tag">🎯 TP 最内 · PP 最外</span>
+    <span class="tag">🌳 选型决策树</span>
+    <span class="tag">⚙️ AC / fp8 / overlap</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="combine"><span class="num">01</span>真实训练 = 组合并行</h2>
+<p>前面六章每一种并行都解决一个特定问题，但单独用都不够：DP 不省显存、TP 不能跨机、PP 有气泡……所以实际训练把它们<strong>叠起来用</strong>，叫 3D / 4D / 5D 并行。比如一个经典配置：</p>
+<ul>
+<li>机内 8 卡做 <strong>TP</strong>（吃 NVLink 带宽）</li>
+<li>若干机做 <strong>PP</strong>（跨节点，通信稀疏）</li>
+<li>剩下的卡做 <strong>FSDP/DP</strong>（最外层，梯度可重叠）</li>
+<li>长序列再叠 <strong>CP</strong>，MoE 再叠 <strong>EP</strong></li>
+</ul>
+<p>关键问题变成：<strong>这成百上千张卡，谁和谁组成一个 TP 组、谁和谁组成 PP 组？</strong></p>
+
+<h2 class="section" id="mesh"><span class="num">02</span>DeviceMesh：用多维网格描述 GPU 布局</h2>
+<p>两个框架都用一个「多维网格」给每张卡分配一组坐标 $(\text{tp\_rank}, \text{dp\_rank}, \text{pp\_rank}, ...)$。以 16 卡、$\text{tp}=2,\text{dp}=4,\text{pp}=2$ 为例，全局 rank 由各维坐标和 <strong>stride</strong> 算出：</p>
+$$ \text{global\_rank} = \text{tp\_rank} + \text{dp\_rank}\times 2 + \text{pp\_rank}\times 8 $$
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="16 卡的 nD rank 布局：TP 最内、DP 中间、PP 最外">
+  <text x="20" y="22" fill="#eaeefb" font-size="13.5" font-weight="600">16 卡布局：tp=2（相邻）· dp=4（中间）· pp=2（跨度 8，跨节点）</text>
+  <!-- 16 cells in 2 rows of 8 (pp=0 top, pp=1 bottom) -->
+  <g font-size="11" text-anchor="middle">
+    <!-- pp=0 -->
+    <text x="20" y="62" fill="#9aa3b2" text-anchor="start" font-size="10">节点A (pp0)</text>
+    <!-- tp pairs colored -->
+    <g>
+      <rect x="120" y="48" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="138" y="68" fill="#cdd5ff">0</text><text x="176" y="68" fill="#cdd5ff">1</text>
+      <rect x="200" y="48" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="218" y="68" fill="#cdd5ff">2</text><text x="256" y="68" fill="#cdd5ff">3</text>
+      <rect x="280" y="48" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="298" y="68" fill="#cdd5ff">4</text><text x="336" y="68" fill="#cdd5ff">5</text>
+      <rect x="360" y="48" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="378" y="68" fill="#cdd5ff">6</text><text x="416" y="68" fill="#cdd5ff">7</text>
+    </g>
+    <!-- pp=1 -->
+    <text x="20" y="106" fill="#9aa3b2" text-anchor="start" font-size="10">节点B (pp1)</text>
+    <g>
+      <rect x="120" y="92" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="138" y="112" fill="#cdd5ff">8</text><text x="176" y="112" fill="#cdd5ff">9</text>
+      <rect x="200" y="92" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="218" y="112" fill="#cdd5ff">10</text><text x="256" y="112" fill="#cdd5ff">11</text>
+      <rect x="280" y="92" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="298" y="112" fill="#cdd5ff">12</text><text x="336" y="112" fill="#cdd5ff">13</text>
+      <rect x="360" y="92" width="74" height="30" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="378" y="112" fill="#cdd5ff">14</text><text x="416" y="112" fill="#cdd5ff">15</text>
+    </g>
+  </g>
+  <!-- legend -->
+  <rect x="470" y="44" width="330" height="150" rx="10" fill="#13161f" stroke="#262b3a"/>
+  <text x="486" y="66" fill="#cdd5ff" font-size="12"><tspan fill="#7c93ff" font-weight="700">蓝框</tspan> = 一个 TP 组（相邻 2 卡，stride 1）→ NVLink</text>
+  <text x="486" y="90" fill="#9aa3b2" font-size="12">DP 组 = {0,2,4,6} / {1,3,5,7} ...（stride 2）</text>
+  <text x="486" y="114" fill="#9aa3b2" font-size="12">PP 组 = {0,8} {1,9} ...（stride 8，跨节点）</text>
+  <text x="486" y="146" fill="#86efac" font-size="12" font-weight="600">规律：stride 最小的维放最内层（TP），</text>
+  <text x="486" y="166" fill="#86efac" font-size="12" font-weight="600">stride 最大的维放最外层（PP）。</text>
+  <text x="486" y="186" fill="#fbbf24" font-size="11">→ 通信最密的 TP 落在物理最近的卡上。</text>
+  <text x="20" y="230" fill="#9aa3b2" font-size="12">torchtitan 用 DeviceMesh 命名子网格，Megatron 用 RankGenerator + order 字符串，物理布局等价。</text>
+</svg>
+<div class="cap">nD 布局的核心：每张卡一组坐标，stride 小的维（TP）相邻、走 NVLink；stride 大的维（PP）跨节点。</div>
+</div>
+
+<h2 class="section" id="placement"><span class="num">03</span>放置原则：谁放最内、谁放最外</h2>
+<table>
+<thead><tr><th>维度</th><th>放哪层</th><th>为什么</th></tr></thead>
+<tbody>
+<tr><td><strong>TP / EP</strong></td><td>最内层（NVLink）</td><td>每层都通信、在关键路径、不可重叠 → 必须高带宽</td></tr>
+<tr><td><strong>CP</strong></td><td>中间层</td><td>注意力的 KV 通信较密，紧贴 TP（Megatron）或折进 FSDP（torchtitan）</td></tr>
+<tr><td><strong>DP / FSDP</strong></td><td>外层</td><td>每 step 一次、可与反向重叠 → 容忍较低带宽</td></tr>
+<tr><td><strong>PP</strong></td><td>最外层（跨节点）</td><td>只在 stage 边界传一次激活，通信量最小</td></tr>
+</tbody>
+</table>
+<p>Megatron 把这套顺序固化成一个字符串 <code>order='tp-cp-ep-dp-pp'</code>（最左 = stride 最小 = 最内层）：</p>
+<div class="code-label">Megatron-LM · core/parallel_state.py:561（initialize_model_parallel 默认 order）</div>
+<pre><code class="language-python">def initialize_model_parallel(..., order="tp-cp-ep-dp-pp"):
+    data_parallel_size = world_size // (tp * pp * cp)   # dp 由 world_size 反推
+    decoder_rank_generator = RankGenerator(
+        tp=tensor_model_parallel_size, ep=1, dp=data_parallel_size,
+        pp=pipeline_model_parallel_size, cp=context_parallel_size, order=order, ...)</code></pre>
+<p>torchtitan 用 <code>ParallelDims</code> 把 1 维 world mesh「拆」成多个命名子网格，tuple 顺序即放置顺序（左=最外 PP，右=最内 TP）：</p>
+<div class="code-label">torchtitan · distributed/parallel_dims.py:193</div>
+<pre><code class="language-python">full_dense_mesh = unflatten_mesh(
+    self._world_mesh,
+    ("pp", "dp_replicate", "fsdp", "tp"),          # 左→右 = 外→内
+    (self.pp, self.dp_replicate, fsdp, self.tp))
+# fsdp = dp_shard * cp（CP 折进 FSDP 维）</code></pre>
+<p>顶层 <code>parallelize_*</code> 按固定次序逐个施加并行，<strong>FSDP 永远最后、包在最外</strong>：</p>
+<div class="code-label">torchtitan · models/llama3/parallelize.py:41（施加顺序）</div>
+<pre><code class="language-python">if parallel_dims.cp_enabled:  apply_cp_to_forward(...)        # CP
+if parallel_dims.tp_enabled:  model.parallelize(...)          # TP
+if ac_config.mode != "none":  apply_ac(...)                   # 激活检查点
+if model_compile_enabled:     apply_compile(...)              # torch.compile
+apply_fsdp(model, dp_mesh, ...)                               # FSDP/HSDP（最外）</code></pre>
+
+<h2 class="section" id="decision"><span class="num">04</span>选型决策树</h2>
+<div class="diagram">
+<svg viewBox="0 0 820 300" role="img" aria-label="并行选型决策树">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g font-size="12" text-anchor="middle">
+    <rect x="320" y="20" width="180" height="38" rx="9" fill="#1c2030" stroke="#7c93ff"/><text x="410" y="44" fill="#cdd5ff">模型放得下单卡？</text>
+    <!-- yes -> DP/FSDP -->
+    <rect x="60" y="90" width="200" height="42" rx="9" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/><text x="160" y="108" fill="#bbf7d0">放得下 → DP / FSDP</text><text x="160" y="124" fill="#86efac" font-size="10.5">显存够 DP；不够上 FSDP</text>
+    <!-- no -> TP -->
+    <rect x="560" y="90" width="200" height="42" rx="9" fill="rgba(124,147,255,0.12)" stroke="#7c93ff"/><text x="660" y="108" fill="#cdd5ff">放不下 → 加 TP</text><text x="660" y="124" fill="#9aa3b2" font-size="10.5">单层太大，机内 NVLink</text>
+    <line x1="370" y1="58" x2="200" y2="86" stroke="#64748b" marker-end="url(#a)"/><text x="250" y="74" fill="#86efac" font-size="10">是</text>
+    <line x1="450" y1="58" x2="650" y2="86" stroke="#64748b" marker-end="url(#a)"/><text x="560" y="74" fill="#fbbf24" font-size="10">否</text>
+    <!-- next layer -->
+    <rect x="290" y="160" width="240" height="38" rx="9" fill="#1c2030" stroke="#475569"/><text x="410" y="184" fill="#d7dbe4">还是放不下 / 层数很多？</text>
+    <line x1="660" y1="132" x2="470" y2="158" stroke="#64748b" marker-end="url(#a)"/>
+    <rect x="120" y="226" width="180" height="42" rx="9" fill="rgba(124,147,255,0.12)" stroke="#7c93ff"/><text x="210" y="244" fill="#cdd5ff">层多 → 加 PP</text><text x="210" y="260" fill="#9aa3b2" font-size="10.5">跨节点</text>
+    <rect x="320" y="226" width="170" height="42" rx="9" fill="rgba(124,147,255,0.12)" stroke="#7c93ff"/><text x="405" y="244" fill="#cdd5ff">序列长 → 加 CP</text><text x="405" y="260" fill="#9aa3b2" font-size="10.5">超长上下文</text>
+    <rect x="510" y="226" width="170" height="42" rx="9" fill="rgba(255,138,76,0.12)" stroke="#ff8a4c"/><text x="595" y="244" fill="#ffd9a8">MoE → 加 EP</text><text x="595" y="260" fill="#9aa3b2" font-size="10.5">专家切卡</text>
+    <line x1="360" y1="198" x2="230" y2="222" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="410" y1="198" x2="405" y2="222" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="460" y1="198" x2="580" y2="222" stroke="#64748b" marker-end="url(#a)"/>
+  </g>
+  <text x="410" y="292" text-anchor="middle" fill="#9aa3b2" font-size="11.5">叠加顺序通常：FSDP/DP（外）→ PP → TP/EP（内）→ 长序列叠 CP。逐个加，每加一维都重新评估显存与吞吐。</text>
+</svg>
+<div class="cap">实践选型：先用最省事的 FSDP/DP，按瓶颈逐维叠加。</div>
+</div>
+
+<h2 class="section" id="eng"><span class="num">05</span>通用工程调优</h2>
+<ul>
+<li><strong>激活重计算（activation checkpointing）</strong>：前向不存中间激活，反向时重算——用算力换显存。可选择性只重算最贵的几层。</li>
+<li><strong>混合精度 bf16 / fp8</strong>：计算用低精度、归约用 fp32（见 M2 的 <code>MixedPrecisionPolicy</code>）；fp8 进一步压算力与带宽。</li>
+<li><strong>通信-计算重叠</strong>：贯穿全书的命脉——DP 反向边算边 all-reduce、FSDP 预取参数、PP 异步 p2p、EP 用 shared expert 盖住 all-to-all。</li>
+<li><strong>profiling</strong>：用 torch profiler / nsys 定位是通信瓶颈、气泡还是 OOM，再针对性调维度配比。</li>
+</ul>
+
+<h2 class="section" id="summary"><span class="num">06</span>全手册收束：一张账本，一组原语</h2>
+<p>回到 M0 的那张地图——七章其实只讲了一件事：<strong>把显存账本里的不同项切开，用合适的通信原语把结果对齐</strong>。</p>
+<table>
+<thead><tr><th>模块</th><th>切账本里的</th><th>主原语</th><th>放置</th></tr></thead>
+<tbody>
+<tr><td>DP</td><td>数据（状态冗余）</td><td>all-reduce</td><td>外</td></tr>
+<tr><td>FSDP</td><td>参数+梯度+优化器状态</td><td>all-gather + reduce-scatter</td><td>外</td></tr>
+<tr><td>TP+SP</td><td>层内参数与计算 / 激活</td><td>all-reduce / AG+RS</td><td>最内</td></tr>
+<tr><td>PP</td><td>层（深度）</td><td>send/recv</td><td>最外</td></tr>
+<tr><td>CP</td><td>序列维激活</td><td>ring p2p / all-to-all</td><td>中</td></tr>
+<tr><td>EP</td><td>专家（MoE）</td><td>all-to-all</td><td>内</td></tr>
+</tbody>
+</table>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. 为什么 TP 放最内层、PP 放最外层？用 stride/带宽解释。<br>
+2. 给定「模型 70B、序列 128k、512 卡」，你会怎么排布各并行维度？<br>
+3. torchtitan 的 <code>fsdp = dp_shard * cp</code> 把 CP 折进了哪个维度？这说明 CP 和 FSDP 在通信上有什么共性？<br>
+4. 激活重计算用什么换什么？它和并行维度的选择如何相互影响？</p>
+</div>
+
+<div class="callout">
+<p><span class="label">🎓 读完了</span> 你已经走完 DP → FSDP → TP/SP → PP → CP → EP → nD 的完整路线。想回顾全局，<a href="#" onclick="parent.location.hash='#/foundations';return false;">回到 M0</a> 重读那张「显存账本 + 通信原语」的地图，会发现每种并行都对得上号。TP 里最精妙的词表并行交叉熵，别忘了还有 <a href="#" onclick="parent.location.hash='#/loss';return false;">独立深入篇</a>。</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/ep';return false;"><div class="nl">← 上一章</div><div class="nt">M6 · 专家并行 EP</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/foundations';return false;"><div class="nl">回到开头 ↺</div><div class="nt">M0 · 基础铺垫</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M7 nD 组合 + 工程 · <code>infra/parallize/07-nd</code></p>
+  <p class="footnote">代码片段引自 torchtitan 与 Megatron-LM 真实源码；放置原则与 rank 公式来自 ParallelDims / RankGenerator。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

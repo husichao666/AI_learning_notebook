@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M3 · 张量并行 TP + 序列并行 SP</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  .pill{ display:inline-block; background:rgba(124,147,255,.12); border:1px solid var(--accent); color:#cdd5ff; border-radius:999px; padding:8px 18px; text-decoration:none; font-weight:600; margin:6px 0; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 3 · 张量并行 + 序列并行</span>
+  <h1>张量并行 TP：把一层切到多卡</h1>
+  <p class="lead">当单<strong>一层</strong>就大到放不下时，DP/FSDP 都救不了——得把这一层的矩阵乘法本身切开。TP 用「列切→行切」一对共轭操作，让每张卡只算一片，每层只付一次 all-reduce。序列并行 SP 再顺手把激活也按序列维切薄。</p>
+  <div class="meta-row">
+    <span class="tag">🧩 列切 → 行切，一次 all-reduce</span>
+    <span class="tag">🔀 f / g 共轭算子</span>
+    <span class="tag">📏 SP 切激活</span>
+    <span class="tag">🔌 通信密集 · TP≤8</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="why"><span class="num">01</span>动机：FSDP 也救不了的「单层太大」</h2>
+<p>FSDP 把参数切到各卡，但它有个隐含前提：<strong>前向用到某层时，要把那层的完整参数 all-gather 到一张卡上来算</strong>。如果<em>单独一层</em>就大到一张卡放不下（比如超大 MLP、超大词表），或者这一层产生的<em>中间激活</em>放不下，FSDP 就无能为力了——它切的是「不同卡存不同层」，没切「一层内部的计算」。</p>
+<p>张量并行（Tensor Parallel, TP）正是来切「一层内部」的：把一个大矩阵乘法 $Y = XW$ 沿某个维度切成几块，每张卡只算一块，最后拼起来。关键是<strong>怎么切才能让通信最少</strong>——Megatron 给出的经典答案是「列切配行切」。</p>
+
+<h2 class="section" id="mlp"><span class="num">02</span>Megatron 式 TP：列切 → 行切，一次 all-reduce</h2>
+<p>以 Transformer 的 MLP（$Y = \text{GeLU}(XW_1)W_2$）为例。TP 把它拆成两个互补的切法：</p>
+<ul>
+<li><strong>列切（Column Parallel）</strong>第一个矩阵 $W_1 = [W_1^{(1)}, W_1^{(2)}]$：每卡算出激活的一部分列 $\text{GeLU}(XW_1^{(i)})$，<strong>无需通信</strong>（GeLU 逐元素，可在分片上直接做）。</li>
+<li><strong>行切（Row Parallel）</strong>第二个矩阵 $W_2 = \begin{bmatrix}W_2^{(1)}\\W_2^{(2)}\end{bmatrix}$：每卡用自己那片激活算出部分和，最后一次 <code>all-reduce</code> 求和得到完整输出。</li>
+</ul>
+<p>这样整条 MLP 前向<strong>只在最后付一次 all-reduce</strong>，中间的激活始终是切分的，省通信也省激活显存。</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="MLP 列切到行切，一次 all-reduce">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <rect x="20" y="100" width="90" height="40" rx="7" fill="#1c2030" stroke="#475569"/><text x="65" y="118" text-anchor="middle" fill="#d7dbe4" font-size="12">输入 X</text><text x="65" y="133" text-anchor="middle" fill="#9aa3b2" font-size="10.5">(完整)</text>
+  <line x1="110" y1="120" x2="136" y2="120" stroke="#64748b" marker-end="url(#a)"/>
+  <!-- two lanes -->
+  <g font-size="11" text-anchor="middle">
+    <rect x="140" y="58"  width="150" height="40" rx="7" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="215" y="74" fill="#cdd5ff">W₁⁽¹⁾ 列切</text><text x="215" y="90" fill="#9aa3b2">GeLU → 激活片1</text>
+    <rect x="140" y="142" width="150" height="40" rx="7" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="215" y="158" fill="#cdd5ff">W₁⁽²⁾ 列切</text><text x="215" y="174" fill="#9aa3b2">GeLU → 激活片2</text>
+    <rect x="320" y="58"  width="150" height="40" rx="7" fill="rgba(255,138,76,0.12)" stroke="#ff8a4c"/><text x="395" y="74" fill="#ffd9a8">W₂⁽¹⁾ 行切</text><text x="395" y="90" fill="#9aa3b2">→ 部分和 Y₁</text>
+    <rect x="320" y="142" width="150" height="40" rx="7" fill="rgba(255,138,76,0.12)" stroke="#ff8a4c"/><text x="395" y="158" fill="#ffd9a8">W₂⁽²⁾ 行切</text><text x="395" y="174" fill="#9aa3b2">→ 部分和 Y₂</text>
+    <line x1="290" y1="78"  x2="316" y2="78"  stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="290" y1="162" x2="316" y2="162" stroke="#64748b" marker-end="url(#a)"/>
+  </g>
+  <line x1="470" y1="78"  x2="520" y2="110" stroke="#64748b" marker-end="url(#a)"/>
+  <line x1="470" y1="162" x2="520" y2="130" stroke="#64748b" marker-end="url(#a)"/>
+  <rect x="524" y="98" width="150" height="44" rx="9" fill="rgba(124,147,255,0.2)" stroke="#7c93ff"/><text x="599" y="116" text-anchor="middle" fill="#cdd5ff" font-size="12.5" font-weight="600">all-reduce</text><text x="599" y="133" text-anchor="middle" fill="#fff" font-size="11">Y = Y₁ + Y₂</text>
+  <line x1="674" y1="120" x2="700" y2="120" stroke="#64748b" marker-end="url(#a)"/>
+  <rect x="704" y="100" width="95" height="40" rx="7" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/><text x="751" y="124" text-anchor="middle" fill="#bbf7d0" font-size="12">输出 Y</text>
+  <text x="20" y="215" fill="#9aa3b2" font-size="12">中间激活全程切分（每卡只持一半），只在行切层出口付一次 all-reduce。反向对称：列切层入口付一次 all-reduce。</text>
+</svg>
+<div class="cap">Megatron 的「列切 → 行切」黄金组合：前向一次 all-reduce，反向一次 all-reduce。</div>
+</div>
+
+<h3>f / g 共轭算子：通信藏在 autograd 里</h3>
+<p>Megatron 把这两次通信封装成一对<strong>共轭算子</strong>，是 TP 的数学核心。<code>f</code> 是列切层的入口，<code>g</code> 是行切层的出口，二者前向/反向行为互为镜像：</p>
+<div class="code-label">Megatron-LM · tensor_parallel/mappings.py:197 / :217</div>
+<pre><code class="language-python">class _CopyToModelParallelRegion(torch.autograd.Function):   # f 算子（列切入口）
+    @staticmethod
+    def forward(ctx, input_, group):  return input_                       # 前向：直通
+    @staticmethod
+    def backward(ctx, grad_output):   return _reduce(grad_output, ...), None   # 反向：all-reduce
+
+class _ReduceFromModelParallelRegion(torch.autograd.Function):   # g 算子（行切出口）
+    @staticmethod
+    def forward(ctx, input_, group):  return _reduce(input_, group)       # 前向：all-reduce
+    @staticmethod
+    def backward(ctx, grad_output):   return grad_output, None            # 反向：直通</code></pre>
+<div class="callout key">
+<p><span class="label">🔑 共轭关系</span> <code>f</code>：前向 copy / 反向 all-reduce；<code>g</code>：前向 all-reduce / 反向 copy。一前一后正好各管一个方向的归约。Megatron 每个算子的 docstring 就一句话点明，例如 <code>"forward: all reduce, backward copy"</code>。两个具体的线性层把它们用起来：</p>
+</div>
+<div class="code-label">Megatron-LM · tensor_parallel/layers.py（ColumnParallelLinear :985 / RowParallelLinear :1298）</div>
+<pre><code class="language-python"># 列切：输入过 f 算子，输出默认保持 Shard(-1) 直接喂给下游行切层
+input_parallel = copy_to_tensor_model_parallel_region(input_, group=self.tp_group)   # f
+output = output_parallel   # gather_output=False，不 all-gather
+
+# 行切：输入已是分片不再 scatter，输出过 g 算子做 all-reduce（SP 下换成 reduce-scatter）
+if self.sequence_parallel:
+    output_ = reduce_scatter_to_sequence_parallel_region(output_parallel, ...)  # SP
+else:
+    output_ = reduce_from_tensor_model_parallel_region(output_parallel, ...)    # 普通 TP: g / all-reduce</code></pre>
+
+<h2 class="section" id="attn"><span class="num">03</span>注意力：按 head 切</h2>
+<p>注意力天然适合切——多个 head 彼此独立。把 QKV 投影<strong>列切（按 head 分组）</strong>，每卡算自己负责的那几个 head；输出投影 $W_O$ <strong>行切</strong>，最后一次 all-reduce 合并。和 MLP 完全同构：列切产生分片、行切归约。约束是 <code>n_heads % tp == 0</code>、<code>n_kv_heads % tp == 0</code>。</p>
+
+<h2 class="section" id="vocab"><span class="num">04</span>词表并行：embedding 与 lm_head</h2>
+<p>词表维 $V$ 极大，embedding 和最后的 lm_head 也按词表切。embedding 时每卡只持有一段词表行，对不在本段的 token 先 mask 置零，再 all-reduce 拼出完整结果：</p>
+<div class="code-label">Megatron-LM · tensor_parallel/layers.py:283（VocabParallelEmbedding）</div>
+<pre><code class="language-python">input_mask = (input_ &lt; self.vocab_start_index) | (input_ >= self.vocab_end_index)
+masked_input = input_.clone() - self.vocab_start_index
+masked_input[input_mask] = 0                 # 不在本 rank 词表段的 token 占位 0
+output_parallel = F.embedding(masked_input, self.weight)
+output_parallel[input_mask, :] = 0.0         # 占位行清零
+output = reduce_from_tensor_model_parallel_region(output_parallel, ...)   # all-reduce 拼完整</code></pre>
+<p>输出端的 lm_head 同样词表切。而它后面的交叉熵如果朴素做，需要把巨大的 $[B,S,V]$ logits 全 all-gather——这正是<strong>词表并行交叉熵 / Loss Parallel</strong> 要解决的问题。这是 TP 里最精妙的一环，本手册有独立深入篇：</p>
+<p style="text-align:center"><a class="pill" href="#" onclick="parent.location.hash='#/loss';return false;">→ 深入篇：词表并行交叉熵 Loss Parallel</a></p>
+
+<h2 class="section" id="sp"><span class="num">05</span>序列并行 SP：把激活也切薄</h2>
+<p>纯 TP 下，LayerNorm、Dropout 这些区域的激活在每张卡上仍是<strong>完整</strong>的（它们逐 token 独立，没被 TP 切到）。序列并行（Sequence Parallel, SP）顺手把这些区域的激活<strong>按序列维 $S$ 切分</strong>，让每卡只存 $1/\text{TP}$ 的激活——激活显存随之降到 $1/\text{TP}$。</p>
+<p>代价是把 TP 原本的一次 all-reduce，拆成 SP 的 <strong>all-gather（进入 attention/matmul 前还原完整序列）+ reduce-scatter（出来后切回序列分片）</strong>。这恰好又是 M0 的恒等式：通信总量不变，但激活省了：</p>
+<div class="code-label">Megatron-LM · tensor_parallel/mappings.py（SP 沿 dim0=序列维）:296 / :351</div>
+<pre><code class="language-python"># 列切层入口（SP）：沿序列维 all-gather 还原完整序列，反向 reduce-scatter
+gather_from_sequence_parallel_region(...)        # forward all-gather / backward reduce-scatter
+# 行切层出口（SP）：reduce-scatter 切回序列分片，反向 all-gather
+reduce_scatter_to_sequence_parallel_region(...)  # forward reduce-scatter / backward all-gather</code></pre>
+<div class="callout">
+<p><span class="label">💡 SP 与 TP 是搭档</span> SP 不切注意力的计算（那是 TP/CP 的事），它只把 TP 已有的 all-reduce 改写成 all-gather + reduce-scatter，顺带把 LN/Dropout 区的激活切薄。所以 SP 必须和 TP 一起开，TP=1 时自动关闭。</p>
+</div>
+
+<h2 class="section" id="titan"><span class="num">06</span>torchtitan：用 placement 声明，而非手写通信</h2>
+<p>torchtitan 不手写 f/g 算子，而是用 DTensor 的 <code>placement</code> 声明每个权重/激活怎么切，由框架推导出该插哪个集合通信。列切就是「权重 <code>Shard(0)</code>、输出 <code>Shard(-1)</code>」，行切就是「权重 <code>Shard(1)</code>、输出 <code>Replicate</code>（all-reduce）或 <code>Shard(1)</code>（SP 下 reduce-scatter）」：</p>
+<div class="code-label">torchtitan · models/common/decoder_sharding.py:57 / :68</div>
+<pre><code class="language-python">def colwise_config() -> ShardingConfig:        # 列切
+    return ShardingConfig(
+        state_shardings={"weight": dense_param_placement(tp=Shard(0))},
+        out_dst_shardings=dense_activation_placement(tp=Shard(-1)))
+
+def rowwise_config(*, output_sp: bool = False) -> ShardingConfig:   # 行切
+    out_tp = Shard(1) if output_sp else Replicate()   # SP→reduce-scatter；否则 all-reduce
+    return ShardingConfig(
+        state_shardings={"weight": dense_param_placement(tp=Shard(1))},
+        out_dst_shardings=dense_activation_placement(tp=out_tp))</code></pre>
+<p>MLP 就是 w1/w3 列切、w2 行切；出口的 <code>output_sp</code> 一个开关切换 all-reduce / reduce-scatter——和 Megatron 的两个不同函数一一对应：</p>
+<div class="code-label">torchtitan · models/common/decoder_sharding.py:200（set_dense_ffn_sharding）</div>
+<pre><code class="language-python">feed_forward_cfg.w1.sharding_config = colwise_config()                 # 列切
+feed_forward_cfg.w3.sharding_config = colwise_config()                 # 列切
+feed_forward_cfg.w2.sharding_config = rowwise_config(output_sp=enable_sp)   # 行切 → 出口一次通信</code></pre>
+<p>更经典、字面化的 <code>ParallelStyle</code> 写法在 qwen3_vl 里能看到（llama3 已改为上面的 config 驱动）：</p>
+<div class="code-label">torchtitan · models/qwen3_vl/parallelize.py:60</div>
+<pre><code class="language-python">layer_plan = {
+    "attention.wq": ColwiseParallel(), "attention.wk": ColwiseParallel(), "attention.wv": ColwiseParallel(),
+    "attention.wo": RowwiseParallel(output_layouts=Replicate()),
+    "feed_forward.w1": ColwiseParallel(), "feed_forward.w3": ColwiseParallel(),
+    "feed_forward.w2": RowwiseParallel(output_layouts=Replicate()),
+}
+parallelize_module(model, tp_mesh, layer_plan)</code></pre>
+
+<h2 class="section" id="cost"><span class="num">07</span>为什么 TP 通信密集、一般不跨机</h2>
+<p>TP 和 DP/FSDP 有个本质区别：<strong>它的通信在前向/反向的关键路径上，无法与计算重叠</strong>。行切层必须等 all-reduce 完成才能往下走；而且<em>每一层</em>的 attention 出口和 MLP 出口各有一次 all-reduce（SP 下是 all-gather + reduce-scatter），一个 step 里几十上百层、数百次集合通信，通信量正比于 $\text{batch}\times\text{seq}\times\text{hidden}$。</p>
+<div class="callout warn">
+<p><span class="label">⚠️ 放置原则</span> 因此 TP 极度依赖带宽，通常只在<strong>单机内 NVLink/NVSwitch</strong> 域使用（典型 TP≤8，正好一台机器）。跨机做 TP 会被 InfiniBand/以太网的低带宽拖垮。超过单机的并行规模，交给通信稀疏或可重叠的 DP/FSDP/PP/CP 去承担——这条原则在 <strong>M7 nD 组合</strong> 会再次出现。</p>
+</div>
+
+<h2 class="section" id="compare"><span class="num">08</span>对比与启用</h2>
+<div class="two-col">
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 显式 f/g 算子</h4>
+    <ul>
+      <li><code>ColumnParallelLinear</code> / <code>RowParallelLinear</code></li>
+      <li>共轭 autograd 算子手写 all-reduce</li>
+      <li>SP：<code>--sequence-parallel</code>（需 TP&gt;1）</li>
+      <li>序列优先布局 <code>[s, b, h]</code></li>
+    </ul>
+  </div>
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span> DTensor placement</h4>
+    <ul>
+      <li><code>ColwiseParallel</code> / <code>RowwiseParallel</code> / <code>SequenceParallel</code></li>
+      <li><code>Shard</code> 放置即通信语义</li>
+      <li><code>tensor_parallel_degree</code> + <code>enable_sequence_parallel</code></li>
+      <li>与 loss parallel、FSDP/PP 经 DTensor 组合</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. MLP 为什么「列切→行切」只需一次 all-reduce？如果两个矩阵都列切会怎样？<br>
+2. f 算子和 g 算子的前向/反向分别做什么？为什么说它们共轭？<br>
+3. SP 把 TP 的一次 all-reduce 换成了哪两个原语？省下了什么显存？<br>
+4. 为什么 TP 一般 ≤8、不跨机？它和 DP 在「能否与计算重叠」上有什么本质不同？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/fsdp';return false;"><div class="nl">← 上一章</div><div class="nt">M2 · FSDP / ZeRO</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/pp';return false;"><div class="nl">下一章 →</div><div class="nt">M4 · 流水线并行 PP</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M3 张量并行 TP + SP · <code>infra/parallize/03-tp</code></p>
+  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码；深入篇见 <a href="#" onclick="parent.location.hash='#/loss';return false;">词表并行交叉熵</a>。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

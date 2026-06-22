@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M5 · 上下文并行 CP</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 5 · 上下文并行</span>
+  <h1>上下文并行 CP：把超长序列切到多卡</h1>
+  <p class="lead">序列长到几十万 token，注意力的激活单卡就装不下了。CP 沿序列维把它切开——难点在于注意力需要<strong>全局的 K/V</strong>，于是有了 Ring Attention 与 Ulysses 两条路线。</p>
+  <div class="meta-row">
+    <span class="tag">📜 切序列维</span>
+    <span class="tag">💍 Ring Attention + online softmax</span>
+    <span class="tag">🔀 Ulysses all-to-all</span>
+    <span class="tag">⚖️ zigzag 负载均衡</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="why"><span class="num">01</span>动机：长序列的激活墙</h2>
+<p>注意力的显存和计算随序列长度 $S$ 增长很快（激活 $O(S)$、注意力分数 $O(S^2)$）。当 $S$ 到几十万时，哪怕模型本身放得下，单卡也存不下这么长序列的激活。</p>
+<p>上下文并行（Context Parallel, CP）的做法：把序列沿长度维切成 $S/\text{cp}$ 段，每张卡只处理自己那一段。其它层（MLP、LayerNorm）逐 token 独立，切了就切了；<strong>唯一的麻烦是注意力</strong>——它要让每个 query 看到<em>全部</em> key/value，而 K/V 现在分散在各张卡上。</p>
+
+<h2 class="section" id="problem"><span class="num">02</span>难点：注意力需要全局 K/V</h2>
+<p>每张卡持有自己那段的 Q、K、V。query 段在卡 $i$ 上，但它要 attend 的 key/value 跨越<strong>所有</strong>卡。所以必须跨卡通信，把别人的 K/V 拿过来（或把自己的 Q 送过去）。怎么通信、怎么在不把完整序列 materialize 的前提下算出正确的 softmax，就是 CP 的全部技术内容。</p>
+
+<h2 class="section" id="routes"><span class="num">03</span>两条主流路线</h2>
+<p>Megatron 的配置项 <code>cp_comm_type</code> 把所有路线列得清清楚楚，可以直接当地图看：</p>
+<div class="code-label">Megatron-LM · transformer/transformer_config.py:869（cp_comm_type docstring）</div>
+<pre><code class="language-python">"""Inter-gpu communication type for context parallelism.
+"p2p":       环形拓扑里用 P2P 交换 KV 分块；异步，可与注意力计算重叠。
+"all_gather": 算注意力前 all-gather 拿到完整 KV；同步，不可重叠。
+"a2a":       类似 DeepSpeed Ulysses，用 all-to-all 把注意力头散到 CP 组，再聚合得到完整序列 QKV。
+"a2a+p2p":   分层实现：低层 CP 组（NVLink）用 a2a，高层组（IB）用 p2p。"""</code></pre>
+
+<h3>路线 A：Ring Attention（环形 P2P + online softmax）</h3>
+<p>每张卡保留自己的 Q 分片，把 K/V 分块在 CP 环上<strong>一跳一跳地 P2P 传递</strong>：每收到一块 K/V 就算一次局部注意力，用 <em>online softmax</em>（维护 running max 和 running sum）把多块结果增量合并成正确的全局 softmax——全程不需要把完整序列拼出来。P2P 是异步的，可以和计算重叠。</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 230" role="img" aria-label="Ring Attention：KV 在环上传递，online softmax 增量合并">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7c93ff"/></marker></defs>
+  <text x="20" y="24" fill="#eaeefb" font-size="13.5" font-weight="600">4 张卡组成环：各持 Q 分片不动，KV 分块顺时针传递</text>
+  <!-- 4 nodes in a ring -->
+  <g font-size="11" text-anchor="middle">
+    <circle cx="410" cy="80" r="34" fill="#161922" stroke="#5b6bb0"/><text x="410" y="76" fill="#aab6ff">卡0</text><text x="410" y="92" fill="#9aa3b2" font-size="9.5">Q0·KV→</text>
+    <circle cx="560" cy="140" r="34" fill="#161922" stroke="#5b6bb0"/><text x="560" y="136" fill="#aab6ff">卡1</text><text x="560" y="152" fill="#9aa3b2" font-size="9.5">Q1·KV→</text>
+    <circle cx="410" cy="200" r="34" fill="#161922" stroke="#5b6bb0"/><text x="410" y="196" fill="#aab6ff">卡2</text><text x="410" y="212" fill="#9aa3b2" font-size="9.5">Q2·KV→</text>
+    <circle cx="260" cy="140" r="34" fill="#161922" stroke="#5b6bb0"/><text x="260" y="136" fill="#aab6ff">卡3</text><text x="260" y="152" fill="#9aa3b2" font-size="9.5">Q3·KV→</text>
+  </g>
+  <!-- ring arrows -->
+  <path d="M442,92 Q500,100 532,120" fill="none" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#a)"/>
+  <path d="M548,172 Q480,196 442,196" fill="none" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#a)"/>
+  <path d="M378,196 Q300,188 272,168" fill="none" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#a)"/>
+  <path d="M272,112 Q340,84 376,80" fill="none" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#a)"/>
+  <!-- online softmax box -->
+  <rect x="20" y="60" width="190" height="110" rx="10" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
+  <text x="115" y="84" text-anchor="middle" fill="#bbf7d0" font-size="12.5" font-weight="700">online softmax</text>
+  <text x="115" y="106" text-anchor="middle" fill="#86efac" font-size="11">每收一块 KV：</text>
+  <text x="115" y="124" text-anchor="middle" fill="#9aa3b2" font-size="10.5">更新 running max m</text>
+  <text x="115" y="140" text-anchor="middle" fill="#9aa3b2" font-size="10.5">更新 running sum ℓ</text>
+  <text x="115" y="158" text-anchor="middle" fill="#9aa3b2" font-size="10.5">增量累加输出 O</text>
+  <text x="20" y="216" fill="#9aa3b2" font-size="12">转一圈后，每张卡的 Q 都「见过」全部 KV，得到与完整注意力数值相同的结果——但从不物化完整序列。</text>
+</svg>
+<div class="cap">Ring Attention：Q 不动、KV 绕环 P2P，online softmax 把每一跳的局部结果增量合并成全局结果。</div>
+</div>
+
+<h3>路线 B：Ulysses（all-to-all 转置）</h3>
+<p>另一条路：用 <code>all-to-all</code> 把张量从「按序列切」转成「按 head 切」——每卡拿到<strong>完整序列但只算部分 head</strong>。这样注意力内部无需任何通信（每卡本地算自己的 head），算完再 all-to-all 转回「按序列切」。通信量更省，但要求 head 数 ≥ cp_size。</p>
+
+<table>
+<thead><tr><th>路线</th><th>怎么传</th><th>特点</th></tr></thead>
+<tbody>
+<tr><td><code>p2p</code> Ring</td><td>KV 绕环 P2P</td><td>异步、可重叠；通用</td></tr>
+<tr><td><code>a2a</code> Ulysses</td><td>all-to-all 转置 head/seq</td><td>通信省；需 head≥cp</td></tr>
+<tr><td><code>all_gather</code></td><td>算前 all-gather 全 KV</td><td>同步、不可重叠；实现简单</td></tr>
+<tr><td><code>a2a+p2p</code></td><td>组内 a2a + 组间 p2p</td><td>分层，适配 NVLink+IB</td></tr>
+</tbody>
+</table>
+
+<h2 class="section" id="balance"><span class="num">04</span>zigzag：causal mask 下的负载均衡</h2>
+<p>因果掩码下，序列<strong>尾部</strong>的 token 要 attend 前面所有 token，计算量大；<strong>头部</strong>的 token 几乎不用算。如果按顺序简单切（卡0拿前 1/N、卡N-1拿后 1/N），最后一张卡会忙死、第一张卡闲死。</p>
+<p>解法叫 <strong>zigzag（首尾配对）</strong>：把序列切成 $2\cdot\text{cp}$ 块，第 $i$ 张卡取第 $i$ 块和第 $(2\text{cp}-1-i)$ 块——一头一尾配一对，各卡总计算量就均衡了。Megatron 在取 batch 时显式这么做：</p>
+<div class="code-label">Megatron-LM · core/utils.py:2007（get_batch_on_this_cp_rank）</div>
+<pre><code class="language-python">val = val.view(*val.shape[0:seq_dim], 2 * cp_size, val.shape[seq_dim] // (2 * cp_size), ...)
+index = torch.zeros(2, dtype=torch.int64, device=val.device)
+index[0].fill_(cp_rank)                    # 第 i 块
+index[1].fill_(2 * cp_size - cp_rank - 1)  # 对称的第 (2cp-1-i) 块
+val = val.index_select(seq_dim, index)     # 一头一尾配对，负载均衡</code></pre>
+<p>torchtitan 用 <code>_HeadTailLoadBalancer</code>（SDPA）/ <code>_PTRRLoadBalancer</code>（FlexAttention）做同样的事，并强制序列长度能被 $2\cdot\text{cp}$ 整除：</p>
+<div class="code-label">torchtitan · distributed/parallel_dims.py:519</div>
+<pre><code class="language-python">@property
+def seq_len_divisor(self):
+    # SP 要求 seq_len 能被 TP 整除；CP（默认开负载均衡）要求能被 2*CP 整除
+    return self.tp * (self.cp * 2)</code></pre>
+
+<h2 class="section" id="impl"><span class="num">05</span>实现：两个框架都「委托」给别人</h2>
+<div class="callout warn">
+<p><span class="label">📝 诚实说明（很重要）</span> CP 的核心算法（online softmax + 环形 P2P）在这两个仓库里<strong>都不是自己写的</strong>：</p>
+<ul style="margin:8px 0 0">
+<li><strong>torchtitan</strong> 把 CP 完全委托给 PyTorch 实验性 API <code>torch.distributed.tensor.experimental._attention</code>——负载均衡器、shard 函数、ring/all-to-all dispatcher 全 import 自它。torchtitan 本体只做装配。</li>
+<li><strong>Megatron-LM</strong> 把 ring attention 完全委托给 <strong>TransformerEngine</strong>。原生注意力直接 <code>assert context_parallel_size == 1</code>，CP 只能走 TE。</li>
+</ul>
+</div>
+<p>torchtitan 的装配代码——把内层注意力包进 CP 上下文，对 SDPA 用 DTensor（沿 head 维 <code>Shard(2)</code>）交给 PyTorch 的 CP dispatcher：</p>
+<div class="code-label">torchtitan · distributed/context_parallel.py:74</div>
+<pre><code class="language-python">elif isinstance(first, ScaledDotProductAttention):
+    _enable_context_parallel_dispatcher()
+    def cp_forward(q, k, v, **kwargs):
+        # 包成沿 head 维分片的 DTensor，由 PyTorch 处理 ring/all-to-all
+        q = DTensor.from_local(q, mesh, [Shard(2)], run_check=False)
+        k = DTensor.from_local(k, mesh, [Shard(2)], run_check=False)
+        v = DTensor.from_local(v, mesh, [Shard(2)], run_check=False)
+        return orig_fn(q, k, v, **kwargs).to_local()</code></pre>
+<p>Megatron 把 CP group/comm_type 透传给 TE 的注意力构造：</p>
+<div class="code-label">Megatron-LM · core/transformer/dot_product_attention.py:57 + extensions/transformer_engine.py:1440</div>
+<pre><code class="language-python"># 原生注意力不支持 CP，强制走 TE
+assert self.config.context_parallel_size == 1, "Context parallelism is only supported by TEDotProductAttention!"
+# TE 路径：把 cp_group / cp_comm_type 透传给 TransformerEngine 的注意力
+if self.config.context_parallel_size > 1:
+    extra_kwargs["cp_group"] = pg_collection.cp
+    extra_kwargs["cp_comm_type"] = cp_comm_type   # "p2p" / "a2a" / ...</code></pre>
+
+<h2 class="section" id="vs-sp"><span class="num">06</span>辨析：CP 与 SP（M3 的序列并行）不是一回事</h2>
+<p>两者都「沿序列切」，但目的和位置完全不同，而且可以叠加：</p>
+<table>
+<thead><tr><th></th><th>SP（M3 的序列并行）</th><th>CP（本章）</th></tr></thead>
+<tbody>
+<tr><td>绑定关系</td><td>绑定 TP，TP=1 时强制关闭</td><td>独立的 process group，与 TP 正交</td></tr>
+<tr><td>切的是</td><td>LayerNorm/Dropout 区的激活</td><td>整个注意力的序列维</td></tr>
+<tr><td>对注意力</td><td><strong>不</strong>参与注意力计算的切分</td><td>核心就是切注意力、跨卡传 KV</td></tr>
+<tr><td>本质</td><td>把 TP 的 all-reduce 改写成 AG+RS</td><td>Ring/Ulysses + online softmax</td></tr>
+</tbody>
+</table>
+
+<h2 class="section" id="compare"><span class="num">07</span>对比与启用</h2>
+<div class="two-col">
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span> 委托 PyTorch 实验 API</h4>
+    <ul>
+      <li><code>context_parallel_degree</code></li>
+      <li><code>context_parallel_load_balancer</code>: headtail / ptrr</li>
+      <li><code>context_parallel_rotate_method</code>: allgather / alltoall</li>
+      <li>CP 折进 FSDP 维（<code>fsdp = dp_shard*cp</code>）</li>
+    </ul>
+  </div>
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 委托 TransformerEngine</h4>
+    <ul>
+      <li><code>--context-parallel-size N</code></li>
+      <li><code>--cp-comm-type p2p|a2a|allgather|a2a+p2p</code></li>
+      <li><code>get_batch_on_this_cp_rank</code> 做 zigzag 切分</li>
+      <li>约束：EP 与 CP 不能同时 &gt;1（见 M7）</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. 序列切开后，为什么注意力不能各算各的？需要传什么？<br>
+2. online softmax 解决了什么问题？为什么 Ring Attention 不用物化完整序列？<br>
+3. 为什么 causal mask 下要 zigzag 切分？简单顺序切会怎样？<br>
+4. CP 和 M3 的 SP 都「切序列」，本质区别是什么？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/pp';return false;"><div class="nl">← 上一章</div><div class="nt">M4 · 流水线并行 PP</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/ep';return false;"><div class="nl">下一章 →</div><div class="nt">M6 · 专家并行 EP</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M5 上下文并行 CP · <code>infra/parallize/05-cp</code></p>
+  <p class="footnote">代码片段引自 torchtitan 与 Megatron-LM 真实源码；ring attention 真正算法分别在 PyTorch 实验 API 与 TransformerEngine 中。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

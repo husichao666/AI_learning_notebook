@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M4 · 流水线并行 PP</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 4 · 流水线并行</span>
+  <h1>流水线并行 PP：把不同层放到不同卡</h1>
+  <p class="lead">模型层数太多放不下，就把它沿深度切成几段（stage），每张卡负责几层，像工厂流水线一样接力。难点只有一个词：<strong>气泡</strong>——以及一连串为消灭气泡而生的调度算法。</p>
+  <div class="meta-row">
+    <span class="tag">🫧 气泡 (P-1)/(P-1+M)</span>
+    <span class="tag">📦 GPipe → 1F1B → 交错 → Zero-Bubble</span>
+    <span class="tag">↔️ p2p send/recv</span>
+    <span class="tag">🔥 warmup/steady/cooldown</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="idea"><span class="num">01</span>核心思想：沿深度切</h2>
+<p>TP 是把<em>一层</em>横着切，PP（Pipeline Parallel）是把<em>层与层之间</em>竖着切：模型的前几层放 stage 0，中间几层放 stage 1……最后几层放 stage P-1。数据像流水线一样，前向时激活从 stage 0 一路传到 stage P-1，反向时梯度逆序传回。</p>
+<p>torchtitan 里能清楚看到这个切分：embedding 放首 stage，transformer 层平摊，norm+lm_head 放尾 stage：</p>
+<div class="code-label">torchtitan · distributed/pipeline_parallel.py:346（_generate_llm_fqn_per_model_part）</div>
+<pre><code class="language-python">num_effective_layers = num_layers + input_weight + output_weight
+layers_per_stage = num_effective_layers // num_stages
+# stage 0 放 tok_embeddings + 前若干层；最后 stage 放尾部层 + norm + lm_head
+if stage_idx == 0:
+    stage_modules.append("tok_embeddings")
+elif stage_idx == num_stages - 1:
+    stage_modules.extend(["norm", "lm_head"])</code></pre>
+<p>跨 stage 只在边界传一次激活/梯度（点对点通信），<strong>通信量极小</strong>——这正是 PP 能跨机的原因（对比 TP 每层都通信）。</p>
+
+<h2 class="section" id="bubble"><span class="num">02</span>气泡：PP 的原罪</h2>
+<p>流水线是链式依赖：stage 1 必须等 stage 0 把激活传过来才能开算。如果一个 batch 整块往里灌，启动阶段后面的 stage 都在<strong>干等</strong>，排空阶段前面的 stage 又在干等。这些空闲就是<strong>气泡（bubble）</strong>。</p>
+<p>解药：把一个 batch 拆成 $M$ 个 <strong>micro-batch</strong> 接连灌入，让各 stage 尽快都忙起来。理想气泡占比约为：</p>
+$$ \text{bubble ratio} \approx \frac{P-1}{P-1+M}, \qquad P=\text{stage 数},\ M=\text{micro-batch 数} $$
+<p>所以 $M$ 越大于 $P$，气泡越小。torchtitan 在 micro-batch 数不足时会直接告警：</p>
+<div class="code-label">torchtitan · distributed/pipeline_parallel.py:268</div>
+<pre><code class="language-python">if n_microbatches &lt; num_total_stages:
+    logger.warning("... may result in a bubble in the pipeline.")</code></pre>
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="GPipe 与 1F1B 的气泡对比">
+  <text x="10" y="20" fill="#aab6ff" font-size="13" font-weight="700">GPipe：先灌完所有前向，再做所有反向</text>
+  <!-- 4 stages rows, time columns. F=blue, B=green, bubble=empty -->
+  <g font-size="9" text-anchor="middle">
+    <!-- labels -->
+    <text x="20" y="44" fill="#9aa3b2" text-anchor="end">S0</text>
+    <text x="20" y="62" fill="#9aa3b2" text-anchor="end">S1</text>
+    <text x="20" y="80" fill="#9aa3b2" text-anchor="end">S2</text>
+    <text x="20" y="98" fill="#9aa3b2" text-anchor="end">S3</text>
+  </g>
+  <!-- helper: each cell 26 wide, 14 tall, start x=28 y=34 -->
+  <g>
+    <!-- stage0 F1..F4 at t0..3 -->
+    <rect x="28"  y="36" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="54" y="36" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="80" y="36" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="36" width="24" height="13" fill="rgba(124,147,255,0.5)"/>
+    <!-- stage1 shifted +1 -->
+    <rect x="54"  y="54" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="80" y="54" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="54" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="54" width="24" height="13" fill="rgba(124,147,255,0.5)"/>
+    <rect x="80"  y="72" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="72" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="72" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="158" y="72" width="24" height="13" fill="rgba(124,147,255,0.5)"/>
+    <rect x="106" y="90" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="90" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="158" y="90" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="184" y="90" width="24" height="13" fill="rgba(124,147,255,0.5)"/>
+    <!-- backward (green) starts after all F; stage3 first -->
+    <rect x="210" y="90" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="236" y="90" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="262" y="90" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="288" y="90" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="236" y="72" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="262" y="72" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="288" y="72" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="314" y="72" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="262" y="54" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="288" y="54" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="314" y="54" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="340" y="54" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="288" y="36" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="314" y="36" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="340" y="36" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="366" y="36" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+  </g>
+  <text x="430" y="50" fill="#fbbf24" font-size="11">蓝=前向 绿=反向</text>
+  <text x="430" y="68" fill="#fbbf24" font-size="11">左下/右上的空白 = 气泡</text>
+  <text x="430" y="86" fill="#9aa3b2" font-size="11">GPipe 还需同时存所有 M 份激活 → 显存 ∝ M</text>
+
+  <text x="10" y="140" fill="#aab6ff" font-size="13" font-weight="700">1F1B：稳态里一前一后交替，激活显存与 M 解耦</text>
+  <g font-size="9">
+    <text x="20" y="162" fill="#9aa3b2" text-anchor="end">S0</text>
+    <text x="20" y="180" fill="#9aa3b2" text-anchor="end">S1</text>
+    <text x="20" y="198" fill="#9aa3b2" text-anchor="end">S2</text>
+    <text x="20" y="216" fill="#9aa3b2" text-anchor="end">S3</text>
+  </g>
+  <g>
+    <!-- 1F1B compact illustration: warmup F's then alternating -->
+    <rect x="28"  y="154" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="54" y="154" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="80" y="154" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="154" width="24" height="13" fill="rgba(124,147,255,0.5)"/>
+    <rect x="132" y="154" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="158" y="154" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="184" y="154" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="210" y="154" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="54"  y="172" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="80" y="172" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="172" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="172" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="158" y="172" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="184" y="172" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="80"  y="190" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="106" y="190" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="190" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="158" y="190" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="184" y="190" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+    <rect x="106" y="208" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="132" y="208" width="24" height="13" fill="rgba(74,222,128,0.5)"/><rect x="158" y="208" width="24" height="13" fill="rgba(124,147,255,0.5)"/><rect x="184" y="208" width="24" height="13" fill="rgba(74,222,128,0.5)"/>
+  </g>
+  <text x="430" y="180" fill="#9aa3b2" font-size="11">气泡总量和 GPipe 相同，</text>
+  <text x="430" y="196" fill="#9aa3b2" font-size="11">但「在飞激活」上限 ≈ stage 数，</text>
+  <text x="430" y="212" fill="#86efac" font-size="11">显存不再随 M 增长。</text>
+</svg>
+<div class="cap">GPipe vs 1F1B（4 stage 示意）：两者气泡总量相同，但 1F1B 把激活显存从 ∝M 降到 ∝P。</div>
+</div>
+
+<h2 class="section" id="evolution"><span class="num">03</span>调度演进：一条消灭气泡的主线</h2>
+<table>
+<thead><tr><th>调度</th><th>关键改进</th><th>代价</th></tr></thead>
+<tbody>
+<tr><td><strong>GPipe</strong></td><td>拆 micro-batch 填满流水线，气泡从 $(P-1)/P$ 降到 $(P-1)/(P-1+M)$</td><td>同时驻留 $M$ 份激活，显存 ∝ M</td></tr>
+<tr><td><strong>1F1B</strong></td><td>稳态「做 1 个前向就立刻做 1 个反向」，在飞激活上限 ≈ P，<strong>显存与 M 解耦</strong></td><td>气泡总量同 GPipe</td></tr>
+<tr><td><strong>交错 1F1B</strong></td><td>每 rank 持 <code>num_model_chunks</code> 个不连续层块（虚拟 stage），气泡 ∝ 1/chunks</td><td>p2p 通信次数翻倍</td></tr>
+<tr><td><strong>Zero-Bubble</strong></td><td>把反向拆成「激活梯度 B」+「权重梯度 W」两步，用 V 形布局填补气泡，逼近 0</td><td>调度复杂、实现精细</td></tr>
+</tbody>
+</table>
+<p>Megatron 用一个分发函数按 PP 度数和虚拟 stage 自动选调度：</p>
+<div class="code-label">Megatron-LM · pipeline_parallel/schedules.py:142（get_forward_backward_func）</div>
+<pre><code class="language-python">if pp_size > 1:
+    if vp_size is not None:
+        forward_backward_func = forward_backward_pipelining_with_interleaving       # 交错 1F1B
+    else:
+        forward_backward_func = forward_backward_pipelining_without_interleaving    # 1F1B
+else:
+    forward_backward_func = forward_backward_no_pipelining</code></pre>
+
+<h2 class="section" id="phases"><span class="num">04</span>1F1B 的三段：warmup / steady / cooldown</h2>
+<p>1F1B 一个 step 分三段。<strong>warmup</strong>：只做前向，把流水线填满；<strong>steady</strong>：一前一后交替，是稳态吞吐区；<strong>cooldown</strong>：只做剩余反向，排空。warmup 的 micro-batch 数取决于本 stage 离末端多远：</p>
+<div class="code-label">Megatron-LM · pipeline_parallel/schedules.py:2166</div>
+<pre><code class="language-python"># 越靠前的 stage 预热越多；最后一个 stage 预热 0
+num_warmup_microbatches = total_stages - current_stage - 1
+num_warmup_microbatches = min(num_warmup_microbatches, num_microbatches)
+num_microbatches_remaining = num_microbatches - num_warmup_microbatches</code></pre>
+<p>稳态循环是 1F1B 的灵魂——一次融合通信「发前向激活、同时收回反向梯度」，紧接着立刻做一个反向：</p>
+<div class="code-label">Megatron-LM · pipeline_parallel/schedules.py:2269（steady 阶段）</div>
+<pre><code class="language-python">for i in range(num_microbatches_remaining):
+    output_tensor, _ = forward_step(...)                                   # 1 个 F
+    output_tensor_grad = p2p_communicator.send_forward_recv_backward(...)  # 发激活 + 收梯度
+    input_tensor  = input_tensors.pop(0)                                   # 取最早那对
+    output_tensor = output_tensors.pop(0)
+    input_tensor_grad = backward_func(input_tensor, output_tensor, output_tensor_grad, config)  # 1 个 B
+    input_tensor = p2p_communicator.send_backward_recv_forward(...)        # 发梯度 + 收下一激活</code></pre>
+
+<h2 class="section" id="p2p"><span class="num">05</span>点对点通信：stage 之间怎么传</h2>
+<p>PP 的通信不是集合通信，而是<strong>点对点 send/recv</strong>。Megatron 的 <code>P2PCommunicator</code> 封装四个方向 + 两个稳态融合算子，底层用 <code>torch.distributed.P2POp</code> + <code>batch_isend_irecv</code>：</p>
+<div class="code-label">Megatron-LM · pipeline_parallel/p2p_communication.py:424 / :486</div>
+<pre><code class="language-python">def recv_forward(...):   # 从上一 stage 收激活；首 stage 收到 None
+    if is_first_stage: input_tensor = None
+    else: input_tensor, _, _ = self._communicate(recv_prev=True, recv_next=False, ...)
+
+def send_forward(...):   # 把激活发给下一 stage；尾 stage 不发
+    if not is_last_stage: self._communicate(tensor_send_next=output_tensor, ...)
+# 另有 recv_backward / send_backward，以及稳态用的 send_forward_recv_backward / send_backward_recv_forward</code></pre>
+
+<h2 class="section" id="titan"><span class="num">06</span>torchtitan：复用 PyTorch 的 pipelining</h2>
+<p>torchtitan 不自己写调度，而是直接用 PyTorch 的 <code>torch.distributed.pipelining</code>，把 schedule 名字解析成对应的类（GPipe / 1F1B / Interleaved1F1B / ZBVZeroBubble / DualPipeV）：</p>
+<div class="code-label">torchtitan · distributed/pipeline_parallel.py:253（_build_pipeline_schedule）</div>
+<pre><code class="language-python">schedule_class = get_schedule_class(parallelism.pipeline_parallel_schedule)   # 名字 → 类
+looped_schedule = issubclass(schedule_class, PipelineScheduleMulti)
+n_microbatches = batch_size // microbatch_size
+if looped_schedule:   # 多 stage（交错 / zero-bubble）
+    schedule = schedule_class(stages, n_microbatches=n_microbatches, loss_fn=loss_fn, ...)
+else:                 # 单 stage（GPipe / 1F1B）
+    schedule = schedule_class(stages[0], n_microbatches=n_microbatches, loss_fn=loss_fn, ...)</code></pre>
+<p>切模型时它真的把不属于本 stage 的子模块删掉/置 None，得到一个「瘦身版」模型：</p>
+<div class="code-label">torchtitan · distributed/pipeline_parallel.py:444（_split_module）</div>
+<pre><code class="language-python">model = copy.deepcopy(whole_model)
+for module_name, module_value in model.named_children():
+    if isinstance(module_value, (nn.ModuleDict, nn.ModuleList, ...)):
+        new_layers = ModuleList([layer for i, layer in enumerate(module_value) if i in indices_to_keep])
+        setattr(model, module_name, new_layers)        # 只留本 stage 的层
+    elif module_name not in modules_to_keep:
+        setattr(model, module_name, None)              # 不属于本 stage 的整模块置 None</code></pre>
+<p>训练循环里只有首 stage 喂输入、尾 stage 收 loss，中间 stage 全由 schedule 的 <code>step()</code> 驱动：</p>
+<div class="code-label">torchtitan · trainer.py:661</div>
+<pre><code class="language-python">if self.pp_has_first_stage:
+    self.pp_schedule.step(inputs, target=targets, losses=losses, ...)
+else:
+    self.pp_schedule.step(target=targets, losses=losses, ...)
+if self.pp_has_last_stage:                              # 只有最后 stage 有 loss
+    loss = torch.sum(torch.stack(losses)).to(self.device)</code></pre>
+
+<h2 class="section" id="compare"><span class="num">07</span>对比与启用</h2>
+<div class="two-col">
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 手写调度</h4>
+    <ul>
+      <li><code>get_forward_backward_func</code> 按 pp/vp 自动选</li>
+      <li>1F1B / 交错 1F1B 显式 warmup/steady/cooldown</li>
+      <li><code>--pipeline-model-parallel-size</code></li>
+      <li><code>--num-layers-per-virtual-pipeline-stage</code>（交错）</li>
+    </ul>
+  </div>
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span> 复用 pipelining</h4>
+    <ul>
+      <li><code>torch.distributed.pipelining</code> 的 schedule 类</li>
+      <li><code>_split_module</code> 删层切 stage</li>
+      <li><code>pipeline_parallel_degree</code> + <code>pipeline_parallel_schedule</code></li>
+      <li>支持 GPipe / 1F1B / Interleaved1F1B / ZBVZeroBubble</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. 气泡是怎么产生的？为什么 micro-batch 数 $M$ 越大气泡越小？<br>
+2. 1F1B 相比 GPipe 主要改善了什么（提示：不是气泡）？<br>
+3. 交错 1F1B 用什么换取更小的气泡？<br>
+4. PP 为什么能跨机，而 TP 不行？（对比两者的通信量与频率）</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/tp';return false;"><div class="nl">← 上一章</div><div class="nt">M3 · 张量并行 TP + SP</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/cp';return false;"><div class="nl">下一章 →</div><div class="nt">M5 · 上下文并行 CP</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M4 流水线并行 PP · <code>infra/parallize/04-pp</code></p>
+  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码；气泡示意图为简化版，实际调度更紧凑。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

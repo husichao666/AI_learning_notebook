@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M6 · 专家并行 EP</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(124,147,255,0.07), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:760px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,0.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .card.titan{ border-top:3px solid #ff8a4c; } .card.mega{ border-top:3px solid #76b900; }
+  .badge{ font-size:12px; font-weight:700; padding:2px 10px; border-radius:6px; }
+  .badge.titan{ background:rgba(255,138,76,.15); color:#ff8a4c; } .badge.mega{ background:rgba(118,185,0,.15); color:#a3e635; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; } hr{ border:none; border-top:1px solid var(--border); margin:48px 0; }
+  .footnote{ color:var(--muted); font-size:13.5px; } footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 6 · 专家并行</span>
+  <h1>专家并行 EP：把 MoE 的专家放到不同卡</h1>
+  <p class="lead">MoE 用稀疏激活把参数量和计算量解耦——专家很多但每个 token 只激活几个。EP 把不同专家放到不同卡，用 all-to-all 把 token 送到它该去的专家那儿，算完再送回来。</p>
+  <div class="meta-row">
+    <span class="tag">🧠 top-k 路由 + 稀疏激活</span>
+    <span class="tag">🔀 all-to-all dispatch / combine</span>
+    <span class="tag">⚖️ capacity + aux loss</span>
+    <span class="tag">🧩 与 TP/DP 组合</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="moe"><span class="num">01</span>先理解 MoE：稀疏激活</h2>
+<p>MoE（Mixture of Experts）把一个大 FFN 换成 $E$ 个并列的小 FFN（专家），外加一个<strong>路由器（router）</strong>。每个 token 只被路由到 top-k 个专家（通常 k=1 或 2），只有这些专家参与计算：</p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py:780 / torchtitan · models/common/moe.py:225</div>
+<pre><code class="language-python"># router 给每个 token 对 E 个专家打分，选 top-k
+return torch.topk(scores, k=topk, dim=1, sorted=...)   # Megatron
+_, selected_experts_indices = torch.topk(scores_for_choice, k=self.top_k, dim=-1)  # torchtitan</code></pre>
+<div class="callout key">
+<p><span class="label">🔑 参数与计算解耦</span> 256 个专家、top-2，意味着<strong>参数量是稠密模型的百倍，但每个 token 的 FLOPs 只增加 2 倍</strong>。这就是 MoE 能把模型做到万亿参数却还训得动的原因。代价：专家太多，单卡放不下全部专家——于是需要 EP。</p>
+</div>
+
+<h2 class="section" id="ep"><span class="num">02</span>EP：专家切到各卡</h2>
+<p>专家并行（Expert Parallel, EP）把 $E$ 个专家平均分到 ep_size 张卡，每卡持 $E/\text{ep}$ 个：</p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_layer.py:182</div>
+<pre><code class="language-python">assert self.config.num_moe_experts % ep_size == 0
+self.num_local_experts = self.config.num_moe_experts // ep_size      # 每卡持有的专家数
+local_expert_indices_offset = ep_rank * self.num_local_experts
+self.local_expert_indices = [local_expert_indices_offset + i for i in range(self.num_local_experts)]</code></pre>
+<p>torchtitan 用 DTensor 的 <code>Shard(0)</code>（专家维）表达同一件事：</p>
+<div class="code-label">torchtitan · distributed/expert_parallel.py:53</div>
+<pre><code class="language-python">class ExpertParallel(ParallelStyle):
+    def _partition_fn(self, name, mod, device_mesh):
+        for param_name, param in mod.named_parameters(recurse=False):
+            # 专家维 Shard(0)：每卡只存 E/ep 个专家的权重
+            dist_param = nn.Parameter(distribute_tensor(param, device_mesh, [Shard(0)]))
+            mod.register_parameter(param_name, dist_param)</code></pre>
+
+<h2 class="section" id="a2a"><span class="num">03</span>核心通信：all-to-all dispatch / combine</h2>
+<p>问题来了：token 在<strong>它原本所在的卡</strong>上，但它被路由到的专家在<strong>另一张卡</strong>上。怎么把 token 送过去？答案是 <code>all-to-all</code>——每张卡把自己的 token 按「该去哪张卡」分组，互相交换：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 240" role="img" aria-label="EP 的 all-to-all dispatch 与 combine">
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="20" y="22" fill="#eaeefb" font-size="13.5" font-weight="600">dispatch：按路由把 token all-to-all 送到目标专家所在卡</text>
+  <g font-size="10.5" text-anchor="middle">
+    <!-- left: cards holding tokens -->
+    <rect x="30" y="40" width="150" height="64" rx="8" fill="#161922" stroke="#5b6bb0"/>
+    <text x="105" y="58" fill="#aab6ff" font-size="11.5" font-weight="600">卡0 的 token</text>
+    <text x="105" y="76" fill="#9aa3b2">t→E2, t→E0,</text><text x="105" y="92" fill="#9aa3b2">t→E3 ...</text>
+    <rect x="30" y="120" width="150" height="64" rx="8" fill="#161922" stroke="#5b6bb0"/>
+    <text x="105" y="138" fill="#aab6ff" font-size="11.5" font-weight="600">卡1 的 token</text>
+    <text x="105" y="156" fill="#9aa3b2">t→E0, t→E3,</text><text x="105" y="172" fill="#9aa3b2">t→E1 ...</text>
+    <!-- all-to-all box -->
+    <rect x="330" y="78" width="150" height="68" rx="10" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/>
+    <text x="405" y="104" fill="#cdd5ff" font-size="13" font-weight="700">all-to-all</text>
+    <text x="405" y="124" fill="#9aa3b2">按专家归属</text>
+    <text x="405" y="138" fill="#9aa3b2">重新分发</text>
+    <!-- right: cards holding experts -->
+    <rect x="630" y="40" width="160" height="64" rx="8" fill="#161922" stroke="#b9703f"/>
+    <text x="710" y="58" fill="#ffb380" font-size="11.5" font-weight="600">卡0 的专家 E0,E1</text>
+    <text x="710" y="80" fill="#9aa3b2">收到所有→E0/E1</text>
+    <text x="710" y="95" fill="#9aa3b2">的 token，本地算</text>
+    <rect x="630" y="120" width="160" height="64" rx="8" fill="#161922" stroke="#b9703f"/>
+    <text x="710" y="138" fill="#ffb380" font-size="11.5" font-weight="600">卡1 的专家 E2,E3</text>
+    <text x="710" y="160" fill="#9aa3b2">收到所有→E2/E3</text>
+    <text x="710" y="175" fill="#9aa3b2">的 token，本地算</text>
+    <line x1="182" y1="72"  x2="326" y2="100" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="182" y1="152" x2="326" y2="124" stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="482" y1="100" x2="626" y2="72"  stroke="#64748b" marker-end="url(#a)"/>
+    <line x1="482" y1="124" x2="626" y2="152" stroke="#64748b" marker-end="url(#a)"/>
+  </g>
+  <text x="20" y="214" fill="#9aa3b2" font-size="12">combine（反向）：专家算完后，再做一次反向 all-to-all 把输出送回 token 原本所在的卡。</text>
+  <text x="20" y="232" fill="#86efac" font-size="12">两次 all-to-all 之间，每张卡只跑自己本地的几个专家——这就是 EP 省显存的方式。</text>
+</svg>
+<div class="cap">EP 的一来一回：dispatch（all-to-all 把 token 送到专家）→ 本地专家计算 → combine（all-to-all 送回）。</div>
+</div>
+
+<p>Megatron 的 all-to-all dispatcher：</p>
+<div class="code-label">Megatron-LM · transformer/moe/token_dispatcher.py:677（dispatch）/ :836（combine）</div>
+<pre><code class="language-python"># dispatch：按 EP 维把 token 发到持有目标专家的卡
+global_input_tokens = all_to_all(self.ep_group, permutated_local_input_tokens,
+                                 self.output_splits, self.input_splits, ...)
+# combine（反向）：把专家输出送回原 token 所在的卡（splits 互换）
+permutated_local_input_tokens = all_to_all(self.ep_group, hidden_states,
+                                 self.input_splits, self.output_splits, ...)</code></pre>
+<p>torchtitan 用 functional collective 的 <code>all_to_all_single_autograd</code>，结构完全一致：</p>
+<div class="code-label">torchtitan · models/common/token_dispatcher.py:312（dispatch）/ :434（combine）</div>
+<pre><code class="language-python">routed_input = all_to_all_single_autograd(routed_input, output_splits_list, input_splits_list, self.ep_mesh)
+# ... 本地专家计算 ...
+routed_output = all_to_all_single_autograd(routed_output, metadata.input_splits, metadata.output_splits, self.ep_mesh)</code></pre>
+<div class="callout">
+<p><span class="label">💡 重叠技巧</span> 两个框架都在 all-to-all 进行时，<strong>同时计算 shared expert（共享专家）</strong>，把通信延迟藏在计算后面。</p>
+</div>
+
+<h2 class="section" id="balance"><span class="num">04</span>负载均衡：capacity 与 aux loss</h2>
+<p>路由是模型自己学的，可能让某些「热门」专家挤满、冷门专家闲置——既浪费算力又撑爆显存。两道防线：</p>
+<h3>① capacity factor：硬上限 + 丢弃</h3>
+<p>给每个专家设容量上限，超出的 token 直接丢弃（或填充到等长以利分组 GEMM）：</p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py:221</div>
+<pre><code class="language-python">capacity = math.ceil((num_tokens / num_experts) * capacity_factor)   # 每专家容量
+# 超过 capacity 的 token 按概率丢弃（capacity_factor=None 表示不丢）</code></pre>
+<h3>② aux loss：软约束，把负载推向均匀</h3>
+<p>训练时加一个辅助损失 $\mathcal{L}_{aux} = E\sum_i f_i \cdot P_i$（$f_i$=分给专家 i 的 token 比例，$P_i$=路由器给它的平均概率），两者越均衡 loss 越小：</p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py:142（switch_load_balancing_loss_func，源自 Switch Transformer）</div>
+<pre><code class="language-python">aggregated_probs_per_expert = probs.sum(dim=0)
+aux_loss = torch.sum(aggregated_probs_per_expert * tokens_per_expert) * (
+    num_experts * moe_aux_loss_coeff / (topk * total_num_tokens * total_num_tokens))</code></pre>
+
+<h2 class="section" id="combine"><span class="num">05</span>EP 与其它并行组合</h2>
+<p>EP 很少单独用，通常和 TP/DP 一起。专家内部还能再 TP（<code>SequentialMLP</code> 用专家 TP 组），dispatch 后接 TP all-gather、combine 前接 TP reduce-scatter。torchtitan 在 device mesh 上用独立的稀疏区 mesh 管理 EP，从 FSDP+TP「借」rank：$\text{efsdp} = \text{dp\_shard}\cdot\text{cp}\cdot\text{tp}/\text{ep}$（细节见 M7）。</p>
+<div class="code-label">torchtitan · models/llama4/parallelize.py:367（apply_moe_ep_tp，DeepSeek-V3 复用）</div>
+<pre><code class="language-python">if ep_mesh is None:                    # EP 关：专家走 TP
+    experts_mesh, experts_plan = tp_mesh, TensorParallel()
+else:                                  # EP 开：专家走 EP
+    experts_mesh, experts_plan = ep_mesh, ExpertParallel()
+parallelize_module(module=transformer_block.moe.experts, device_mesh=experts_mesh, parallelize_plan=experts_plan)</code></pre>
+
+<h2 class="section" id="compare"><span class="num">06</span>对比与启用</h2>
+<div class="two-col">
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span></h4>
+    <ul>
+      <li><code>--expert-model-parallel-size N</code> + <code>--num-experts E</code></li>
+      <li>dispatcher：<code>allgather</code>(默认) / <code>alltoall</code> / <code>flex</code></li>
+      <li><code>--moe-router-topk</code> / <code>--moe-aux-loss-coeff</code></li>
+      <li><code>--moe-expert-capacity-factor</code></li>
+    </ul>
+  </div>
+  <div class="card titan"><h4><span class="badge titan">torchtitan</span></h4>
+    <ul>
+      <li><code>expert_parallel_degree</code>（config 层）</li>
+      <li><code>num_experts</code>（模型 Config 字段）</li>
+      <li><code>ExpertParallel</code> = <code>Shard(0)</code> 专家维</li>
+      <li><code>AllToAllTokenDispatcher</code>（EP=1 退回本地）</li>
+    </ul>
+  </div>
+</div>
+<div class="callout warn">
+<p><span class="label">📝 易错点（来自源码核对）</span> ① torchtitan 的 <code>ExpertParallel</code> 本身<strong>不含</strong> all-to-all，通信都在 <code>token_dispatcher.py</code>；② EP 用 <code>Shard(0)</code>（专家维），专家-TP 才是 <code>Shard(1)/Shard(2)</code>；③ Megatron <strong>默认 dispatcher 是 allgather</strong>，大规模 EP 才切 alltoall。</p>
+</div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. MoE 为什么能「参数量百倍、计算量只 2 倍」？<br>
+2. EP 的 all-to-all 在传什么？为什么 dispatch 和 combine 要各做一次？<br>
+3. capacity factor 和 aux loss 各自怎么处理专家负载不均？<br>
+4. EP 用 <code>Shard(0)</code> 切的是哪个维度？和专家内部 TP 的 <code>Shard(1)</code> 有什么区别？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/cp';return false;"><div class="nl">← 上一章</div><div class="nt">M5 · 上下文并行 CP</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/nd';return false;"><div class="nl">下一章 →</div><div class="nt">M7 · nD 组合 + 工程</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M6 专家并行 EP · <code>infra/parallize/06-ep</code></p>
+  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码；aux loss 公式源自 Switch Transformer (arXiv:2101.03961)。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>
