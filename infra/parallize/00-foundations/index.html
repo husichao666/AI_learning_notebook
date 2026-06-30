@@ -159,8 +159,10 @@
     <rect x="406" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="501" y="70" fill="#bbf7d0">Adam 一阶 m</text><text x="501" y="86" fill="#86efac">4B</text>
     <rect x="598" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="693" y="70" fill="#bbf7d0">Adam 二阶 v</text><text x="693" y="86" fill="#86efac">4B</text>
   </g>
-  <text x="20" y="120" fill="#9aa3b2" font-size="12.5">└─ 参数 2B + 梯度 2B ─┘</text>
-  <text x="214" y="120" fill="#86efac" font-size="12.5">└──────────── 优化器状态 12B（最大头）────────────┘</text>
+  <path d="M20 100 L20 107 L212 107 L212 100" fill="none" stroke="#9aa3b2" stroke-width="1"/>
+  <text x="116" y="122" text-anchor="middle" fill="#9aa3b2" font-size="12.5">参数 2B + 梯度 2B</text>
+  <path d="M214 100 L214 107 L788 107 L788 100" fill="none" stroke="#4ade80" stroke-width="1"/>
+  <text x="501" y="122" text-anchor="middle" fill="#86efac" font-size="12.5">优化器状态 12B（最大头）= master 4B + 一阶 m 4B + 二阶 v 4B</text>
   <text x="20" y="142" fill="#fbbf24" font-size="12">激活值不在此图内，单独占显存，且随 batch×seq 增长——长序列训练的另一大头。</text>
 </svg>
 <div class="cap">7B 模型：模型状态 = 7e9 × 16B ≈ <strong>112 GB</strong>，单卡放不下。注意「优化器状态」占了 12/16 = 75%——这正是 ZeRO/FSDP 第一刀切它的原因。</div>
@@ -252,21 +254,99 @@
 <div class="cap">三个最常用的归约/聚合原语，以及把它们联系起来的恒等式。</div>
 </div>
 
-<p>这些原语在两个框架里都有最薄的封装。比如 Megatron 的 TP all-reduce 就是一行：</p>
-<div class="code-label">Megatron-LM · megatron/core/tensor_parallel/mappings.py:22</div>
-<pre><code class="language-python">def _reduce(input_, group):
-    """All-reduce the input tensor across model parallel group."""
-    if group.size() == 1:
-        return input_
-    torch.distributed.all_reduce(input_.contiguous(), group=group)
-    return input_</code></pre>
-<p>torchtitan 则把 loss 的归约包成 DTensor 友好的工具（注意它用的就是 functional collective 的 <code>all_reduce</code>）：</p>
-<div class="code-label">torchtitan · torchtitan/distributed/utils.py:30</div>
-<pre><code class="language-python">def _dist_reduce(x, reduceOp, mesh, extra_pg):
-    if isinstance(x, DTensor):
-        # functional collectives 不支持 DTensor 输入，先取本地张量
-        x = x.to_local()
-    return float(funcol.all_reduce(x, reduceOp=reduceOp, group=mesh).item())</code></pre>
+<p>另外三个原语——<strong>broadcast</strong>（复制）、<strong>send/recv</strong>（点对点）、<strong>all-to-all</strong>（转置）——画成图也很直观：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 310" role="img" aria-label="broadcast / send-recv / all-to-all 三个原语示意">
+  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+
+  <!-- broadcast -->
+  <text x="155" y="22" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">broadcast</text>
+  <g font-size="11" text-anchor="middle">
+    <rect x="60"  y="34" width="40" height="26" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="80"  y="51" fill="#cdd5ff">x</text>
+    <rect x="110" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="130" y="51" fill="#4b5468">·</text>
+    <rect x="160" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="180" y="51" fill="#4b5468">·</text>
+    <rect x="210" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="230" y="51" fill="#4b5468">·</text>
+    <line x1="155" y1="64" x2="155" y2="86" stroke="#64748b" marker-end="url(#b)"/>
+    <rect x="60"  y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="80"  y="107" fill="#cdd5ff">x</text>
+    <rect x="110" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="130" y="107" fill="#cdd5ff">x</text>
+    <rect x="160" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="180" y="107" fill="#cdd5ff">x</text>
+    <rect x="210" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="230" y="107" fill="#cdd5ff">x</text>
+  </g>
+  <text x="155" y="134" text-anchor="middle" fill="#9aa3b2" font-size="11">r0 的数据复制到每张卡</text>
+
+  <!-- send / recv -->
+  <text x="650" y="22" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">send / recv</text>
+  <g font-size="11" text-anchor="middle">
+    <text x="565" y="32" fill="#9aa3b2" font-size="10">r0</text><text x="615" y="32" fill="#9aa3b2" font-size="10">r1</text><text x="665" y="32" fill="#9aa3b2" font-size="10">r2</text><text x="715" y="32" fill="#9aa3b2" font-size="10">r3</text>
+    <rect x="545" y="40" width="40" height="26" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="565" y="57" fill="#cdd5ff">m</text>
+    <rect x="595" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="615" y="57" fill="#4b5468">·</text>
+    <rect x="645" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="665" y="57" fill="#4b5468">·</text>
+    <rect x="695" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="715" y="57" fill="#4b5468">·</text>
+    <path d="M565 70 C 565 92, 595 96, 614 96" fill="none" stroke="#7c93ff" marker-end="url(#b)"/>
+    <rect x="595" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="615" y="113" fill="#cdd5ff">m</text>
+  </g>
+  <text x="650" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">点对点：r0 把 m 发给 r1</text>
+
+  <line x1="40" y1="162" x2="780" y2="162" stroke="#262b3a"/>
+
+  <!-- all-to-all -->
+  <text x="410" y="186" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-to-all（每卡按目标切块，互相交换 = 转置）</text>
+  <text x="200" y="206" text-anchor="middle" fill="#9aa3b2" font-size="11">交换前：每行同源，含发往 4 卡的 4 块</text>
+  <text x="620" y="206" text-anchor="middle" fill="#9aa3b2" font-size="11">交换后：每行同色，集齐发给自己的 4 块</text>
+  <g font-size="9" text-anchor="middle">
+    <!-- before grid: color by destination column -->
+    <text x="138" y="232" fill="#9aa3b2" text-anchor="end">r0</text>
+    <rect x="142" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="233" fill="#cdd5ff">0→0</text>
+    <rect x="170" y="220" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="233" fill="#bbf7d0">0→1</text>
+    <rect x="198" y="220" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="233" fill="#fde68a">0→2</text>
+    <rect x="226" y="220" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="233" fill="#fca5a5">0→3</text>
+    <text x="138" y="254" fill="#9aa3b2" text-anchor="end">r1</text>
+    <rect x="142" y="242" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="255" fill="#cdd5ff">1→0</text>
+    <rect x="170" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="255" fill="#bbf7d0">1→1</text>
+    <rect x="198" y="242" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="255" fill="#fde68a">1→2</text>
+    <rect x="226" y="242" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="255" fill="#fca5a5">1→3</text>
+    <text x="138" y="276" fill="#9aa3b2" text-anchor="end">r2</text>
+    <rect x="142" y="264" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="277" fill="#cdd5ff">2→0</text>
+    <rect x="170" y="264" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="277" fill="#bbf7d0">2→1</text>
+    <rect x="198" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="277" fill="#fde68a">2→2</text>
+    <rect x="226" y="264" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="277" fill="#fca5a5">2→3</text>
+    <text x="138" y="298" fill="#9aa3b2" text-anchor="end">r3</text>
+    <rect x="142" y="286" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="299" fill="#cdd5ff">3→0</text>
+    <rect x="170" y="286" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="299" fill="#bbf7d0">3→1</text>
+    <rect x="198" y="286" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="299" fill="#fde68a">3→2</text>
+    <rect x="226" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="299" fill="#fca5a5">3→3</text>
+
+    <line x1="300" y1="258" x2="520" y2="258" stroke="#64748b" marker-end="url(#b)"/>
+    <text x="410" y="250" text-anchor="middle" fill="#9aa3b2" font-size="10">all-to-all</text>
+
+    <!-- after grid: row = destination, all one color -->
+    <text x="548" y="232" fill="#9aa3b2" text-anchor="end">r0</text>
+    <rect x="552" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="565" y="233" fill="#cdd5ff">0→0</text>
+    <rect x="580" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="593" y="233" fill="#cdd5ff">1→0</text>
+    <rect x="608" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="621" y="233" fill="#cdd5ff">2→0</text>
+    <rect x="636" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="649" y="233" fill="#cdd5ff">3→0</text>
+    <text x="548" y="254" fill="#9aa3b2" text-anchor="end">r1</text>
+    <rect x="552" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="565" y="255" fill="#bbf7d0">0→1</text>
+    <rect x="580" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="593" y="255" fill="#bbf7d0">1→1</text>
+    <rect x="608" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="621" y="255" fill="#bbf7d0">2→1</text>
+    <rect x="636" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="649" y="255" fill="#bbf7d0">3→1</text>
+    <text x="548" y="276" fill="#9aa3b2" text-anchor="end">r2</text>
+    <rect x="552" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="565" y="277" fill="#fde68a">0→2</text>
+    <rect x="580" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="593" y="277" fill="#fde68a">1→2</text>
+    <rect x="608" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="621" y="277" fill="#fde68a">2→2</text>
+    <rect x="636" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="649" y="277" fill="#fde68a">3→2</text>
+    <text x="548" y="298" fill="#9aa3b2" text-anchor="end">r3</text>
+    <rect x="552" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="565" y="299" fill="#fca5a5">0→3</text>
+    <rect x="580" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="593" y="299" fill="#fca5a5">1→3</text>
+    <rect x="608" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="621" y="299" fill="#fca5a5">2→3</text>
+    <rect x="636" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="649" y="299" fill="#fca5a5">3→3</text>
+  </g>
+</svg>
+<div class="cap">broadcast 复制、send/recv 点对点、all-to-all 转置。<code>i→j</code> = 源卡 i 发往目标卡 j 的那块；颜色按目标 j 着色，所以转置后每卡（每行）颜色统一。</div>
+</div>
+
+<p class="footnote">这些原语在 PyTorch（<code>torch.distributed</code>）、Megatron-LM、torchtitan 里都只是一行封装。具体框架是怎么调用它们的，留到各并行的章节里结合真实源码看——本章先建立「画面」就够了。</p>
 
 <h2 class="section" id="hardware"><span class="num">05</span>硬件拓扑：带宽决定「谁放哪」</h2>
 <p>卡间带宽分层级，差距极大，这直接决定每种并行该放在哪一层：</p>
