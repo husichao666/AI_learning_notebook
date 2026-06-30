@@ -180,171 +180,192 @@
 </div>
 
 <h2 class="section" id="collective"><span class="num">04</span>通信原语：并行的「语言」</h2>
-<p>多卡协作靠<strong>集合通信（collective communication）</strong>。理解下面 6 个原语，后面所有并行的通信都能看懂。设有 4 张卡，每卡持有一份数据：</p>
+<p>多卡协作靠<strong>集合通信（collective communication）</strong>。一共 6 个原语，吃透它们，后面所有并行的通信都能看懂。下面统一设有 <strong>4 张卡（r0–r3）</strong>、每卡持有一份数据，<strong>逐个</strong>来看——每个先一句话说清「谁的数据变成了什么」，再配一张图。文末附一张速查表，对应到后面各模块。</p>
 
-<table>
-<thead><tr><th>原语</th><th>做什么</th><th>典型用途</th></tr></thead>
-<tbody>
-<tr><td><code>all-reduce</code></td><td>各卡数据按元素求和（或取 max），结果<strong>每卡都得到完整一份</strong></td><td>DP 梯度同步（M1）</td></tr>
-<tr><td><code>reduce-scatter</code></td><td>求和后<strong>每卡只保留 1/N 分片</strong></td><td>FSDP 梯度归约（M2）</td></tr>
-<tr><td><code>all-gather</code></td><td>把各卡的分片<strong>拼成完整一份，每卡都有</strong></td><td>FSDP 还原参数（M2）</td></tr>
-<tr><td><code>broadcast</code></td><td>一张卡的数据复制到所有卡</td><td>初始化、PP 传标量（M4）</td></tr>
-<tr><td><code>all-to-all</code></td><td>每卡把自己的数据按目标切块，<strong>互相交换</strong>（转置）</td><td>MoE 专家并行（M6）</td></tr>
-<tr><td><code>send / recv</code></td><td>点对点，一张卡发给另一张卡</td><td>PP 跨 stage 传激活/梯度（M4）</td></tr>
-</tbody>
-</table>
-<p class="footnote">「典型用途」标了对应模块号——现在记不住没关系，只要先建立「6 个原语」这个名词库，等学到 Mx 时再回头对照即可。本章只需吃透下面这条恒等式。</p>
+<h3>① all-reduce</h3>
+<p>把 4 张卡上的数据<strong>按元素求和</strong>（也可取 max/min），再把结果<strong>发回每一张卡</strong>——所有卡拿到同一份完整的全和。这是 DP 同步梯度的标准操作：每卡各算一份梯度，all-reduce 之后大家持有相同的平均梯度，更新后权重仍然一致。</p>
+<div class="diagram">
+<svg viewBox="0 0 760 158" role="img" aria-label="all-reduce 示意">
+  <defs><marker id="mar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g text-anchor="middle" font-size="14">
+    <text x="95" y="22" fill="#9aa3b2" font-size="11">r0</text><text x="270" y="22" fill="#9aa3b2" font-size="11">r1</text><text x="445" y="22" fill="#9aa3b2" font-size="11">r2</text><text x="620" y="22" fill="#9aa3b2" font-size="11">r3</text>
+    <rect x="40"  y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="95"  y="53" fill="#d7dbe4">a₀</text>
+    <rect x="215" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="270" y="53" fill="#d7dbe4">a₁</text>
+    <rect x="390" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="445" y="53" fill="#d7dbe4">a₂</text>
+    <rect x="565" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="620" y="53" fill="#d7dbe4">a₃</text>
+    <line x1="357" y1="72" x2="357" y2="96" stroke="#64748b" marker-end="url(#mar)"/>
+    <rect x="40"  y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="95"  y="125" fill="#cdd5ff">Σ</text>
+    <rect x="215" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="270" y="125" fill="#cdd5ff">Σ</text>
+    <rect x="390" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="445" y="125" fill="#cdd5ff">Σ</text>
+    <rect x="565" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="620" y="125" fill="#cdd5ff">Σ</text>
+  </g>
+</svg>
+<div class="cap">a₀…a₃ 求和，<strong>每卡都拿到同一份全和 Σ = a₀+a₁+a₂+a₃</strong>。</div>
+</div>
+
+<h3>② reduce-scatter</h3>
+<p>和 all-reduce 一样先求和，但结果<strong>不发完整份</strong>——把全和切成 4 片，第 <em>i</em> 张卡只保留第 <em>i</em> 片。于是通信量和显存都只有 all-reduce 的一部分。FSDP 用它归约梯度：每卡只需要自己负责那片参数的梯度。</p>
+<div class="diagram">
+<svg viewBox="0 0 760 158" role="img" aria-label="reduce-scatter 示意">
+  <defs><marker id="mrs" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g text-anchor="middle" font-size="14">
+    <text x="95" y="22" fill="#9aa3b2" font-size="11">r0</text><text x="270" y="22" fill="#9aa3b2" font-size="11">r1</text><text x="445" y="22" fill="#9aa3b2" font-size="11">r2</text><text x="620" y="22" fill="#9aa3b2" font-size="11">r3</text>
+    <rect x="40"  y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="95"  y="53" fill="#d7dbe4">a₀</text>
+    <rect x="215" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="270" y="53" fill="#d7dbe4">a₁</text>
+    <rect x="390" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="445" y="53" fill="#d7dbe4">a₂</text>
+    <rect x="565" y="30" width="110" height="36" rx="5" fill="#1c2030" stroke="#475569"/><text x="620" y="53" fill="#d7dbe4">a₃</text>
+    <line x1="357" y1="72" x2="357" y2="96" stroke="#64748b" marker-end="url(#mrs)"/>
+    <rect x="40"  y="102" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="95"  y="125" fill="#bbf7d0">Σ₀</text>
+    <rect x="215" y="102" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="270" y="125" fill="#bbf7d0">Σ₁</text>
+    <rect x="390" y="102" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="445" y="125" fill="#bbf7d0">Σ₂</text>
+    <rect x="565" y="102" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="620" y="125" fill="#bbf7d0">Σ₃</text>
+  </g>
+</svg>
+<div class="cap">先求和、再切 4 片，<strong>第 i 张卡只留第 i 片 Σᵢ</strong>（Σᵢ 是全和的第 i 段）。</div>
+</div>
+
+<h3>③ all-gather</h3>
+<p>reduce-scatter 的<strong>逆操作</strong>：每张卡拿出手里的分片，<strong>拼接</strong>成完整一份，然后每张卡都得到这份完整数据（注意只是拼接、<em>不做求和</em>）。FSDP 在前向/反向前用它把分散保存的参数临时凑齐。</p>
+<div class="diagram">
+<svg viewBox="0 0 760 158" role="img" aria-label="all-gather 示意">
+  <defs><marker id="mag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g text-anchor="middle">
+    <text x="95" y="22" fill="#9aa3b2" font-size="11">r0</text><text x="270" y="22" fill="#9aa3b2" font-size="11">r1</text><text x="445" y="22" fill="#9aa3b2" font-size="11">r2</text><text x="620" y="22" fill="#9aa3b2" font-size="11">r3</text>
+    <rect x="40"  y="30" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="95"  y="53" fill="#bbf7d0" font-size="14">b₀</text>
+    <rect x="215" y="30" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="270" y="53" fill="#bbf7d0" font-size="14">b₁</text>
+    <rect x="390" y="30" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="445" y="53" fill="#bbf7d0" font-size="14">b₂</text>
+    <rect x="565" y="30" width="110" height="36" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="620" y="53" fill="#bbf7d0" font-size="14">b₃</text>
+    <line x1="357" y1="72" x2="357" y2="96" stroke="#64748b" marker-end="url(#mag)"/>
+    <rect x="40"  y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="95"  y="125" fill="#cdd5ff" font-size="12">b₀b₁b₂b₃</text>
+    <rect x="215" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="270" y="125" fill="#cdd5ff" font-size="12">b₀b₁b₂b₃</text>
+    <rect x="390" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="445" y="125" fill="#cdd5ff" font-size="12">b₀b₁b₂b₃</text>
+    <rect x="565" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="620" y="125" fill="#cdd5ff" font-size="12">b₀b₁b₂b₃</text>
+  </g>
+</svg>
+<div class="cap">每卡交出自己的分片 bᵢ，<strong>拼成完整 b₀b₁b₂b₃，每卡都有</strong>（只拼接，不求和）。</div>
+</div>
 
 <div class="callout key">
 <p><span class="label">🔑 最重要的恒等式</span></p>
 <p style="margin:8px 0 0"><strong>all-reduce = reduce-scatter + all-gather</strong></p>
-<p>这就是为什么 FSDP（reduce-scatter 梯度 + all-gather 参数）的通信量大约是 DDP（一次 all-reduce）的 1.5×——它把 all-reduce 拆成两半，中间插入了「只持有分片」的省显存窗口。后面会反复用到这个关系。</p>
+<p>把上面 ①②③ 串起来看：先 reduce-scatter 把全和切成分片（中间出现「每卡只持有 1/N」的省显存窗口），再 all-gather 拼回完整，效果就等于一次 all-reduce。这就是为什么 FSDP（reduce-scatter 梯度 + all-gather 参数）的通信量约为 DDP（一次 all-reduce）的 1.5×——它把 all-reduce 拆成两半，中间插进了省显存的缝。后面会反复用到这个关系。</p>
 </div>
 
+<h3>④ broadcast</h3>
+<p>一张卡（root，这里是 r0）把它的数据<strong>原样复制</strong>到所有卡，不做任何运算。常用于初始化时同步随机种子/权重，或 PP 中把一个标量（如序列长度）告诉所有 stage。</p>
 <div class="diagram">
-<svg viewBox="0 0 820 300" role="img" aria-label="all-reduce / reduce-scatter / all-gather 三个原语示意">
-  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
-  <!-- all-reduce -->
-  <text x="135" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-reduce</text>
-  <g font-size="11" text-anchor="middle">
-    <rect x="40"  y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="60"  y="55" fill="#d7dbe4">a₀</text>
-    <rect x="90"  y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="110" y="55" fill="#d7dbe4">a₁</text>
-    <rect x="140" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="160" y="55" fill="#d7dbe4">a₂</text>
-    <rect x="190" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="210" y="55" fill="#d7dbe4">a₃</text>
-    <line x1="135" y1="68" x2="135" y2="92" stroke="#64748b" marker-end="url(#a)"/>
-    <rect x="40"  y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="60"  y="113" fill="#cdd5ff">Σ</text>
-    <rect x="90"  y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="110" y="113" fill="#cdd5ff">Σ</text>
-    <rect x="140" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="160" y="113" fill="#cdd5ff">Σ</text>
-    <rect x="190" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="210" y="113" fill="#cdd5ff">Σ</text>
+<svg viewBox="0 0 760 158" role="img" aria-label="broadcast 示意">
+  <defs><marker id="mbc" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g text-anchor="middle" font-size="14">
+    <text x="95" y="22" fill="#9aa3b2" font-size="11">r0 (root)</text><text x="270" y="22" fill="#9aa3b2" font-size="11">r1</text><text x="445" y="22" fill="#9aa3b2" font-size="11">r2</text><text x="620" y="22" fill="#9aa3b2" font-size="11">r3</text>
+    <rect x="40"  y="30" width="110" height="36" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="95"  y="53" fill="#cdd5ff">x</text>
+    <rect x="215" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="270" y="53" fill="#4b5468">·</text>
+    <rect x="390" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="445" y="53" fill="#4b5468">·</text>
+    <rect x="565" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="620" y="53" fill="#4b5468">·</text>
+    <line x1="357" y1="72" x2="357" y2="96" stroke="#64748b" marker-end="url(#mbc)"/>
+    <rect x="40"  y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="95"  y="125" fill="#cdd5ff">x</text>
+    <rect x="215" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="270" y="125" fill="#cdd5ff">x</text>
+    <rect x="390" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="445" y="125" fill="#cdd5ff">x</text>
+    <rect x="565" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="620" y="125" fill="#cdd5ff">x</text>
   </g>
-  <text x="135" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">每卡都得到全和 Σ</text>
-  <!-- reduce-scatter -->
-  <text x="410" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">reduce-scatter</text>
-  <g font-size="11" text-anchor="middle">
-    <rect x="315" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="335" y="55" fill="#d7dbe4">a₀</text>
-    <rect x="365" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="385" y="55" fill="#d7dbe4">a₁</text>
-    <rect x="415" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="435" y="55" fill="#d7dbe4">a₂</text>
-    <rect x="465" y="38" width="40" height="26" rx="4" fill="#1c2030" stroke="#475569"/><text x="485" y="55" fill="#d7dbe4">a₃</text>
-    <line x1="410" y1="68" x2="410" y2="92" stroke="#64748b" marker-end="url(#a)"/>
-    <rect x="315" y="96" width="40" height="26" rx="4" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="335" y="113" fill="#bbf7d0">Σ₀</text>
-    <rect x="365" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="385" y="113" fill="#4b5468">·</text>
-    <rect x="415" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="435" y="113" fill="#4b5468">·</text>
-    <rect x="465" y="96" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="485" y="113" fill="#4b5468">·</text>
-  </g>
-  <text x="410" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">每卡只留自己那 1/N 分片的和</text>
-  <!-- all-gather -->
-  <text x="685" y="24" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-gather</text>
-  <g font-size="11" text-anchor="middle">
-    <rect x="590" y="38" width="40" height="26" rx="4" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="610" y="55" fill="#bbf7d0">b₀</text>
-    <rect x="640" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="660" y="55" fill="#4b5468">·</text>
-    <rect x="690" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="710" y="55" fill="#4b5468">·</text>
-    <rect x="740" y="38" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="760" y="55" fill="#4b5468">·</text>
-    <line x1="685" y1="68" x2="685" y2="92" stroke="#64748b" marker-end="url(#a)"/>
-    <rect x="590" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="610" y="113" fill="#cdd5ff">b₀</text>
-    <rect x="640" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="660" y="113" fill="#cdd5ff">b₁</text>
-    <rect x="690" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="710" y="113" fill="#cdd5ff">b₂</text>
-    <rect x="740" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="760" y="113" fill="#cdd5ff">b₃</text>
-  </g>
-  <text x="685" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">各卡分片拼成完整，每卡都有</text>
-  <!-- identity -->
-  <rect x="120" y="178" width="580" height="44" rx="10" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
-  <text x="410" y="205" text-anchor="middle" fill="#bbf7d0" font-size="14" font-weight="700">all-reduce ≡ reduce-scatter ∘ all-gather</text>
-  <text x="410" y="250" text-anchor="middle" fill="#9aa3b2" font-size="12">先 reduce-scatter 把和切成分片（每卡省显存），再 all-gather 拼回完整——这就是 FSDP 的核心。</text>
 </svg>
-<div class="cap">三个最常用的归约/聚合原语，以及把它们联系起来的恒等式。</div>
+<div class="cap">root 卡的 x <strong>原样复制到每张卡</strong>，不做运算。</div>
 </div>
 
-<p>另外三个原语——<strong>broadcast</strong>（复制）、<strong>send/recv</strong>（点对点）、<strong>all-to-all</strong>（转置）——画成图也很直观：</p>
-
+<h3>⑤ send / recv</h3>
+<p>唯一的<strong>点对点</strong>原语：指定一张卡发（send）、另一张卡收（recv），其余卡不参与。流水线并行 PP 用它在相邻 stage 间传递激活（前向）和梯度（反向）。</p>
 <div class="diagram">
-<svg viewBox="0 0 820 310" role="img" aria-label="broadcast / send-recv / all-to-all 三个原语示意">
-  <defs><marker id="b" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
-
-  <!-- broadcast -->
-  <text x="155" y="22" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">broadcast</text>
-  <g font-size="11" text-anchor="middle">
-    <rect x="60"  y="34" width="40" height="26" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="80"  y="51" fill="#cdd5ff">x</text>
-    <rect x="110" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="130" y="51" fill="#4b5468">·</text>
-    <rect x="160" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="180" y="51" fill="#4b5468">·</text>
-    <rect x="210" y="34" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="230" y="51" fill="#4b5468">·</text>
-    <line x1="155" y1="64" x2="155" y2="86" stroke="#64748b" marker-end="url(#b)"/>
-    <rect x="60"  y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="80"  y="107" fill="#cdd5ff">x</text>
-    <rect x="110" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="130" y="107" fill="#cdd5ff">x</text>
-    <rect x="160" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="180" y="107" fill="#cdd5ff">x</text>
-    <rect x="210" y="90" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="230" y="107" fill="#cdd5ff">x</text>
+<svg viewBox="0 0 760 158" role="img" aria-label="send / recv 示意">
+  <defs><marker id="msr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7c93ff"/></marker></defs>
+  <g text-anchor="middle" font-size="14">
+    <text x="95" y="22" fill="#9aa3b2" font-size="11">r0</text><text x="270" y="22" fill="#9aa3b2" font-size="11">r1</text><text x="445" y="22" fill="#9aa3b2" font-size="11">r2</text><text x="620" y="22" fill="#9aa3b2" font-size="11">r3</text>
+    <rect x="40"  y="30" width="110" height="36" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="95"  y="53" fill="#cdd5ff">m</text>
+    <rect x="215" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="270" y="53" fill="#4b5468">·</text>
+    <rect x="390" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="445" y="53" fill="#4b5468">·</text>
+    <rect x="565" y="30" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="620" y="53" fill="#4b5468">·</text>
+    <path d="M95 66 C 95 90, 200 102, 268 102" fill="none" stroke="#7c93ff" stroke-width="1.5" marker-end="url(#msr)"/>
+    <text x="183" y="84" fill="#7c93ff" font-size="11">send m</text>
+    <rect x="40"  y="102" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="95"  y="125" fill="#4b5468">·</text>
+    <rect x="215" y="102" width="110" height="36" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="270" y="125" fill="#cdd5ff">m</text>
+    <rect x="390" y="102" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="445" y="125" fill="#4b5468">·</text>
+    <rect x="565" y="102" width="110" height="36" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="620" y="125" fill="#4b5468">·</text>
   </g>
-  <text x="155" y="134" text-anchor="middle" fill="#9aa3b2" font-size="11">r0 的数据复制到每张卡</text>
+</svg>
+<div class="cap">点对点：<strong>r0 发、r1 收</strong>，m 从 r0 搬到 r1，其余卡不参与。</div>
+</div>
 
-  <!-- send / recv -->
-  <text x="650" y="22" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">send / recv</text>
-  <g font-size="11" text-anchor="middle">
-    <text x="565" y="32" fill="#9aa3b2" font-size="10">r0</text><text x="615" y="32" fill="#9aa3b2" font-size="10">r1</text><text x="665" y="32" fill="#9aa3b2" font-size="10">r2</text><text x="715" y="32" fill="#9aa3b2" font-size="10">r3</text>
-    <rect x="545" y="40" width="40" height="26" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="565" y="57" fill="#cdd5ff">m</text>
-    <rect x="595" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="615" y="57" fill="#4b5468">·</text>
-    <rect x="645" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="665" y="57" fill="#4b5468">·</text>
-    <rect x="695" y="40" width="40" height="26" rx="4" fill="#161922" stroke="#2a2f3e"/><text x="715" y="57" fill="#4b5468">·</text>
-    <path d="M565 70 C 565 92, 595 96, 614 96" fill="none" stroke="#7c93ff" marker-end="url(#b)"/>
-    <rect x="595" y="96" width="40" height="26" rx="4" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="615" y="113" fill="#cdd5ff">m</text>
-  </g>
-  <text x="650" y="140" text-anchor="middle" fill="#9aa3b2" font-size="11">点对点：r0 把 m 发给 r1</text>
-
-  <line x1="40" y1="162" x2="780" y2="162" stroke="#262b3a"/>
-
-  <!-- all-to-all -->
-  <text x="410" y="186" text-anchor="middle" fill="#7c93ff" font-size="13" font-weight="700">all-to-all（每卡按目标切块，互相交换 = 转置）</text>
-  <text x="200" y="206" text-anchor="middle" fill="#9aa3b2" font-size="11">交换前：每行同源，含发往 4 卡的 4 块</text>
-  <text x="620" y="206" text-anchor="middle" fill="#9aa3b2" font-size="11">交换后：每行同色，集齐发给自己的 4 块</text>
+<h3>⑥ all-to-all</h3>
+<p>最复杂的一个：每张卡把自己的数据<strong>切成 N 块、分别发给 N 张卡</strong>，同时收下别人发来的块——相当于把 N×N 的数据矩阵做一次<strong>转置</strong>。MoE 专家并行用它把 token <strong>分发（dispatch）</strong>到所属专家所在的卡，算完再 all-to-all <strong>收回（combine）</strong>。</p>
+<div class="diagram">
+<svg viewBox="0 0 760 145" role="img" aria-label="all-to-all 转置示意">
+  <defs><marker id="ma2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="195" y="16" text-anchor="middle" fill="#9aa3b2" font-size="11">交换前：每行同源（含发往 4 卡的 4 块）</text>
+  <text x="607" y="16" text-anchor="middle" fill="#9aa3b2" font-size="11">交换后：每行同色（集齐发给自己的 4 块）</text>
   <g font-size="9" text-anchor="middle">
     <!-- before grid: color by destination column -->
-    <text x="138" y="232" fill="#9aa3b2" text-anchor="end">r0</text>
-    <rect x="142" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="233" fill="#cdd5ff">0→0</text>
-    <rect x="170" y="220" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="233" fill="#bbf7d0">0→1</text>
-    <rect x="198" y="220" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="233" fill="#fde68a">0→2</text>
-    <rect x="226" y="220" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="233" fill="#fca5a5">0→3</text>
-    <text x="138" y="254" fill="#9aa3b2" text-anchor="end">r1</text>
-    <rect x="142" y="242" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="255" fill="#cdd5ff">1→0</text>
-    <rect x="170" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="255" fill="#bbf7d0">1→1</text>
-    <rect x="198" y="242" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="255" fill="#fde68a">1→2</text>
-    <rect x="226" y="242" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="255" fill="#fca5a5">1→3</text>
-    <text x="138" y="276" fill="#9aa3b2" text-anchor="end">r2</text>
-    <rect x="142" y="264" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="277" fill="#cdd5ff">2→0</text>
-    <rect x="170" y="264" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="277" fill="#bbf7d0">2→1</text>
-    <rect x="198" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="277" fill="#fde68a">2→2</text>
-    <rect x="226" y="264" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="277" fill="#fca5a5">2→3</text>
-    <text x="138" y="298" fill="#9aa3b2" text-anchor="end">r3</text>
-    <rect x="142" y="286" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="299" fill="#cdd5ff">3→0</text>
-    <rect x="170" y="286" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="299" fill="#bbf7d0">3→1</text>
-    <rect x="198" y="286" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="299" fill="#fde68a">3→2</text>
-    <rect x="226" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="299" fill="#fca5a5">3→3</text>
+    <text x="138" y="42" fill="#9aa3b2" text-anchor="end">r0</text>
+    <rect x="142" y="30" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="43" fill="#cdd5ff">0→0</text>
+    <rect x="170" y="30" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="43" fill="#bbf7d0">0→1</text>
+    <rect x="198" y="30" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="43" fill="#fde68a">0→2</text>
+    <rect x="226" y="30" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="43" fill="#fca5a5">0→3</text>
+    <text x="138" y="64" fill="#9aa3b2" text-anchor="end">r1</text>
+    <rect x="142" y="52" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="65" fill="#cdd5ff">1→0</text>
+    <rect x="170" y="52" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="65" fill="#bbf7d0">1→1</text>
+    <rect x="198" y="52" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="65" fill="#fde68a">1→2</text>
+    <rect x="226" y="52" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="65" fill="#fca5a5">1→3</text>
+    <text x="138" y="86" fill="#9aa3b2" text-anchor="end">r2</text>
+    <rect x="142" y="74" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="87" fill="#cdd5ff">2→0</text>
+    <rect x="170" y="74" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="87" fill="#bbf7d0">2→1</text>
+    <rect x="198" y="74" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="87" fill="#fde68a">2→2</text>
+    <rect x="226" y="74" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="87" fill="#fca5a5">2→3</text>
+    <text x="138" y="108" fill="#9aa3b2" text-anchor="end">r3</text>
+    <rect x="142" y="96" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="155" y="109" fill="#cdd5ff">3→0</text>
+    <rect x="170" y="96" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="183" y="109" fill="#bbf7d0">3→1</text>
+    <rect x="198" y="96" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="211" y="109" fill="#fde68a">3→2</text>
+    <rect x="226" y="96" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="239" y="109" fill="#fca5a5">3→3</text>
 
-    <line x1="300" y1="258" x2="520" y2="258" stroke="#64748b" marker-end="url(#b)"/>
-    <text x="410" y="250" text-anchor="middle" fill="#9aa3b2" font-size="10">all-to-all</text>
+    <line x1="300" y1="72" x2="520" y2="72" stroke="#64748b" marker-end="url(#ma2)"/>
+    <text x="410" y="64" text-anchor="middle" fill="#9aa3b2" font-size="10">all-to-all（转置）</text>
 
     <!-- after grid: row = destination, all one color -->
-    <text x="548" y="232" fill="#9aa3b2" text-anchor="end">r0</text>
-    <rect x="552" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="565" y="233" fill="#cdd5ff">0→0</text>
-    <rect x="580" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="593" y="233" fill="#cdd5ff">1→0</text>
-    <rect x="608" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="621" y="233" fill="#cdd5ff">2→0</text>
-    <rect x="636" y="220" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="649" y="233" fill="#cdd5ff">3→0</text>
-    <text x="548" y="254" fill="#9aa3b2" text-anchor="end">r1</text>
-    <rect x="552" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="565" y="255" fill="#bbf7d0">0→1</text>
-    <rect x="580" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="593" y="255" fill="#bbf7d0">1→1</text>
-    <rect x="608" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="621" y="255" fill="#bbf7d0">2→1</text>
-    <rect x="636" y="242" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="649" y="255" fill="#bbf7d0">3→1</text>
-    <text x="548" y="276" fill="#9aa3b2" text-anchor="end">r2</text>
-    <rect x="552" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="565" y="277" fill="#fde68a">0→2</text>
-    <rect x="580" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="593" y="277" fill="#fde68a">1→2</text>
-    <rect x="608" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="621" y="277" fill="#fde68a">2→2</text>
-    <rect x="636" y="264" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="649" y="277" fill="#fde68a">3→2</text>
-    <text x="548" y="298" fill="#9aa3b2" text-anchor="end">r3</text>
-    <rect x="552" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="565" y="299" fill="#fca5a5">0→3</text>
-    <rect x="580" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="593" y="299" fill="#fca5a5">1→3</text>
-    <rect x="608" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="621" y="299" fill="#fca5a5">2→3</text>
-    <rect x="636" y="286" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="649" y="299" fill="#fca5a5">3→3</text>
+    <text x="548" y="42" fill="#9aa3b2" text-anchor="end">r0</text>
+    <rect x="552" y="30" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="565" y="43" fill="#cdd5ff">0→0</text>
+    <rect x="580" y="30" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="593" y="43" fill="#cdd5ff">1→0</text>
+    <rect x="608" y="30" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="621" y="43" fill="#cdd5ff">2→0</text>
+    <rect x="636" y="30" width="26" height="18" rx="3" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="649" y="43" fill="#cdd5ff">3→0</text>
+    <text x="548" y="64" fill="#9aa3b2" text-anchor="end">r1</text>
+    <rect x="552" y="52" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="565" y="65" fill="#bbf7d0">0→1</text>
+    <rect x="580" y="52" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="593" y="65" fill="#bbf7d0">1→1</text>
+    <rect x="608" y="52" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="621" y="65" fill="#bbf7d0">2→1</text>
+    <rect x="636" y="52" width="26" height="18" rx="3" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="649" y="65" fill="#bbf7d0">3→1</text>
+    <text x="548" y="86" fill="#9aa3b2" text-anchor="end">r2</text>
+    <rect x="552" y="74" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="565" y="87" fill="#fde68a">0→2</text>
+    <rect x="580" y="74" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="593" y="87" fill="#fde68a">1→2</text>
+    <rect x="608" y="74" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="621" y="87" fill="#fde68a">2→2</text>
+    <rect x="636" y="74" width="26" height="18" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="649" y="87" fill="#fde68a">3→2</text>
+    <text x="548" y="108" fill="#9aa3b2" text-anchor="end">r3</text>
+    <rect x="552" y="96" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="565" y="109" fill="#fca5a5">0→3</text>
+    <rect x="580" y="96" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="593" y="109" fill="#fca5a5">1→3</text>
+    <rect x="608" y="96" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="621" y="109" fill="#fca5a5">2→3</text>
+    <rect x="636" y="96" width="26" height="18" rx="3" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="649" y="109" fill="#fca5a5">3→3</text>
   </g>
 </svg>
-<div class="cap">broadcast 复制、send/recv 点对点、all-to-all 转置。<code>i→j</code> = 源卡 i 发往目标卡 j 的那块；颜色按目标 j 着色，所以转置后每卡（每行）颜色统一。</div>
+<div class="cap"><code>i→j</code> = 源卡 i 发往目标卡 j 的那块；颜色按目标 j 着色，所以转置后每卡（每行）颜色统一——这就是「转置」。</div>
 </div>
+
+<h3>速查表：6 个原语用在哪</h3>
+<p>把 6 个原语收成一张表，对应到后面各模块——现在记不住没关系，等学到 Mx 时回头对照即可：</p>
+<table>
+<thead><tr><th>原语</th><th>一句话</th><th>用在哪个模块</th></tr></thead>
+<tbody>
+<tr><td><code>all-reduce</code></td><td>求和，每卡都得到完整全和</td><td>DP 梯度同步（M1）</td></tr>
+<tr><td><code>reduce-scatter</code></td><td>求和后每卡只留 1/N 分片</td><td>FSDP 梯度归约（M2）</td></tr>
+<tr><td><code>all-gather</code></td><td>分片拼成完整，每卡都有</td><td>FSDP 还原参数（M2）</td></tr>
+<tr><td><code>broadcast</code></td><td>一张卡的数据复制到所有卡</td><td>初始化、PP 传标量（M4）</td></tr>
+<tr><td><code>send / recv</code></td><td>点对点，一张卡发给另一张卡</td><td>PP 跨 stage 传激活/梯度（M4）</td></tr>
+<tr><td><code>all-to-all</code></td><td>每卡按目标切块、互相交换（转置）</td><td>MoE 专家并行（M6）</td></tr>
+</tbody>
+</table>
 
 <p class="footnote">这些原语在 PyTorch（<code>torch.distributed</code>）、Megatron-LM、torchtitan 里都只是一行封装。具体框架是怎么调用它们的，留到各并行的章节里结合真实源码看——本章先建立「画面」就够了。</p>
 
