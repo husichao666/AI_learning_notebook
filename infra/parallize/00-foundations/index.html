@@ -63,13 +63,70 @@
     <span class="tag">🧮 16 字节/参数</span>
     <span class="tag">🔁 all-reduce = reduce-scatter + all-gather</span>
     <span class="tag">🔌 NVLink vs InfiniBand</span>
-    <span class="tag">📊 MFU / bubble / overlap</span>
+    <span class="tag">📊 显存账本 / MFU / overlap</span>
   </div>
 </div></header>
 
 <div class="wrap">
 
-<h2 class="section" id="why"><span class="num">01</span>为什么需要并行：两堵墙</h2>
+<div class="callout key">
+<p><span class="label">🎯 读完这一章，你应该能回答 3 个问题</span></p>
+<ol style="margin:6px 0 0">
+<li>一个 7B 模型，单卡 80GB 显存为什么还是装不下？显存到底花在哪？</li>
+<li><code>all-reduce</code> 和 <code>reduce-scatter + all-gather</code> 是什么关系？</li>
+<li>为什么 TP 一般塞进单机、而 PP / DP 可以跨机？</li>
+</ol>
+<p style="margin:10px 0 0;color:var(--muted);font-size:14px">答得上来，就可以进 M1；答不上来，回到对应小节再看一遍。后面所有并行都建立在这三件事上。</p>
+</div>
+
+<h2 class="section" id="step"><span class="num">01</span>先看清：一个训练 step 长什么样</h2>
+<p>所有并行都是在「一次训练 step」上做文章。所以先把这一个 step 拆开——它永远是固定的四拍，每一拍都<strong>产生或消耗一种显存</strong>：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 820 250" role="img" aria-label="一次训练 step 的四拍及其显存去向">
+  <defs><marker id="s" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c93ff"/></marker></defs>
+  <!-- 4 stages -->
+  <g font-size="13" text-anchor="middle">
+    <rect x="20"  y="40" width="170" height="54" rx="9" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/>
+    <text x="105" y="64" fill="#cdd5ff" font-weight="700">① forward 前向</text>
+    <text x="105" y="83" fill="#9aa3b2" font-size="11.5">用「权重」算出 loss</text>
+
+    <rect x="216" y="40" width="170" height="54" rx="9" fill="rgba(251,191,36,0.12)" stroke="#fbbf24"/>
+    <text x="301" y="64" fill="#fde68a" font-weight="700">② 存「激活值」</text>
+    <text x="301" y="83" fill="#9aa3b2" font-size="11.5">中间结果，反向要用</text>
+
+    <rect x="412" y="40" width="170" height="54" rx="9" fill="rgba(74,222,128,0.14)" stroke="#4ade80"/>
+    <text x="497" y="64" fill="#bbf7d0" font-weight="700">③ backward 反向</text>
+    <text x="497" y="83" fill="#9aa3b2" font-size="11.5">算出「梯度」</text>
+
+    <rect x="608" y="40" width="190" height="54" rx="9" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/>
+    <text x="703" y="64" fill="#cdd5ff" font-weight="700">④ optimizer.step()</text>
+    <text x="703" y="83" fill="#9aa3b2" font-size="11.5">用「优化器状态」更新权重</text>
+
+    <line x1="190" y1="67" x2="214" y2="67" stroke="#7c93ff" marker-end="url(#s)"/>
+    <line x1="386" y1="67" x2="410" y2="67" stroke="#7c93ff" marker-end="url(#s)"/>
+    <line x1="582" y1="67" x2="606" y2="67" stroke="#7c93ff" marker-end="url(#s)"/>
+  </g>
+  <!-- loop back -->
+  <path d="M703 94 L703 130 L105 130 L105 96" fill="none" stroke="#475569" stroke-dasharray="4 4" marker-end="url(#s)"/>
+  <text x="404" y="124" text-anchor="middle" fill="#64748b" font-size="11.5">权重更新完，下一个 batch 重新开始 ↺</text>
+  <!-- memory tally -->
+  <text x="20" y="172" fill="#eaeefb" font-size="13" font-weight="600">这一拍碰到的显存，正是下一节「账本」的四项：</text>
+  <g font-size="12">
+    <text x="20"  y="198" fill="#cdd5ff">• 权重 weights（①④ 都要）</text>
+    <text x="300" y="198" fill="#fde68a">• 激活值 activations（②存，③用完即放）</text>
+    <text x="20"  y="222" fill="#bbf7d0">• 梯度 gradients（③产生）</text>
+    <text x="300" y="222" fill="#bbf7d0">• 优化器状态 optimizer states（④用）</text>
+  </g>
+</svg>
+<div class="cap">一次 step = 前向 → 存激活 → 反向 → 更新。<strong>带着这张图去看下一节的显存账本</strong>，每一项都能对上号。</div>
+</div>
+
+<div class="callout">
+<p><span class="label">💡 为什么要先记这张图</span> 后面每种并行，本质都是「在四拍中的某一拍插入卡间通信」：DP 在 ③ 后同步梯度、FSDP 在 ① 前临时凑齐权重、PP 把不同层的 ①③ 拆到不同卡……所以看不懂某个并行在干嘛时，先问：<strong>它动的是哪一拍？</strong></p>
+</div>
+
+<h2 class="section" id="why"><span class="num">02</span>为什么需要并行：两堵墙</h2>
 <p>单卡训练大模型会撞上两堵墙：</p>
 <ul>
 <li><strong>显存墙</strong>：模型参数、梯度、优化器状态、激活值加起来远超单卡显存（H100 也只有 80GB）。一个 7B 模型光优化器状态就要 ~84GB——单卡装不下。</li>
@@ -77,8 +134,8 @@
 </ul>
 <p>并行的本质就是：<strong>把「模型状态」和「计算」拆开，摊到多张卡上</strong>。拆什么、怎么拆、拆完怎么把结果对齐——就是整本手册的内容。要理解拆什么，先看清显存到底花在哪。</p>
 
-<h2 class="section" id="memory"><span class="num">02</span>显存账本：一次训练 step 的显存去向</h2>
-<p>训练时显存由四部分构成，记参数量为 $P$：</p>
+<h2 class="section" id="memory"><span class="num">03</span>显存账本：一次训练 step 的显存去向</h2>
+<p>对照上一节那张 step 图，训练显存就是它碰到的四样东西。记参数量为 $P$：</p>
 <table>
 <thead><tr><th>组成</th><th>是什么</th><th>混合精度 + Adam 下的大小</th></tr></thead>
 <tbody>
@@ -109,25 +166,32 @@
 <div class="cap">7B 模型：模型状态 = 7e9 × 16B ≈ <strong>112 GB</strong>，单卡放不下。注意「优化器状态」占了 12/16 = 75%——这正是 ZeRO/FSDP 第一刀切它的原因。</div>
 </div>
 
+<div class="callout warn">
+<p><span class="label">🧮 把这笔账算到底：7B 模型上单卡</span></p>
+<p style="margin:8px 0 0">模型状态 = 7e9 × 16B = <strong>112 GB</strong>。一张 H100 只有 80GB——<strong>光是参数+梯度+优化器状态就溢出 32GB，激活值还没算</strong>。这就是「显存墙」具体长什么样。<br>
+切谁最划算？优化器状态占 12/16 = 75%，所以 ZeRO/FSDP 第一刀就切它：把 112GB 摊到 8 卡，每卡只剩 14GB，墙瞬间消失。<strong>这一笔账，就是后面所有「省显存」并行的出发点。</strong></p>
+</div>
+
 <div class="callout key">
 <p><span class="label">🔑 记住这张账本</span></p>
 <p>后面每种并行都对应「切账本里的某一项」：<strong>FSDP/ZeRO 切模型状态</strong>（参数+梯度+优化器状态）；<strong>TP/PP 切参数与对应计算</strong>；<strong>SP/CP 切激活值</strong>（按序列维）。看不懂某个并行省了什么时，回来对照这张表。</p>
 </div>
 
-<h2 class="section" id="collective"><span class="num">03</span>通信原语：并行的「语言」</h2>
+<h2 class="section" id="collective"><span class="num">04</span>通信原语：并行的「语言」</h2>
 <p>多卡协作靠<strong>集合通信（collective communication）</strong>。理解下面 6 个原语，后面所有并行的通信都能看懂。设有 4 张卡，每卡持有一份数据：</p>
 
 <table>
 <thead><tr><th>原语</th><th>做什么</th><th>典型用途</th></tr></thead>
 <tbody>
-<tr><td><code>all-reduce</code></td><td>各卡数据按元素求和（或取 max），结果<strong>每卡都得到完整一份</strong></td><td>DP 梯度同步、TP 行切层输出合并</td></tr>
-<tr><td><code>reduce-scatter</code></td><td>求和后<strong>每卡只保留 1/N 分片</strong></td><td>FSDP 梯度归约、SP 输出</td></tr>
-<tr><td><code>all-gather</code></td><td>把各卡的分片<strong>拼成完整一份，每卡都有</strong></td><td>FSDP 还原参数、SP 还原激活</td></tr>
-<tr><td><code>broadcast</code></td><td>一张卡的数据复制到所有卡</td><td>初始化、PP 传 token 数</td></tr>
-<tr><td><code>all-to-all</code></td><td>每卡把自己的数据按目标切块，<strong>互相交换</strong>（转置）</td><td>MoE 专家并行 dispatch/combine、Ulysses CP</td></tr>
-<tr><td><code>send / recv</code></td><td>点对点，一张卡发给另一张卡</td><td>PP 跨 stage 传激活/梯度</td></tr>
+<tr><td><code>all-reduce</code></td><td>各卡数据按元素求和（或取 max），结果<strong>每卡都得到完整一份</strong></td><td>DP 梯度同步（M1）</td></tr>
+<tr><td><code>reduce-scatter</code></td><td>求和后<strong>每卡只保留 1/N 分片</strong></td><td>FSDP 梯度归约（M2）</td></tr>
+<tr><td><code>all-gather</code></td><td>把各卡的分片<strong>拼成完整一份，每卡都有</strong></td><td>FSDP 还原参数（M2）</td></tr>
+<tr><td><code>broadcast</code></td><td>一张卡的数据复制到所有卡</td><td>初始化、PP 传标量（M4）</td></tr>
+<tr><td><code>all-to-all</code></td><td>每卡把自己的数据按目标切块，<strong>互相交换</strong>（转置）</td><td>MoE 专家并行（M6）</td></tr>
+<tr><td><code>send / recv</code></td><td>点对点，一张卡发给另一张卡</td><td>PP 跨 stage 传激活/梯度（M4）</td></tr>
 </tbody>
 </table>
+<p class="footnote">「典型用途」标了对应模块号——现在记不住没关系，只要先建立「6 个原语」这个名词库，等学到 Mx 时再回头对照即可。本章只需吃透下面这条恒等式。</p>
 
 <div class="callout key">
 <p><span class="label">🔑 最重要的恒等式</span></p>
@@ -204,7 +268,7 @@
         x = x.to_local()
     return float(funcol.all_reduce(x, reduceOp=reduceOp, group=mesh).item())</code></pre>
 
-<h2 class="section" id="hardware"><span class="num">04</span>硬件拓扑：带宽决定「谁放哪」</h2>
+<h2 class="section" id="hardware"><span class="num">05</span>硬件拓扑：带宽决定「谁放哪」</h2>
 <p>卡间带宽分层级，差距极大，这直接决定每种并行该放在哪一层：</p>
 <table>
 <thead><tr><th>层级</th><th>互连</th><th>量级带宽</th><th>适合放</th></tr></thead>
@@ -217,15 +281,15 @@
 <p><span class="label">💡 核心放置直觉</span> 通信越频繁、越在关键路径上的并行（TP），越要放进高带宽的 NVLink 域（典型 TP≤8，正好一台机器）；通信稀疏、能和计算重叠的（PP / DP），可以容忍跨机的低带宽。这条原则会在 <strong>M7 nD 组合</strong> 里反复出现。</p>
 </div>
 
-<h2 class="section" id="metrics"><span class="num">05</span>衡量指标：怎么判断快不快</h2>
+<h2 class="section" id="metrics"><span class="num">06</span>衡量指标：怎么判断快不快</h2>
+<p>本章只需先认识 3 个当下用得上的词，其余指标（如流水线的「气泡 bubble」）等到第一次遇到它的模块再讲：</p>
 <ul>
-<li><strong>吞吐 throughput</strong>：每秒处理多少 token（tokens/s）。最终目标。</li>
+<li><strong>吞吐 throughput</strong>：每秒处理多少 token（tokens/s）。最终目标，一切优化都为它服务。</li>
 <li><strong>MFU（Model FLOPs Utilization）</strong>：实际算力利用率 = 实测 FLOPs / 硬件峰值 FLOPs。40~50% 算不错，越高越好。</li>
-<li><strong>气泡 bubble</strong>：流水线并行里 GPU 干等的空闲时间占比（M4 详谈）。</li>
-<li><strong>通信-计算重叠 overlap</strong>：让集合通信和计算同时进行，把通信时间「藏」在计算后面。这是所有高效并行实现的命脉——后面会看到 FSDP 预取参数、DP 反向边算边 all-reduce、PP 用异步 p2p，全是为了 overlap。</li>
+<li><strong>通信-计算重叠 overlap</strong>：让集合通信和计算同时进行，把通信时间「藏」在计算后面。这是所有高效并行实现的命脉——后面会看到 FSDP 预取参数、DP 反向边算边 all-reduce、PP 用异步 p2p，全是为了 overlap。从 M1 起就会用到这个词。</li>
 </ul>
 
-<h2 class="section" id="map"><span class="num">06</span>本手册地图：每种并行切账本里的什么</h2>
+<h2 class="section" id="map"><span class="num">07</span>本手册地图：每种并行切账本里的什么</h2>
 <p>有了显存账本和通信原语，整本手册可以一句话概括成「<strong>切账本里的不同项，用不同原语对齐结果</strong>」：</p>
 <table>
 <thead><tr><th>模块</th><th>切账本里的</th><th>主要通信原语</th></tr></thead>
