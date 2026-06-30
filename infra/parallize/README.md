@@ -11,6 +11,7 @@
 
 - **整本书（GitHub Pages，需先开启）** 👉 <https://husichao666.github.io/AI_learning_notebook/infra/parallize/>
 - **单章即点即看（htmlpreview）** 👉 [词表并行交叉熵 Loss Parallel](https://htmlpreview.github.io/?https://github.com/husichao666/AI_learning_notebook/blob/main/infra/parallize/loss_parallel/index.html)
+- **单章即点即看（htmlpreview）** 👉 [MoE 负载均衡 aux_loss 解析](https://htmlpreview.github.io/?https://github.com/husichao666/AI_learning_notebook/blob/main/infra/parallize/moe_aux_loss/index.html)
 
 ## 🧭 一句话主线
 
@@ -151,9 +152,10 @@
 - MoE 简介：router / gating、top-k 路由、稀疏激活
 - **EP**：不同 expert 放不同卡，靠 `all-to-all` 做 token 的 dispatch / combine
 - 与 TP/DP 组合：EP×TP、容量因子 capacity factor、负载均衡 loss
+  - **负载均衡 aux_loss 深入** 👉 **本系列已发布：[moe_aux_loss](./moe_aux_loss/)**（mindformers pynative 与 Megatron-LM 逐行对照）
 - 工程难点：token 分布不均导致的通信倾斜
 
-> ✅ **学完自测**：MoE 的 all-to-all 在传什么？专家负载不均会怎样？
+> ✅ **学完自测**：MoE 的 all-to-all 在传什么？专家负载不均会怎样？负载均衡 aux_loss 里哪一项带梯度、哪一项是 detach 的计数？（→ 读 moe_aux_loss）
 
 ---
 
@@ -184,6 +186,7 @@
 | M4 | 流水线并行 PP | [`04-pp/`](./04-pp/) | ✅ 已发布 |
 | M5 | 上下文并行 CP | [`05-cp/`](./05-cp/) | ✅ 已发布 |
 | M6 | 专家并行 EP | [`06-ep/`](./06-ep/) | ✅ 已发布 |
+| M6 深入 | MoE 负载均衡 aux_loss（mindformers vs Megatron） | [`moe_aux_loss/`](./moe_aux_loss/) | ✅ 已发布 |
 | M7 | nD 组合并行 + 工程 | [`07-nd/`](./07-nd/) | ✅ 已发布 |
 
 > 每章为 `infra/parallize/<topic>/index.html` 下的独立 HTML，风格统一：

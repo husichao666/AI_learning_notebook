@@ -99,6 +99,7 @@
     { id:'pp',          grp:'模型维', title:'M4 · 流水线并行 PP', sub:'切层间，1F1B',             path:'04-pp/index.html',          status:'wip' },
     { id:'cp',          grp:'序列/专家维', title:'M5 · 上下文并行 CP', sub:'切序列，Ring Attention', path:'05-cp/index.html',          status:'wip' },
     { id:'ep',          grp:'序列/专家维', title:'M6 · 专家并行 EP',   sub:'MoE，all-to-all',        path:'06-ep/index.html',          status:'wip' },
+    { id:'auxloss',     grp:'序列/专家维', title:'MoE 负载均衡 aux_loss', sub:'EP 深入 · mindformers vs Megatron', path:'moe_aux_loss/index.html', status:'done', sub_item:true },
     { id:'nd',          grp:'综合', title:'M7 · nD 组合 + 工程', sub:'DeviceMesh，选型决策',     path:'07-nd/index.html',          status:'wip' },
   ];
   const frame=document.getElementById('frame'), navEl=document.getElementById('nav'),
