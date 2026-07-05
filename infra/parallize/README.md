@@ -90,7 +90,7 @@
   - 前向：用到某层时 `all-gather` 还原它的参数 → 算完 → **立刻丢弃**（reshard）
   - 反向：再 `all-gather` 参数 → 算梯度 → `reduce-scatter` 把梯度切回各卡
   - 关键词：unshard / reshard、通信-计算 overlap、prefetch 预取
-- **FSDP1 vs FSDP2**：FlatParameter 整体切 vs 逐参数切（per-parameter，基于 DTensor，torchtitan 用的就是它）
+- **FSDP1 vs FSDP2**：FlatParameter 整体切 vs 逐参数切（per-parameter，基于 DTensor）
 - 进阶：CPU / NVMe offload
 - **权衡**：通信量约为 DP 的 1.5×，换来显存大幅下降
 
@@ -164,11 +164,11 @@
 **核心问题：真实大模型训练是把上面**全部组合**起来用的。**
 
 - **3D / 4D / 5D 并行**：DP × FSDP × TP × PP × CP × EP 自由组合
-- **Device Mesh**：用一个多维网格描述 GPU 的逻辑布局（torchtitan 的 `DeviceMesh` / Megatron 的 `parallel_state`）
+- **Device Mesh**：用一个多维网格描述 GPU 的逻辑布局（Megatron 的 `parallel_state`）
 - **放置原则**：通信最密的（TP）放最内层 NVLink，PP 跨节点，DP/FSDP 放最外层
 - **选型决策树**：放得下就 FSDP/DP → 单层太大加 TP → 层太多加 PP → 序列太长加 CP → MoE 加 EP
 - 通用优化：激活重计算 activation checkpointing、bf16 / fp8 混合精度、通信-计算 overlap、profiling 定位瓶颈
-- **框架对比**：Megatron-LM / Megatron-Core、DeepSpeed、**torchtitan**（PyTorch 原生 DTensor）
+- **框架对比**：Megatron-LM / Megatron-Core、DeepSpeed
 
 > ✅ **学完自测**：给定「模型 70B、序列 128k、512 卡」，你会怎么排布各并行维度？
 
@@ -190,5 +190,5 @@
 | M7 | nD 组合并行 + 工程 | [`07-nd/`](./07-nd/) | ✅ 已发布 |
 
 > 每章为 `infra/parallize/<topic>/index.html` 下的独立 HTML，风格统一：
-> 动机 → 数学/原理 → 通信&显存分析 → 框架源码（Megatron-LM / torchtitan）逐行对照 → 内联 SVG 示意图。
-> 所有代码片段均引自两个框架的真实源码并标注 `文件:行号`。
+> 动机 → 数学/原理 → 通信&显存分析 → Megatron-LM 源码逐行解读 → 内联 SVG 示意图。
+> 所有代码片段均引自 Megatron-LM 真实源码并标注 `文件:行号`。

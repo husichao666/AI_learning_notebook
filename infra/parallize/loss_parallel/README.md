@@ -1,7 +1,7 @@
-# Loss Parallel 深入解析：torchtitan 与 Megatron-LM 的词表并行交叉熵
+# Loss Parallel 深入解析：词表并行交叉熵的原理与 Megatron-LM 实现
 
 > 当词表大到把 logits 全聚合（all-gather）变得不可承受时，如何只用几个标量的通信就算出一模一样的交叉熵？
-> 本文从数学原理出发，逐行对照 Megatron-LM 的显式 autograd 实现与 torchtitan 的 DTensor 声明式实现。
+> 本文从数学原理出发，逐行解读 Megatron-LM 的显式 autograd 实现，并介绍与之正交、同样降显存的分块计算（chunked loss）技术。
 
 ## 📖 在线阅读（渲染版）
 
@@ -18,20 +18,15 @@
 3. 通信量分析 —— all-gather vs 三次小标量 all-reduce，省约 4 个数量级
 4. Megatron-LM 源码逐行解读 —— `VocabParallelCrossEntropy` 与未融合实现
 5. Megatron 的 Fused 通信合并 —— `@jit_fuser` + 把两次 SUM 合并成一次 all-reduce
-6. torchtitan 的 DTensor 实现 —— `Shard(-1)` 声明 + `loss_parallel()` 上下文 + `local_map`
-7. torchtitan 的 ChunkedCELoss —— 正交的序列维分块，与词表并行叠加
-8. 反向传播为何零通信 —— 梯度 = softmax − onehot，两项都在本地
-9. 两套实现对比
-10. 总结与实践要点
+6. 互补技术：序列维分块计算（chunked loss）—— 正交的序列维分块，与词表并行叠加
+7. 反向传播为何零通信 —— 梯度 = softmax − onehot，两项都在本地
+8. 总结与实践要点
 
 ## 参考源码
 
 - `Megatron-LM/megatron/core/tensor_parallel/cross_entropy.py`
 - `Megatron-LM/megatron/core/fusions/fused_cross_entropy.py`
 - `Megatron-LM/megatron/core/models/common/language_module/language_module.py`
-- `torchtitan/torchtitan/components/loss.py`
-- `torchtitan/torchtitan/distributed/utils.py`
-- `torchtitan/torchtitan/models/common/decoder_sharding.py`
 
 ---
 

@@ -71,10 +71,9 @@
 
 <h2 class="section" id="moe"><span class="num">01</span>先理解 MoE：稀疏激活</h2>
 <p>MoE（Mixture of Experts）把一个大 FFN 换成 $E$ 个并列的小 FFN（专家），外加一个<strong>路由器（router）</strong>。每个 token 只被路由到 top-k 个专家（通常 k=1 或 2），只有这些专家参与计算：</p>
-<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py:780 / torchtitan · models/common/moe.py:225</div>
+<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py:780</div>
 <pre><code class="language-python"># router 给每个 token 对 E 个专家打分，选 top-k
-return torch.topk(scores, k=topk, dim=1, sorted=...)   # Megatron
-_, selected_experts_indices = torch.topk(scores_for_choice, k=self.top_k, dim=-1)  # torchtitan</code></pre>
+return torch.topk(scores, k=topk, dim=1, sorted=...)</code></pre>
 <div class="callout key">
 <p><span class="label">🔑 参数与计算解耦</span> 256 个专家、top-2，意味着<strong>参数量是稠密模型的百倍，但每个 token 的 FLOPs 只增加 2 倍</strong>。这就是 MoE 能把模型做到万亿参数却还训得动的原因。代价：专家太多，单卡放不下全部专家——于是需要 EP。</p>
 </div>
@@ -86,14 +85,7 @@ _, selected_experts_indices = torch.topk(scores_for_choice, k=self.top_k, dim=-1
 self.num_local_experts = self.config.num_moe_experts // ep_size      # 每卡持有的专家数
 local_expert_indices_offset = ep_rank * self.num_local_experts
 self.local_expert_indices = [local_expert_indices_offset + i for i in range(self.num_local_experts)]</code></pre>
-<p>torchtitan 用 DTensor 的 <code>Shard(0)</code>（专家维）表达同一件事：</p>
-<div class="code-label">torchtitan · distributed/expert_parallel.py:53</div>
-<pre><code class="language-python">class ExpertParallel(ParallelStyle):
-    def _partition_fn(self, name, mod, device_mesh):
-        for param_name, param in mod.named_parameters(recurse=False):
-            # 专家维 Shard(0)：每卡只存 E/ep 个专家的权重
-            dist_param = nn.Parameter(distribute_tensor(param, device_mesh, [Shard(0)]))
-            mod.register_parameter(param_name, dist_param)</code></pre>
+<p>Megatron 在 EP 组（<code>expert_model_parallel_group</code>）上按专家维切分：每张卡只持有 <code>num_local_experts = E / ep_size</code> 个专家的权重，<code>local_expert_indices</code> 记录本卡负责的全局专家编号区间。</p>
 
 <h2 class="section" id="a2a"><span class="num">03</span>核心通信：all-to-all dispatch / combine</h2>
 <p>问题来了：token 在<strong>它原本所在的卡</strong>上，但它被路由到的专家在<strong>另一张卡</strong>上。怎么把 token 送过去？答案是 <code>all-to-all</code>——每张卡把自己的 token 按「该去哪张卡」分组，互相交换：</p>
@@ -143,13 +135,9 @@ global_input_tokens = all_to_all(self.ep_group, permutated_local_input_tokens,
 # combine（反向）：把专家输出送回原 token 所在的卡（splits 互换）
 permutated_local_input_tokens = all_to_all(self.ep_group, hidden_states,
                                  self.input_splits, self.output_splits, ...)</code></pre>
-<p>torchtitan 用 functional collective 的 <code>all_to_all_single_autograd</code>，结构完全一致：</p>
-<div class="code-label">torchtitan · models/common/token_dispatcher.py:312（dispatch）/ :434（combine）</div>
-<pre><code class="language-python">routed_input = all_to_all_single_autograd(routed_input, output_splits_list, input_splits_list, self.ep_mesh)
-# ... 本地专家计算 ...
-routed_output = all_to_all_single_autograd(routed_output, metadata.input_splits, metadata.output_splits, self.ep_mesh)</code></pre>
+<p>注意 dispatch 与 combine 只是把 <code>input_splits</code> 和 <code>output_splits</code> 互换——同一条 all-to-all 通道，一来一回把 token 送出去再收回来。</p>
 <div class="callout">
-<p><span class="label">💡 重叠技巧</span> 两个框架都在 all-to-all 进行时，<strong>同时计算 shared expert（共享专家）</strong>，把通信延迟藏在计算后面。</p>
+<p><span class="label">💡 重叠技巧</span> Megatron 在 all-to-all 进行时，<strong>同时计算 shared expert（共享专家）</strong>，把通信延迟藏在计算后面。</p>
 </div>
 
 <h2 class="section" id="balance"><span class="num">04</span>负载均衡：capacity 与 aux loss</h2>
@@ -167,17 +155,16 @@ aux_loss = torch.sum(aggregated_probs_per_expert * tokens_per_expert) * (
     num_experts * moe_aux_loss_coeff / (topk * total_num_tokens * total_num_tokens))</code></pre>
 
 <h2 class="section" id="combine"><span class="num">05</span>EP 与其它并行组合</h2>
-<p>EP 很少单独用，通常和 TP/DP 一起。专家内部还能再 TP（<code>SequentialMLP</code> 用专家 TP 组），dispatch 后接 TP all-gather、combine 前接 TP reduce-scatter。torchtitan 在 device mesh 上用独立的稀疏区 mesh 管理 EP，从 FSDP+TP「借」rank：$\text{efsdp} = \text{dp\_shard}\cdot\text{cp}\cdot\text{tp}/\text{ep}$（细节见 M7）。</p>
-<div class="code-label">torchtitan · models/llama4/parallelize.py:367（apply_moe_ep_tp，DeepSeek-V3 复用）</div>
-<pre><code class="language-python">if ep_mesh is None:                    # EP 关：专家走 TP
-    experts_mesh, experts_plan = tp_mesh, TensorParallel()
-else:                                  # EP 开：专家走 EP
-    experts_mesh, experts_plan = ep_mesh, ExpertParallel()
-parallelize_module(module=transformer_block.moe.experts, device_mesh=experts_mesh, parallelize_plan=experts_plan)</code></pre>
+<p>EP 很少单独用，通常和 TP/DP 一起。专家内部还能再 TP（<code>SequentialMLP</code> 用专家 TP 组），dispatch 后接 TP all-gather、combine 前接 TP reduce-scatter。Megatron 为 MoE 单独维护一套专家并行进程组——expert-DP、expert-TP、EP 各自成组，与稠密部分的 DP/TP 解耦，从而可以让专家区和注意力区用不同的并行度（细节见 M7）。</p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_layer.py（expert-TP 与 EP 组合）</div>
+<pre><code class="language-python"># 专家区独立成组：EP 切专家，专家内部再 TP
+self.experts = build_module(submodules.experts, self.num_local_experts, self.config)
+# tp_group 用于专家内部张量切分，ep_group 用于专家间 all-to-all
+# 二者正交：ep_size × expert_tp_size 张卡共同承载全部专家</code></pre>
 
-<h2 class="section" id="compare"><span class="num">06</span>对比与启用</h2>
+<h2 class="section" id="compare"><span class="num">06</span>在 Megatron 中启用</h2>
 <div class="two-col">
-  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span></h4>
+  <div class="card mega"><h4><span class="badge mega">核心开关</span></h4>
     <ul>
       <li><code>--expert-model-parallel-size N</code> + <code>--num-experts E</code></li>
       <li>dispatcher：<code>allgather</code>(默认) / <code>alltoall</code> / <code>flex</code></li>
@@ -185,17 +172,17 @@ parallelize_module(module=transformer_block.moe.experts, device_mesh=experts_mes
       <li><code>--moe-expert-capacity-factor</code></li>
     </ul>
   </div>
-  <div class="card titan"><h4><span class="badge titan">torchtitan</span></h4>
+  <div class="card mega"><h4><span class="badge mega">与 TP/DP 组合</span></h4>
     <ul>
-      <li><code>expert_parallel_degree</code>（config 层）</li>
-      <li><code>num_experts</code>（模型 Config 字段）</li>
-      <li><code>ExpertParallel</code> = <code>Shard(0)</code> 专家维</li>
-      <li><code>AllToAllTokenDispatcher</code>（EP=1 退回本地）</li>
+      <li><code>--expert-tensor-parallel-size</code>：专家内部再 TP</li>
+      <li>EP 切专家、专家-TP 切专家权重列/行，二者正交</li>
+      <li>dispatch 后 TP all-gather、combine 前 TP reduce-scatter</li>
+      <li>EP=1 时 dispatcher 退化为本地计算，无 all-to-all</li>
     </ul>
   </div>
 </div>
 <div class="callout warn">
-<p><span class="label">📝 易错点（来自源码核对）</span> ① torchtitan 的 <code>ExpertParallel</code> 本身<strong>不含</strong> all-to-all，通信都在 <code>token_dispatcher.py</code>；② EP 用 <code>Shard(0)</code>（专家维），专家-TP 才是 <code>Shard(1)/Shard(2)</code>；③ Megatron <strong>默认 dispatcher 是 allgather</strong>，大规模 EP 才切 alltoall。</p>
+<p><span class="label">📝 易错点（来自源码核对）</span> ① all-to-all 通信都在 <code>token_dispatcher.py</code>，专家切分本身不含通信；② EP 切的是「专家这一维」，专家-TP 切的是「单个专家权重的列/行」，两者不要混淆；③ Megatron <strong>默认 dispatcher 是 allgather</strong>，大规模 EP 才切 alltoall。</p>
 </div>
 
 <div class="callout key">
@@ -203,7 +190,7 @@ parallelize_module(module=transformer_block.moe.experts, device_mesh=experts_mes
 <p>1. MoE 为什么能「参数量百倍、计算量只 2 倍」？<br>
 2. EP 的 all-to-all 在传什么？为什么 dispatch 和 combine 要各做一次？<br>
 3. capacity factor 和 aux loss 各自怎么处理专家负载不均？<br>
-4. EP 用 <code>Shard(0)</code> 切的是哪个维度？和专家内部 TP 的 <code>Shard(1)</code> 有什么区别？</p>
+4. EP 切的是「专家这一维」，专家内部 TP 切的又是什么？两者为什么正交？</p>
 </div>
 
 <div class="chap-nav">
@@ -213,7 +200,7 @@ parallelize_module(module=transformer_block.moe.experts, device_mesh=experts_mes
 
 <footer>
   <p>并行训练学习手册 · M6 专家并行 EP · <code>infra/parallize/06-ep</code></p>
-  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码；aux loss 公式源自 Switch Transformer (arXiv:2101.03961)。</p>
+  <p class="footnote">代码片段引自 Megatron-LM 真实源码；aux loss 公式源自 Switch Transformer (arXiv:2101.03961)。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>

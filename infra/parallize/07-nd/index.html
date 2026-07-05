@@ -80,7 +80,7 @@
 <p>关键问题变成：<strong>这成百上千张卡，谁和谁组成一个 TP 组、谁和谁组成 PP 组？</strong></p>
 
 <h2 class="section" id="mesh"><span class="num">02</span>DeviceMesh：用多维网格描述 GPU 布局</h2>
-<p>两个框架都用一个「多维网格」给每张卡分配一组坐标 $(\text{tp\_rank}, \text{dp\_rank}, \text{pp\_rank}, ...)$。以 16 卡、$\text{tp}=2,\text{dp}=4,\text{pp}=2$ 为例，全局 rank 由各维坐标和 <strong>stride</strong> 算出：</p>
+<p>Megatron 在 <code>parallel_state</code> 里用一个「多维网格」给每张卡分配一组坐标 $(\text{tp\_rank}, \text{dp\_rank}, \text{pp\_rank}, ...)$。以 16 卡、$\text{tp}=2,\text{dp}=4,\text{pp}=2$ 为例，全局 rank 由各维坐标和 <strong>stride</strong> 算出：</p>
 $$ \text{global\_rank} = \text{tp\_rank} + \text{dp\_rank}\times 2 + \text{pp\_rank}\times 8 $$
 
 <div class="diagram">
@@ -114,7 +114,7 @@ $$ \text{global\_rank} = \text{tp\_rank} + \text{dp\_rank}\times 2 + \text{pp\_r
   <text x="486" y="146" fill="#86efac" font-size="12" font-weight="600">规律：stride 最小的维放最内层（TP），</text>
   <text x="486" y="166" fill="#86efac" font-size="12" font-weight="600">stride 最大的维放最外层（PP）。</text>
   <text x="486" y="186" fill="#fbbf24" font-size="11">→ 通信最密的 TP 落在物理最近的卡上。</text>
-  <text x="20" y="230" fill="#9aa3b2" font-size="12">torchtitan 用 DeviceMesh 命名子网格，Megatron 用 RankGenerator + order 字符串，物理布局等价。</text>
+  <text x="20" y="230" fill="#9aa3b2" font-size="12">Megatron 用 RankGenerator + order 字符串生成各维子组，把物理布局固化成确定的 rank 映射。</text>
 </svg>
 <div class="cap">nD 布局的核心：每张卡一组坐标，stride 小的维（TP）相邻、走 NVLink；stride 大的维（PP）跨节点。</div>
 </div>
@@ -124,7 +124,7 @@ $$ \text{global\_rank} = \text{tp\_rank} + \text{dp\_rank}\times 2 + \text{pp\_r
 <thead><tr><th>维度</th><th>放哪层</th><th>为什么</th></tr></thead>
 <tbody>
 <tr><td><strong>TP / EP</strong></td><td>最内层（NVLink）</td><td>每层都通信、在关键路径、不可重叠 → 必须高带宽</td></tr>
-<tr><td><strong>CP</strong></td><td>中间层</td><td>注意力的 KV 通信较密，紧贴 TP（Megatron）或折进 FSDP（torchtitan）</td></tr>
+<tr><td><strong>CP</strong></td><td>中间层</td><td>注意力的 KV 通信较密，Megatron 中紧贴 TP 摆放</td></tr>
 <tr><td><strong>DP / FSDP</strong></td><td>外层</td><td>每 step 一次、可与反向重叠 → 容忍较低带宽</td></tr>
 <tr><td><strong>PP</strong></td><td>最外层（跨节点）</td><td>只在 stage 边界传一次激活，通信量最小</td></tr>
 </tbody>
@@ -136,20 +136,7 @@ $$ \text{global\_rank} = \text{tp\_rank} + \text{dp\_rank}\times 2 + \text{pp\_r
     decoder_rank_generator = RankGenerator(
         tp=tensor_model_parallel_size, ep=1, dp=data_parallel_size,
         pp=pipeline_model_parallel_size, cp=context_parallel_size, order=order, ...)</code></pre>
-<p>torchtitan 用 <code>ParallelDims</code> 把 1 维 world mesh「拆」成多个命名子网格，tuple 顺序即放置顺序（左=最外 PP，右=最内 TP）：</p>
-<div class="code-label">torchtitan · distributed/parallel_dims.py:193</div>
-<pre><code class="language-python">full_dense_mesh = unflatten_mesh(
-    self._world_mesh,
-    ("pp", "dp_replicate", "fsdp", "tp"),          # 左→右 = 外→内
-    (self.pp, self.dp_replicate, fsdp, self.tp))
-# fsdp = dp_shard * cp（CP 折进 FSDP 维）</code></pre>
-<p>顶层 <code>parallelize_*</code> 按固定次序逐个施加并行，<strong>FSDP 永远最后、包在最外</strong>：</p>
-<div class="code-label">torchtitan · models/llama3/parallelize.py:41（施加顺序）</div>
-<pre><code class="language-python">if parallel_dims.cp_enabled:  apply_cp_to_forward(...)        # CP
-if parallel_dims.tp_enabled:  model.parallelize(...)          # TP
-if ac_config.mode != "none":  apply_ac(...)                   # 激活检查点
-if model_compile_enabled:     apply_compile(...)              # torch.compile
-apply_fsdp(model, dp_mesh, ...)                               # FSDP/HSDP（最外）</code></pre>
+<p><code>RankGenerator</code> 按 <code>order</code> 从右到左依次展开各维（最右 <code>pp</code> 步长最大、最左 <code>tp</code> 步长最小），为 TP / CP / EP / DP / PP 各生成对应的进程子组。于是<strong>放置原则不是靠手工排卡，而是由这一个字符串决定</strong>：改 <code>order</code> 即改物理布局，通信最密的 TP 永远落在 stride 最小、物理最近的卡上。</p>
 
 <h2 class="section" id="decision"><span class="num">04</span>选型决策树</h2>
 <div class="diagram">
@@ -204,7 +191,7 @@ apply_fsdp(model, dp_mesh, ...)                               # FSDP/HSDP（最�
 <p><span class="label">✅ 学完自测</span></p>
 <p>1. 为什么 TP 放最内层、PP 放最外层？用 stride/带宽解释。<br>
 2. 给定「模型 70B、序列 128k、512 卡」，你会怎么排布各并行维度？<br>
-3. torchtitan 的 <code>fsdp = dp_shard * cp</code> 把 CP 折进了哪个维度？这说明 CP 和 FSDP 在通信上有什么共性？<br>
+3. Megatron 的 <code>order='tp-cp-ep-dp-pp'</code> 里，把某一维左移/右移会改变什么？为什么 CP 紧贴 TP、而不是放到最外？<br>
 4. 激活重计算用什么换什么？它和并行维度的选择如何相互影响？</p>
 </div>
 
@@ -219,7 +206,7 @@ apply_fsdp(model, dp_mesh, ...)                               # FSDP/HSDP（最�
 
 <footer>
   <p>并行训练学习手册 · M7 nD 组合 + 工程 · <code>infra/parallize/07-nd</code></p>
-  <p class="footnote">代码片段引自 torchtitan 与 Megatron-LM 真实源码；放置原则与 rank 公式来自 ParallelDims / RankGenerator。</p>
+  <p class="footnote">代码片段引自 Megatron-LM 真实源码；放置原则与 rank 公式来自 parallel_state 的 RankGenerator。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>

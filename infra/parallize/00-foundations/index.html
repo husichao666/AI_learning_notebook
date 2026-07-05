@@ -532,7 +532,7 @@
 </tbody>
 </table>
 
-<p class="footnote">这些原语在 PyTorch（<code>torch.distributed</code>）、Megatron-LM、torchtitan 里都只是一行封装。具体框架是怎么调用它们的，留到各并行的章节里结合真实源码看——本章先建立「画面」就够了。</p>
+<p class="footnote">这些原语在 PyTorch（<code>torch.distributed</code>）和 Megatron-LM 里都只是一行封装。具体框架是怎么调用它们的，留到各并行的章节里结合真实源码看——本章先建立「画面」就够了。</p>
 
 <h2 class="section" id="hardware"><span class="num">05</span>硬件拓扑：带宽决定「谁放哪」</h2>
 <p>卡间带宽分层级，差距极大，这直接决定每种并行该放在哪一层：</p>
@@ -577,7 +577,7 @@
 
 <footer>
   <p>并行训练学习手册 · M0 基础铺垫 · <code>infra/parallize/00-foundations</code></p>
-  <p class="footnote">显存账本为标准混合精度 + Adam 估算；代码片段引自 Megatron-LM 与 torchtitan 真实源码。</p>
+  <p class="footnote">显存账本为标准混合精度 + Adam 估算；代码片段引自 Megatron-LM 真实源码。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>

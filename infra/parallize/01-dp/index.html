@@ -64,7 +64,6 @@
     <span class="tag">🪣 bucket + 反向重叠</span>
     <span class="tag">🚫 省不了显存</span>
     <span class="tag">🟢 Megatron DDP</span>
-    <span class="tag">🟠 torchtitan</span>
   </div>
 </div></header>
 
@@ -79,36 +78,55 @@
 </ol>
 
 <div class="diagram">
-<svg viewBox="0 0 820 250" role="img" aria-label="数据并行流程：复制模型、切数据、all-reduce 梯度">
-  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
-  <text x="60" y="28" fill="#9aa3b2" font-size="12">global batch</text>
-  <rect x="40" y="36" width="120" height="30" rx="5" fill="#1c2030" stroke="#475569"/><text x="100" y="56" text-anchor="middle" fill="#d7dbe4" font-size="12">B 条样本</text>
-  <line x1="100" y1="66" x2="100" y2="86" stroke="#64748b" marker-end="url(#a)"/>
-  <text x="100" y="82" text-anchor="middle" fill="#9aa3b2" font-size="10">切 N 份</text>
-  <!-- two GPU lanes -->
-  <g>
-    <rect x="40" y="92" width="142" height="58" rx="8" fill="#161922" stroke="#5b6bb0"/>
-    <text x="111" y="112" text-anchor="middle" fill="#aab6ff" font-size="12" font-weight="600">GPU 0</text>
-    <text x="111" y="130" text-anchor="middle" fill="#9aa3b2" font-size="11">完整模型 · batch[0]</text>
-    <text x="111" y="144" text-anchor="middle" fill="#9aa3b2" font-size="11">→ 局部梯度 g₀</text>
-    <rect x="198" y="92" width="142" height="58" rx="8" fill="#161922" stroke="#5b6bb0"/>
-    <text x="269" y="112" text-anchor="middle" fill="#aab6ff" font-size="12" font-weight="600">GPU 1</text>
-    <text x="269" y="130" text-anchor="middle" fill="#9aa3b2" font-size="11">完整模型 · batch[1]</text>
-    <text x="269" y="144" text-anchor="middle" fill="#9aa3b2" font-size="11">→ 局部梯度 g₁</text>
-  </g>
-  <!-- all-reduce -->
-  <line x1="350" y1="121" x2="396" y2="121" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
-  <rect x="400" y="98" width="180" height="46" rx="9" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/>
-  <text x="490" y="118" text-anchor="middle" fill="#cdd5ff" font-size="12.5" font-weight="600">all-reduce 梯度</text>
-  <text x="490" y="135" text-anchor="middle" fill="#fff" font-size="12">ḡ = (g₀+g₁)/N</text>
-  <line x1="580" y1="121" x2="626" y2="121" stroke="#64748b" stroke-width="1.5" marker-end="url(#a)"/>
-  <rect x="630" y="98" width="160" height="46" rx="9" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/>
-  <text x="710" y="118" text-anchor="middle" fill="#bbf7d0" font-size="12.5" font-weight="600">各卡用 ḡ 更新</text>
-  <text x="710" y="135" text-anchor="middle" fill="#86efac" font-size="11">模型保持一致</text>
-  <text x="40" y="185" fill="#fbbf24" font-size="12">关键：all-reduce 后每张卡拿到的是<tspan font-weight="700"> 完整且相同 </tspan>的平均梯度 → 更新后模型不发散。</text>
-  <text x="40" y="212" fill="#9aa3b2" font-size="12">等价于：N 卡 DP 跑 batch=B，相当于单卡跑 batch=N×B（global batch 放大 N 倍）。</text>
+<svg viewBox="0 0 820 348" role="img" aria-label="数据并行：两张 GPU 各喂一条数据，前向→反向→更新，反向间 all-reduce 同步梯度">
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/></marker>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c93ff"/></marker></defs>
+
+  <!-- 列标题 -->
+  <text x="120" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">数据分片</text>
+  <text x="246" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">前向</text>
+  <text x="372" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">反向</text>
+  <text x="648" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">更新</text>
+
+  <!-- GPU 0 lane -->
+  <rect x="8" y="46" width="712" height="92" rx="14" fill="#12151d" stroke="#2f3650"/>
+  <text x="22" y="98" fill="#aab6ff" font-size="16" font-weight="700">GPU 0</text>
+  <rect x="72"  y="68" width="96"  height="48" rx="8" fill="#1c2030" stroke="#475569"/><text x="120" y="98" text-anchor="middle" fill="#d7dbe4" font-size="15">数据 x₀</text>
+  <rect x="192" y="68" width="108" height="48" rx="8" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="246" y="98" text-anchor="middle" fill="#cdd5ff" font-size="15">forward</text>
+  <rect x="312" y="68" width="120" height="48" rx="8" fill="rgba(74,222,128,0.14)" stroke="#4ade80"/><text x="372" y="92" text-anchor="middle" fill="#bbf7d0" font-size="15">backward</text><text x="372" y="110" text-anchor="middle" fill="#86efac" font-size="12.5">→ 梯度 g₀</text>
+  <rect x="578" y="68" width="140" height="48" rx="8" fill="rgba(251,191,36,0.12)" stroke="#fbbf24"/><text x="648" y="92" text-anchor="middle" fill="#fde68a" font-size="14.5">optimizer.step</text><text x="648" y="110" text-anchor="middle" fill="#fbbf24" font-size="12.5">用 ḡ 更新</text>
+  <line x1="168" y1="92" x2="190" y2="92" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="300" y1="92" x2="310" y2="92" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- GPU 1 lane -->
+  <rect x="8" y="216" width="712" height="92" rx="14" fill="#12151d" stroke="#2f3650"/>
+  <text x="22" y="268" fill="#aab6ff" font-size="16" font-weight="700">GPU 1</text>
+  <rect x="72"  y="238" width="96"  height="48" rx="8" fill="#1c2030" stroke="#475569"/><text x="120" y="268" text-anchor="middle" fill="#d7dbe4" font-size="15">数据 x₁</text>
+  <rect x="192" y="238" width="108" height="48" rx="8" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="246" y="268" text-anchor="middle" fill="#cdd5ff" font-size="15">forward</text>
+  <rect x="312" y="238" width="120" height="48" rx="8" fill="rgba(74,222,128,0.14)" stroke="#4ade80"/><text x="372" y="262" text-anchor="middle" fill="#bbf7d0" font-size="15">backward</text><text x="372" y="280" text-anchor="middle" fill="#86efac" font-size="12.5">→ 梯度 g₁</text>
+  <rect x="578" y="238" width="140" height="48" rx="8" fill="rgba(251,191,36,0.12)" stroke="#fbbf24"/><text x="648" y="262" text-anchor="middle" fill="#fde68a" font-size="14.5">optimizer.step</text><text x="648" y="280" text-anchor="middle" fill="#fbbf24" font-size="12.5">用 ḡ 更新</text>
+  <line x1="168" y1="262" x2="190" y2="262" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="300" y1="262" x2="310" y2="262" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- AllReduce 节点（横跨两条 lane 之间）-->
+  <rect x="450" y="150" width="146" height="64" rx="12" fill="rgba(124,147,255,0.2)" stroke="#7c93ff" stroke-width="1.5"/>
+  <text x="523" y="174" text-anchor="middle" fill="#cdd5ff" font-size="16" font-weight="700">AllReduce</text>
+  <text x="523" y="194" text-anchor="middle" fill="#fff" font-size="14">ḡ = (g₀ + g₁) / 2</text>
+  <text x="523" y="209" text-anchor="middle" fill="#9aa3b2" font-size="12">两卡得到同一份 ḡ</text>
+
+  <!-- 反向 → AllReduce -->
+  <path d="M432 104 C 444 120, 448 148, 450 164" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="432" y="134" fill="#7c93ff" font-size="13">g₀</text>
+  <path d="M432 250 C 444 234, 448 208, 450 200" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="432" y="234" fill="#7c93ff" font-size="13">g₁</text>
+  <!-- AllReduce → 更新 -->
+  <path d="M596 168 C 614 140, 580 108, 578 92" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M596 196 C 614 224, 580 246, 578 262" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="612" y="186" text-anchor="middle" fill="#7c93ff" font-size="13">ḡ</text>
+
+  <text x="20" y="338" fill="#fbbf24" font-size="14">两卡各喂一条数据，<tspan font-weight="700">并行</tspan>跑前向/反向；反向产出的 g₀、g₁ 经 AllReduce 求平均成 ḡ，两卡用<tspan font-weight="700"> 同一份 ḡ </tspan>更新 → 模型始终一致。</text>
 </svg>
-<div class="cap">DP 的一个训练 step：复制 → 切数据 → all-reduce 梯度 → 同步更新。</div>
+<div class="cap">DP 的一个 step：两张 GPU 各持完整模型、各喂一条数据，独立前向+反向；反向算出的梯度用一次 <strong>AllReduce</strong> 求平均，再各自更新。</div>
 </div>
 
 <h2 class="section" id="bucket"><span class="num">02</span>Megatron-LM：手写 DDP 的 bucket 与反向重叠</h2>
@@ -157,35 +175,7 @@ def no_sync(self):
         for bucket_group in self.bucket_groups + self.expert_parallel_bucket_groups:
             bucket_group.is_last_microbatch = True</code></pre>
 
-<h2 class="section" id="titan"><span class="num">03</span>torchtitan：DP 已被「收编」进 FSDP2</h2>
-<div class="callout warn">
-<p><span class="label">📝 一个会让初学者意外的事实</span> torchtitan 当前版本里<strong>没有独立的 DDP / replicate 代码</strong>。「数据复制」被表达为 device mesh 的一个轴 <code>dp_replicate</code>，由 FSDP2 在该轴上做 <code>Replicate</code> 放置来实现——当分片度 <code>dp_shard=1</code> 时，分片是 no-op，整体就退化为纯 DDP 的复制语义。</p>
-</div>
-<p>它用 <code>ParallelDims</code> 把 <code>dp_replicate</code> 和 <code>dp_shard</code> 放进同一个 mesh，应用入口按是否启用复制轴来决定传 1D 还是 2D mesh：</p>
-<div class="code-label">torchtitan · models/llama3/parallelize.py:96</div>
-<pre><code class="language-python"># dp_replicate>1 → 传 2D mesh（HSDP）；否则只用 fsdp 轴
-names = ["dp_replicate", "fsdp"] if parallel_dims.dp_replicate_enabled else ["fsdp"]
-dp_mesh = parallel_dims.get_mesh(names)
-apply_fsdp(model, dp_mesh, ...)
-if parallel_dims.dp_replicate_enabled:
-    logger.info("Applied HSDP to the model")   # replicate + shard
-else:
-    logger.info("Applied FSDP to the model")
-# dp_shard == 1 时，fsdp 轴上分片为 no-op → 行为等同纯 DDP</code></pre>
-<p>由于走的是 FSDP2 的归约通路，torchtitan 只需关掉 FSDP 默认的 1/N 梯度除法，自己按全局有效 token 数来缩放 loss：</p>
-<div class="code-label">torchtitan · distributed/fsdp.py:11</div>
-<pre><code class="language-python">def disable_fsdp_gradient_division(model):
-    for module in model.modules():
-        if isinstance(module, FSDPModule):
-            module.set_gradient_divide_factor(1.0)</code></pre>
-<p>配置上，两个 degree 字段就涵盖了 DDP / FSDP / HSDP 三种形态：</p>
-<div class="code-label">torchtitan · config/configs.py</div>
-<pre><code class="language-python">data_parallel_replicate_degree: int = 1   # >1 → 复制；与 shard>1 同开 = HSDP
-data_parallel_shard_degree: int = -1      # >1 → 分片(FSDP)；1 = 关闭分片(纯 DDP)；-1 = 吃掉剩余 rank
-# 纯 DDP：  --parallelism.data_parallel_replicate_degree N --parallelism.data_parallel_shard_degree 1
-# 纯 FSDP： --parallelism.data_parallel_shard_degree N</code></pre>
-
-<h2 class="section" id="nomem"><span class="num">04</span>为什么 DP 省不了显存</h2>
+<h2 class="section" id="nomem"><span class="num">03</span>为什么 DP 省不了显存</h2>
 <p>这是 DP 最重要的局限，也是后面所有「切模型状态」并行存在的理由。在纯 DDP 下，每张卡都持有<strong>完整的</strong>：参数（$2P$）、梯度（$2P$）、优化器状态（$12P$）。all-reduce 只是让梯度数值一致，并没有让任何一张卡少存东西：</p>
 <div class="code-label">Megatron-LM · param_and_grad_buffer.py:1068（grad buffer 按整模型 numel 分配）</div>
 <pre><code class="language-python"># grad_data 的大小 = 整个模型的参数量，每张卡都分配这么大
@@ -195,7 +185,7 @@ self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
 <p><span class="label">⚠️ 结论</span> N 卡 DP 的<strong>单卡显存 = 单卡训练的显存</strong>（约 $16P$ 字节模型状态 + 激活），完全不随 N 下降。DP 切的是<em>数据和计算</em>，不切<em>模型状态</em>。想让 $16P$ 也摊薄到 $16P/N$，就得进入下一章——把优化器状态、梯度、参数也切开（FSDP / ZeRO）。</p>
 </div>
 
-<h2 class="section" id="compare"><span class="num">05</span>两套实现对比</h2>
+<h2 class="section" id="compare"><span class="num">04</span>Megatron-LM 手写 DDP 要点回顾</h2>
 <div class="two-col">
   <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 手写 DDP</h4>
     <ul>
@@ -206,13 +196,13 @@ self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
       <li>机制透明，最适合学习</li>
     </ul>
   </div>
-  <div class="card titan"><h4><span class="badge titan">torchtitan</span> 收编进 FSDP2</h4>
+  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 显存与适用场景</h4>
     <ul>
-      <li>无独立 DDP，<code>dp_replicate</code> = mesh 一个轴</li>
-      <li>FSDP2 在该轴做 <code>Replicate</code>（dp_shard=1 即纯复制）</li>
-      <li><code>disable_fsdp_gradient_division</code> + 按 token 缩放</li>
-      <li>DDP / FSDP / HSDP 用两个 degree 字段统一表达</li>
-      <li>组合性强（与 TP/PP/CP 经 DTensor 拼装）</li>
+      <li>每卡持完整参数 / 梯度 / 优化器状态</li>
+      <li>显存不随 N 下降，切的是数据与计算</li>
+      <li><code>use_distributed_optimizer</code> 才进一步分片</li>
+      <li>适合模型放得下单卡、只想加速的场景</li>
+      <li>是理解 FSDP / ZeRO 的最佳起点</li>
     </ul>
   </div>
 </div>
@@ -222,7 +212,7 @@ self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
 <p>1. DP 为什么省不了显存？all-reduce 之后每张卡持有的梯度是完整的还是分片的？<br>
 2. Megatron 为什么把参数按反向<strong>逆序</strong>分 bucket？这对 overlap 有什么帮助？<br>
 3. 8 卡 DP、每卡 batch=4，global batch 是多少？<br>
-4. torchtitan 里 <code>data_parallel_shard_degree=1</code> 配 <code>data_parallel_replicate_degree=8</code> 等价于什么并行？</p>
+4. Megatron 的 <code>no_sync()</code> 在梯度累积时做了什么？为什么能省通信？</p>
 </div>
 
 <div class="chap-nav">
@@ -232,7 +222,7 @@ self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
 
 <footer>
   <p>并行训练学习手册 · M1 数据并行 DP · <code>infra/parallize/01-dp</code></p>
-  <p class="footnote">代码片段引自 Megatron-LM 与 torchtitan 真实源码，行号见各 <code>code-label</code>；为讲解做了精简。</p>
+  <p class="footnote">代码片段引自 Megatron-LM 真实源码，行号见各 <code>code-label</code>；为讲解做了精简。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>

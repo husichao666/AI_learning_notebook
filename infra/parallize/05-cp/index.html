@@ -116,8 +116,71 @@
 <div class="cap">Ring Attention：Q 不动、KV 绕环 P2P，online softmax 把每一跳的局部结果增量合并成全局结果。</div>
 </div>
 
-<h3>路线 B：Ulysses（all-to-all 转置）</h3>
-<p>另一条路：用 <code>all-to-all</code> 把张量从「按序列切」转成「按 head 切」——每卡拿到<strong>完整序列但只算部分 head</strong>。这样注意力内部无需任何通信（每卡本地算自己的 head），算完再 all-to-all 转回「按序列切」。通信量更省，但要求 head 数 ≥ cp_size。</p>
+<p class="footnote">💡 Colossal-AI 早期论文里的「Ring Self-Attention（RSA）」就是这条路线；下面用公式说明为什么绕环累加能和一次性算全序列<strong>数值完全相等</strong>。</p>
+
+<h4>为什么 softmax 能「分块累加」——公式推导</h4>
+<p>取某一个 query 向量 $q$，标准注意力要它和<strong>全序列</strong>的 $S$ 个 key/value 做：</p>
+$$ o \;=\; \sum_{j=1}^{S} \frac{e^{q\cdot k_j}}{\sum_{l=1}^{S} e^{q\cdot k_l}}\, v_j $$
+<p>麻烦在分母 $\sum_l e^{q\cdot k_l}$——它要<strong>看到所有 key</strong> 才能算出。而 CP 下每卡只有 $S/\text{cp}$ 段 KV，凑不齐这个全局分母。</p>
+
+<p>但把序列切成若干块 $B_b$，为每块定义<strong>局部分子 $p_b$、局部分母 $\ell_b$</strong>：</p>
+$$ \ell_b=\!\!\sum_{j\in B_b}\!\! e^{q\cdot k_j},\qquad p_b=\!\!\sum_{j\in B_b}\!\! e^{q\cdot k_j}\,v_j
+\;\;\Longrightarrow\;\; o=\frac{\sum_b p_b}{\sum_b \ell_b} $$
+<div class="callout key">
+<p><span class="label">🔑 关键洞察</span> 分子 $\sum_b p_b$ 和分母 $\sum_b \ell_b$ 都是<strong>可加的</strong>。所以不必同时拥有全部 KV——<em>每来一块就把这块的 $p_b,\ell_b$ 累加进去</em>，转完一圈再一除即可。「每个 Q 看全序列」不是同时拥有，而是逐块累加。</p>
+</div>
+
+<p>直接算 $e^{q\cdot k_j}$ 会数值溢出，实际要减最大值 $m$。但每来一块，全局最大值会变大，旧的累加结果得<strong>追溯修正</strong>。于是维护三个 running 量:最大值 $m$、分母 $\ell$、输出 $o$。来了新块 $B_b$，先算这块自己的局部量:</p>
+$$ m_{\text{blk}}=\max_{j\in B_b}(q\cdot k_j),\quad
+\ell_{\text{blk}}=\!\!\sum_{j\in B_b}\!\! e^{q\cdot k_j-m_{\text{blk}}},\quad
+o_{\text{blk}}=\!\!\sum_{j\in B_b}\!\! e^{q\cdot k_j-m_{\text{blk}}}v_j $$
+<p>再更新全局最大值，并给<strong>新旧两边</strong>各乘上修正因子（这就是 online softmax / FlashAttention 的核心递推）：</p>
+$$ m_{\text{new}}=\max(m,m_{\text{blk}}) $$
+$$ \ell \leftarrow e^{\,m-m_{\text{new}}}\,\ell + e^{\,m_{\text{blk}}-m_{\text{new}}}\,\ell_{\text{blk}},\qquad
+o \leftarrow e^{\,m-m_{\text{new}}}\,o + e^{\,m_{\text{blk}}-m_{\text{new}}}\,o_{\text{blk}} $$
+<p>其中 $e^{\,m-m_{\text{new}}}$ 是因为基准从旧 $m$ 换成更大的 $m_{\text{new}}$、之前的指数项「多减了」，要乘回来补偿。全部块处理完，最终输出 $o_{\text{final}}=o/\ell$，与标准注意力<strong>完全等价，无任何近似</strong>。</p>
+
+<p><strong>套到环上</strong>：cp 张卡围成环，本地 <strong>Q 不动</strong>，<strong>K/V 绕环传</strong>。执行 cp 步，第 $t$ 步用本地 Q 和「这一步收到的那块 KV」算一次局部注意力、按上面递推更新 $(m,\ell,o)$，同时把 KV 发给下游（通信与计算重叠）。转满一圈，每张卡的 Q 就依次见过全部 KV，$(m,\ell,o)$ 累加完整。省显存正是因为<strong>任一时刻每卡只握着 $1/\text{cp}$ 的 KV</strong>。</p>
+
+<h3>路线 B：Ulysses（all-to-all 换轴）</h3>
+<p>Ring 是「序列一直切着、靠传 KV 补齐」；Ulysses（DeepSpeed 提出）反过来——<strong>一进注意力就换一根轴切</strong>。非注意力部分照常按序列切 <code>[B, S/cp, H]</code>，但注意力前用一次 <code>all-to-all</code> 把切分维从<em>序列</em>换成<em>注意力头</em>，变成 <code>[B, S, H/cp]</code>：每卡换到<strong>完整序列、但只算 1/cp 的 head</strong>。</p>
+<div class="diagram">
+<svg viewBox="0 0 820 150" role="img" aria-label="Ulysses：all-to-all 把序列切换成 head 切">
+  <defs><marker id="u" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4ade80"/></marker></defs>
+  <rect x="40" y="45" width="200" height="60" rx="10" fill="#161922" stroke="#5b6bb0"/>
+  <text x="140" y="70" text-anchor="middle" fill="#aab6ff" font-size="13" font-weight="600">按序列切</text>
+  <text x="140" y="90" text-anchor="middle" fill="#9aa3b2" font-size="12">[B, S/cp, H] · 每卡一段序列</text>
+  <path d="M250,75 L330,75" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#u)"/>
+  <text x="290" y="66" text-anchor="middle" fill="#86efac" font-size="11">all-to-all</text>
+  <rect x="340" y="45" width="210" height="60" rx="10" fill="#161922" stroke="#4ade80"/>
+  <text x="445" y="70" text-anchor="middle" fill="#bbf7d0" font-size="13" font-weight="600">按 head 切</text>
+  <text x="445" y="90" text-anchor="middle" fill="#9aa3b2" font-size="12">[B, S, H/cp] · 每卡全序列、部分 head</text>
+  <path d="M560,75 L640,75" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#u)"/>
+  <text x="600" y="66" text-anchor="middle" fill="#86efac" font-size="11">标准注意力</text>
+  <rect x="650" y="45" width="130" height="60" rx="10" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
+  <text x="715" y="70" text-anchor="middle" fill="#bbf7d0" font-size="12" font-weight="600">本地算完</text>
+  <text x="715" y="90" text-anchor="middle" fill="#9aa3b2" font-size="11">再 a2a 换回</text>
+</svg>
+<div class="cap">Ulysses：注意力前后各一次 all-to-all，在「序列切 ↔ head 切」之间换轴；注意力本身是完整序列的标准算子，无需改写。</div>
+</div>
+<p>因为每卡拿到了整条序列，<strong>注意力就是普通的标准算子，不用 online softmax、不用改 kernel</strong>。通信只有两次 all-to-all，量小且随 cp 增大每卡通信量还下降。代价是<strong>并行度被 head 数卡死</strong>：head 要能均分到各卡，所以 $\text{cp}\le\text{head 数}$（GQA 下受更少的 KV-head 数限制）。head 少时 CP 度就上不去。</p>
+
+<h3>两条路线怎么选</h3>
+<table>
+<thead><tr><th>维度</th><th>Ring（p2p，Colossal-AI 路线）</th><th>Ulysses（a2a，DeepSpeed 路线）</th></tr></thead>
+<tbody>
+<tr><td>注意力时切哪一维</td><td><strong>序列 sequence</strong></td><td><strong>注意力头 head</strong></td></tr>
+<tr><td>通信原语</td><td>Ring P2P 逐块传 KV</td><td>前后两次 all-to-all</td></tr>
+<tr><td>并行度上限</td><td>基本不受限，可切超长</td><td><strong>≤ head 数</strong>（GQA 看 KV-head）</td></tr>
+<tr><td>通信量</td><td>随序列 $S$ 增长</td><td>小，且随 cp 增大每卡下降</td></tr>
+<tr><td>注意力算子</td><td>需 online-softmax 分块实现</td><td>标准算子，不用改</td></tr>
+<tr><td>causal 负载均衡</td><td>需 zigzag 重排（见下节）</td><td>天然均衡</td></tr>
+<tr><td>attention 期间每卡显存</td><td>只持 $1/\text{cp}$ 序列</td><td>持完整序列、$1/\text{cp}$ 的 head</td></tr>
+</tbody>
+</table>
+<div class="callout">
+<p><span class="label">🧩 现实里常两者结合</span> 因为各有短板，业界（如 <strong>USP / Unified Sequence Parallelism</strong>，Megatron 的 <code>a2a+p2p</code> 也是这个思路）把二者组成 2D：<strong>内层 Ulysses</strong> 用 a2a 吃满 head 数，<strong>外层 Ring</strong> 用 p2p 沿序列继续放大并行度——既绕开 Ulysses 的 head 上限，又比纯 Ring 省一部分通信。</p>
+</div>
 
 <table>
 <thead><tr><th>路线</th><th>怎么传</th><th>特点</th></tr></thead>
@@ -138,31 +201,11 @@ index = torch.zeros(2, dtype=torch.int64, device=val.device)
 index[0].fill_(cp_rank)                    # 第 i 块
 index[1].fill_(2 * cp_size - cp_rank - 1)  # 对称的第 (2cp-1-i) 块
 val = val.index_select(seq_dim, index)     # 一头一尾配对，负载均衡</code></pre>
-<p>torchtitan 用 <code>_HeadTailLoadBalancer</code>（SDPA）/ <code>_PTRRLoadBalancer</code>（FlexAttention）做同样的事，并强制序列长度能被 $2\cdot\text{cp}$ 整除：</p>
-<div class="code-label">torchtitan · distributed/parallel_dims.py:519</div>
-<pre><code class="language-python">@property
-def seq_len_divisor(self):
-    # SP 要求 seq_len 能被 TP 整除；CP（默认开负载均衡）要求能被 2*CP 整除
-    return self.tp * (self.cp * 2)</code></pre>
 
-<h2 class="section" id="impl"><span class="num">05</span>实现：两个框架都「委托」给别人</h2>
+<h2 class="section" id="impl"><span class="num">05</span>实现：核心算法委托给 TransformerEngine</h2>
 <div class="callout warn">
-<p><span class="label">📝 诚实说明（很重要）</span> CP 的核心算法（online softmax + 环形 P2P）在这两个仓库里<strong>都不是自己写的</strong>：</p>
-<ul style="margin:8px 0 0">
-<li><strong>torchtitan</strong> 把 CP 完全委托给 PyTorch 实验性 API <code>torch.distributed.tensor.experimental._attention</code>——负载均衡器、shard 函数、ring/all-to-all dispatcher 全 import 自它。torchtitan 本体只做装配。</li>
-<li><strong>Megatron-LM</strong> 把 ring attention 完全委托给 <strong>TransformerEngine</strong>。原生注意力直接 <code>assert context_parallel_size == 1</code>，CP 只能走 TE。</li>
-</ul>
+<p><span class="label">📝 诚实说明（很重要）</span> CP 的核心算法（online softmax + 环形 P2P）在 Megatron-LM 里<strong>不是自己写的</strong>：Megatron 把 ring attention 完全委托给 <strong>TransformerEngine</strong>。原生注意力直接 <code>assert context_parallel_size == 1</code>，CP 只能走 TE，Megatron 本体只负责 zigzag 切分与把 CP group/comm_type 透传进去。</p>
 </div>
-<p>torchtitan 的装配代码——把内层注意力包进 CP 上下文，对 SDPA 用 DTensor（沿 head 维 <code>Shard(2)</code>）交给 PyTorch 的 CP dispatcher：</p>
-<div class="code-label">torchtitan · distributed/context_parallel.py:74</div>
-<pre><code class="language-python">elif isinstance(first, ScaledDotProductAttention):
-    _enable_context_parallel_dispatcher()
-    def cp_forward(q, k, v, **kwargs):
-        # 包成沿 head 维分片的 DTensor，由 PyTorch 处理 ring/all-to-all
-        q = DTensor.from_local(q, mesh, [Shard(2)], run_check=False)
-        k = DTensor.from_local(k, mesh, [Shard(2)], run_check=False)
-        v = DTensor.from_local(v, mesh, [Shard(2)], run_check=False)
-        return orig_fn(q, k, v, **kwargs).to_local()</code></pre>
 <p>Megatron 把 CP group/comm_type 透传给 TE 的注意力构造：</p>
 <div class="code-label">Megatron-LM · core/transformer/dot_product_attention.py:57 + extensions/transformer_engine.py:1440</div>
 <pre><code class="language-python"># 原生注意力不支持 CP，强制走 TE
@@ -184,24 +227,14 @@ if self.config.context_parallel_size > 1:
 </tbody>
 </table>
 
-<h2 class="section" id="compare"><span class="num">07</span>对比与启用</h2>
-<div class="two-col">
-  <div class="card titan"><h4><span class="badge titan">torchtitan</span> 委托 PyTorch 实验 API</h4>
-    <ul>
-      <li><code>context_parallel_degree</code></li>
-      <li><code>context_parallel_load_balancer</code>: headtail / ptrr</li>
-      <li><code>context_parallel_rotate_method</code>: allgather / alltoall</li>
-      <li>CP 折进 FSDP 维（<code>fsdp = dp_shard*cp</code>）</li>
-    </ul>
-  </div>
-  <div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 委托 TransformerEngine</h4>
-    <ul>
-      <li><code>--context-parallel-size N</code></li>
-      <li><code>--cp-comm-type p2p|a2a|allgather|a2a+p2p</code></li>
-      <li><code>get_batch_on_this_cp_rank</code> 做 zigzag 切分</li>
-      <li>约束：EP 与 CP 不能同时 &gt;1（见 M7）</li>
-    </ul>
-  </div>
+<h2 class="section" id="compare"><span class="num">07</span>启用</h2>
+<div class="card mega"><h4><span class="badge mega">Megatron-LM</span> 委托 TransformerEngine</h4>
+  <ul>
+    <li><code>--context-parallel-size N</code></li>
+    <li><code>--cp-comm-type p2p|a2a|allgather|a2a+p2p</code></li>
+    <li><code>get_batch_on_this_cp_rank</code> 做 zigzag 切分</li>
+    <li>约束：EP 与 CP 不能同时 &gt;1（见 M7）</li>
+  </ul>
 </div>
 
 <div class="callout key">
@@ -219,7 +252,7 @@ if self.config.context_parallel_size > 1:
 
 <footer>
   <p>并行训练学习手册 · M5 上下文并行 CP · <code>infra/parallize/05-cp</code></p>
-  <p class="footnote">代码片段引自 torchtitan 与 Megatron-LM 真实源码；ring attention 真正算法分别在 PyTorch 实验 API 与 TransformerEngine 中。</p>
+  <p class="footnote">代码片段引自 Megatron-LM 真实源码；ring attention 的真正算法在 TransformerEngine 中。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>
