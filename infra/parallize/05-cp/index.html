@@ -70,14 +70,72 @@
 <div class="wrap">
 
 <h2 class="section" id="why"><span class="num">01</span>动机：长序列的激活墙</h2>
-<p>注意力的显存和计算随序列长度 $S$ 增长很快（激活 $O(S)$、注意力分数 $O(S^2)$）。当 $S$ 到几十万时，哪怕模型本身放得下，单卡也存不下这么长序列的激活。</p>
-<p>上下文并行（Context Parallel, CP）的做法：把序列沿长度维切成 $S/\text{cp}$ 段，每张卡只处理自己那一段。其它层（MLP、LayerNorm）逐 token 独立，切了就切了；<strong>唯一的麻烦是注意力</strong>——它要让每个 query 看到<em>全部</em> key/value，而 K/V 现在分散在各张卡上。</p>
+
+<h3>先看清注意力到底在算什么</h3>
+<p>一层自注意力（单个 head，忽略 batch）拿到三个矩阵 $Q,K,V$，形状都是 <code>[S, d]</code>——$S$ 是序列长度，$d$ 是每个 token 的向量维度。它算两次矩阵乘：先 $Q$ 和 $K^\top$ 相乘得到<strong>分数矩阵</strong> $P=QK^\top$，形状 <code>[S, S]</code>（每一对 token 之间一个数）；对 $P$ 逐行做 softmax，再乘 $V$ 得到输出 <code>[S, d]</code>：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 860 210" role="img" aria-label="注意力两次矩阵乘：QKᵀ 得到 SxS 分数矩阵，再乘 V 得到输出">
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9aa3b2"/></marker>
+  </defs>
+  <!-- Q -->
+  <rect x="24" y="55" width="46" height="110" rx="6" fill="rgba(124,147,255,0.14)" stroke="#5b6bb0"/>
+  <text x="47" y="112" text-anchor="middle" fill="#aab6ff" font-size="14" font-weight="700">Q</text>
+  <text x="47" y="184" text-anchor="middle" fill="#9aa3b2" font-size="11">[S, d]</text>
+  <text x="94" y="115" text-anchor="middle" fill="#d7dbe4" font-size="16">×</text>
+  <!-- Kᵀ -->
+  <rect x="112" y="88" width="110" height="46" rx="6" fill="rgba(124,147,255,0.14)" stroke="#5b6bb0"/>
+  <text x="167" y="116" text-anchor="middle" fill="#aab6ff" font-size="14" font-weight="700">Kᵀ</text>
+  <text x="167" y="152" text-anchor="middle" fill="#9aa3b2" font-size="11">[d, S]</text>
+  <text x="242" y="115" text-anchor="middle" fill="#d7dbe4" font-size="16">=</text>
+  <!-- P scores S×S -->
+  <rect x="262" y="55" width="110" height="110" rx="6" fill="rgba(251,191,36,0.14)" stroke="#fbbf24" stroke-width="1.6"/>
+  <text x="317" y="104" text-anchor="middle" fill="#fcd34d" font-size="13" font-weight="700">P = QKᵀ</text>
+  <text x="317" y="124" text-anchor="middle" fill="#9aa3b2" font-size="11">[S, S]</text>
+  <text x="317" y="184" text-anchor="middle" fill="#fbbf24" font-size="10.5">← 平方爆炸的元凶</text>
+  <!-- softmax arrow -->
+  <path d="M378,110 L438,110" fill="none" stroke="#4ade80" stroke-width="1.8" marker-end="url(#ar)"/>
+  <text x="408" y="100" text-anchor="middle" fill="#86efac" font-size="10.5">softmax</text>
+  <text x="408" y="126" text-anchor="middle" fill="#9aa3b2" font-size="9.5">逐行</text>
+  <!-- P' -->
+  <rect x="448" y="55" width="110" height="110" rx="6" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/>
+  <text x="503" y="114" text-anchor="middle" fill="#bbf7d0" font-size="12.5" font-weight="700">softmax(P)</text>
+  <text x="503" y="184" text-anchor="middle" fill="#9aa3b2" font-size="11">[S, S]</text>
+  <text x="580" y="115" text-anchor="middle" fill="#d7dbe4" font-size="16">×</text>
+  <!-- V -->
+  <rect x="600" y="55" width="46" height="110" rx="6" fill="rgba(124,147,255,0.14)" stroke="#5b6bb0"/>
+  <text x="623" y="112" text-anchor="middle" fill="#aab6ff" font-size="14" font-weight="700">V</text>
+  <text x="623" y="184" text-anchor="middle" fill="#9aa3b2" font-size="11">[S, d]</text>
+  <text x="670" y="115" text-anchor="middle" fill="#d7dbe4" font-size="16">=</text>
+  <!-- O -->
+  <rect x="690" y="55" width="46" height="110" rx="6" fill="rgba(74,222,128,0.16)" stroke="#4ade80" stroke-width="1.6"/>
+  <text x="713" y="112" text-anchor="middle" fill="#bbf7d0" font-size="14" font-weight="700">O</text>
+  <text x="713" y="184" text-anchor="middle" fill="#9aa3b2" font-size="11">[S, d]</text>
+  <!-- compute note -->
+  <rect x="756" y="55" width="82" height="110" rx="8" fill="rgba(255,255,255,0.02)" stroke="#262b3a"/>
+  <text x="797" y="82" text-anchor="middle" fill="#9aa3b2" font-size="9.5">两次乘法</text>
+  <text x="797" y="100" text-anchor="middle" fill="#d7dbe4" font-size="11" font-weight="700">O(S²·d)</text>
+  <text x="797" y="126" text-anchor="middle" fill="#9aa3b2" font-size="9.5">P 显存</text>
+  <text x="797" y="144" text-anchor="middle" fill="#fbbf24" font-size="11" font-weight="700">O(S²)</text>
+</svg>
+<div class="cap">单 head 注意力的两次矩阵乘。真实模型有 $H$ 个 head、batch $B$，形状是 <code>[B, H, S, d]</code>，计算量 $O(B\,H\,S^2 d)$，中间分数矩阵 $P$ 占显存 $O(B\,H\,S^2)$。</div>
+</div>
+
+<p>要命的就是中间那个 <code>[S, S]</code> 的分数矩阵 $P$：它随序列长度<strong>平方增长</strong>。$S$ 从 4K 涨到 128K（×32），$P$ 就膨胀 <strong>1024 倍</strong>。计算量 $O(S^2 d)$、激活显存 $O(S^2)$——这就是长序列训练撞上的<strong>激活墙</strong>：哪怕模型权重本身放得下，单卡也存不下这么长序列的注意力激活。</p>
+
+<div class="callout">
+<p><span class="label">📐 记住三个形状</span> $Q,K,V$ 是 <code>[S, d]</code>（线性增长），分数矩阵 $P=QK^\top$ 是 <code>[S, S]</code>（<strong>平方增长</strong>），输出 $O$ 回到 <code>[S, d]</code>。CP 要对付的正是那个平方项。</p>
+</div>
+
+<h3>CP 的思路：沿序列维把它切开</h3>
+<p>上下文并行（Context Parallel, CP）的做法：把序列沿长度维切成 $S/\text{cp}$ 段，每张卡只处理自己那一段。这样每卡的分数矩阵只有 <code>[S/cp, S]</code>（甚至配合切分只需局部块），激活显存立刻降下来。其它层（MLP、LayerNorm）逐 token 独立，切了就切了；<strong>唯一的麻烦是注意力</strong>——它要让每个 query 看到<em>全部</em> key/value（分母要对<strong>整行</strong> $S$ 个 key 求和），而 K/V 现在分散在各张卡上。</p>
 
 <h2 class="section" id="problem"><span class="num">02</span>难点：注意力需要全局 K/V</h2>
 <p>每张卡持有自己那段的 Q、K、V。query 段在卡 $i$ 上，但它要 attend 的 key/value 跨越<strong>所有</strong>卡。所以必须跨卡通信，把别人的 K/V 拿过来（或把自己的 Q 送过去）。怎么通信、怎么在不把完整序列 materialize 的前提下算出正确的 softmax，就是 CP 的全部技术内容。</p>
 
-<h2 class="section" id="routes"><span class="num">03</span>两条主流路线</h2>
-<p>Megatron 的配置项 <code>cp_comm_type</code> 把所有路线列得清清楚楚，可以直接当地图看：</p>
+<h2 class="section" id="routes"><span class="num">03</span>三条路线：Ring / Ulysses / all-gather</h2>
+<p>拿到全局 K/V 有三种做法：<strong>一跳一跳传</strong>（Ring）、<strong>换一根轴切</strong>（Ulysses）、<strong>算前一次性凑齐</strong>（all-gather）。Megatron 的配置项 <code>cp_comm_type</code> 把它们列得清清楚楚，可以直接当地图看：</p>
 <div class="code-label">Megatron-LM · transformer/transformer_config.py:869（cp_comm_type docstring）</div>
 <pre><code class="language-python">"""Inter-gpu communication type for context parallelism.
 "p2p":       环形拓扑里用 P2P 交换 KV 分块；异步，可与注意力计算重叠。
@@ -144,38 +202,142 @@ o \leftarrow e^{\,m-m_{\text{new}}}\,o + e^{\,m_{\text{blk}}-m_{\text{new}}}\,o_
 
 <h3>路线 B：Ulysses（all-to-all 换轴）</h3>
 <p>Ring 是「序列一直切着、靠传 KV 补齐」；Ulysses（DeepSpeed 提出）反过来——<strong>一进注意力就换一根轴切</strong>。非注意力部分照常按序列切 <code>[B, S/cp, H]</code>，但注意力前用一次 <code>all-to-all</code> 把切分维从<em>序列</em>换成<em>注意力头</em>，变成 <code>[B, S, H/cp]</code>：每卡换到<strong>完整序列、但只算 1/cp 的 head</strong>。</p>
-<div class="diagram">
-<svg viewBox="0 0 820 150" role="img" aria-label="Ulysses：all-to-all 把序列切换成 head 切">
-  <defs><marker id="u" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4ade80"/></marker></defs>
-  <rect x="40" y="45" width="200" height="60" rx="10" fill="#161922" stroke="#5b6bb0"/>
-  <text x="140" y="70" text-anchor="middle" fill="#aab6ff" font-size="13" font-weight="600">按序列切</text>
-  <text x="140" y="90" text-anchor="middle" fill="#9aa3b2" font-size="12">[B, S/cp, H] · 每卡一段序列</text>
-  <path d="M250,75 L330,75" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#u)"/>
-  <text x="290" y="66" text-anchor="middle" fill="#86efac" font-size="11">all-to-all</text>
-  <rect x="340" y="45" width="210" height="60" rx="10" fill="#161922" stroke="#4ade80"/>
-  <text x="445" y="70" text-anchor="middle" fill="#bbf7d0" font-size="13" font-weight="600">按 head 切</text>
-  <text x="445" y="90" text-anchor="middle" fill="#9aa3b2" font-size="12">[B, S, H/cp] · 每卡全序列、部分 head</text>
-  <path d="M560,75 L640,75" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#u)"/>
-  <text x="600" y="66" text-anchor="middle" fill="#86efac" font-size="11">标准注意力</text>
-  <rect x="650" y="45" width="130" height="60" rx="10" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
-  <text x="715" y="70" text-anchor="middle" fill="#bbf7d0" font-size="12" font-weight="600">本地算完</text>
-  <text x="715" y="90" text-anchor="middle" fill="#9aa3b2" font-size="11">再 a2a 换回</text>
-</svg>
-<div class="cap">Ulysses：注意力前后各一次 all-to-all，在「序列切 ↔ head 切」之间换轴；注意力本身是完整序列的标准算子，无需改写。</div>
-</div>
-<p>因为每卡拿到了整条序列，<strong>注意力就是普通的标准算子，不用 online softmax、不用改 kernel</strong>。通信只有两次 all-to-all，量小且随 cp 增大每卡通信量还下降。代价是<strong>并行度被 head 数卡死</strong>：head 要能均分到各卡，所以 $\text{cp}\le\text{head 数}$（GQA 下受更少的 KV-head 数限制）。head 少时 CP 度就上不去。</p>
 
-<h3>两条路线怎么选</h3>
+<p>关键是搞懂这一次 <code>all-to-all</code> 到底搬了什么。以 <strong>4 张卡、4 个 head</strong> 为例：换轴前，卡 $i$ 手里是<strong>第 $i$ 段序列的全部 4 个 head</strong>；all-to-all 后，卡 $j$ 手里变成<strong>全部 4 段序列、但只有第 $j$ 个 head</strong>。本质是一次「分块转置」——把本地张量沿 head 维切成 4 块，第 $j$ 块发给卡 $j$，同时从每张卡各收一块：</p>
+
+<div class="diagram">
+<svg viewBox="0 0 840 320" role="img" aria-label="4 张卡的 all-to-all：把「按序列切」转置成「按 head 切」">
+  <defs><marker id="u" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="#9aa3b2"/></marker></defs>
+  <!-- headers -->
+  <text x="200" y="26" text-anchor="middle" fill="#eaeefb" font-size="13" font-weight="700">all-to-all 前：每卡 = 一段序列 × 全部 head</text>
+  <text x="640" y="26" text-anchor="middle" fill="#eaeefb" font-size="13" font-weight="700">all-to-all 后：每卡 = 全序列 × 一个 head</text>
+  <!-- LEFT grid: rows = cards, each cell colored by head-group (column) -->
+  <!-- column headers h0..h3 -->
+  <text x="95"  y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head0</text>
+  <text x="158" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head1</text>
+  <text x="221" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head2</text>
+  <text x="284" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head3</text>
+  <!-- rows -->
+  <!-- row i cells: fill by column color -->
+  <!-- card0 -->
+  <text x="40" y="86" text-anchor="middle" fill="#aab6ff" font-size="11">卡0</text>
+  <rect x="67"  y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h0</text>
+  <rect x="130" y="70" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h1</text>
+  <rect x="193" y="70" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h2</text>
+  <rect x="256" y="70" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h3</text>
+  <!-- card1 -->
+  <text x="40" y="122" text-anchor="middle" fill="#aab6ff" font-size="11">卡1</text>
+  <rect x="67"  y="106" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h0</text>
+  <rect x="130" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h1</text>
+  <rect x="193" y="106" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h2</text>
+  <rect x="256" y="106" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h3</text>
+  <!-- card2 -->
+  <text x="40" y="158" text-anchor="middle" fill="#aab6ff" font-size="11">卡2</text>
+  <rect x="67"  y="142" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h0</text>
+  <rect x="130" y="142" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h1</text>
+  <rect x="193" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h2</text>
+  <rect x="256" y="142" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h3</text>
+  <!-- card3 -->
+  <text x="40" y="194" text-anchor="middle" fill="#aab6ff" font-size="11">卡3</text>
+  <rect x="67"  y="178" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h0</text>
+  <rect x="130" y="178" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h1</text>
+  <rect x="193" y="178" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h2</text>
+  <rect x="256" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h3</text>
+  <!-- middle arrow -->
+  <path d="M336,138 L484,138" fill="none" stroke="#9aa3b2" stroke-width="2" marker-end="url(#u)"/>
+  <text x="410" y="128" text-anchor="middle" fill="#d7dbe4" font-size="12" font-weight="700">all-to-all</text>
+  <text x="410" y="156" text-anchor="middle" fill="#9aa3b2" font-size="10">按 head 重新分发</text>
+  <text x="410" y="172" text-anchor="middle" fill="#9aa3b2" font-size="10">（同色块聚到同一张卡）</text>
+  <!-- RIGHT grid: rows = cards, each row single color (its head), columns = seq chunks -->
+  <text x="535" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq0</text>
+  <text x="598" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq1</text>
+  <text x="661" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq2</text>
+  <text x="724" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq3</text>
+  <!-- card0 → head0 (blue) -->
+  <text x="480" y="86" text-anchor="middle" fill="#aab6ff" font-size="11">卡0</text>
+  <rect x="507" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="536" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h0</text>
+  <rect x="570" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="599" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h0</text>
+  <rect x="633" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="662" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h0</text>
+  <rect x="696" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="725" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h0</text>
+  <!-- card1 → head1 (green) -->
+  <text x="480" y="122" text-anchor="middle" fill="#aab6ff" font-size="11">卡1</text>
+  <rect x="507" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="536" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h1</text>
+  <rect x="570" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="599" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h1</text>
+  <rect x="633" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="662" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h1</text>
+  <rect x="696" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="725" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h1</text>
+  <!-- card2 → head2 (amber) -->
+  <text x="480" y="158" text-anchor="middle" fill="#aab6ff" font-size="11">卡2</text>
+  <rect x="507" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="536" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h2</text>
+  <rect x="570" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="599" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h2</text>
+  <rect x="633" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="662" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h2</text>
+  <rect x="696" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="725" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h2</text>
+  <!-- card3 → head3 (pink) -->
+  <text x="480" y="194" text-anchor="middle" fill="#aab6ff" font-size="11">卡3</text>
+  <rect x="507" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="536" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h3</text>
+  <rect x="570" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="599" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h3</text>
+  <rect x="633" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="662" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h3</text>
+  <rect x="696" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="725" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h3</text>
+  <!-- bottom flow note -->
+  <text x="420" y="238" text-anchor="middle" fill="#9aa3b2" font-size="11.5">换轴后每卡握着完整序列的 1 个 head → 直接跑标准注意力 → 再来一次 all-to-all 换回「按序列切」</text>
+  <rect x="150" y="256" width="540" height="44" rx="10" fill="rgba(74,222,128,0.06)" stroke="#4ade80"/>
+  <text x="420" y="283" text-anchor="middle" fill="#bbf7d0" font-size="11.5">同一格记号 S<tspan baseline-shift="sub" font-size="8">i</tspan>·h<tspan baseline-shift="sub" font-size="8">j</tspan> = 第 i 段序列的第 j 个 head 的数据；通信前后数据没变，只是换了「谁持有它」</text>
+</svg>
+<div class="cap">4 张卡的 all-to-all：左边每张卡拿一段序列的全部 head（每行彩虹色）；一次 all-to-all 把同色块聚到同一张卡，右边每张卡拿全序列的一个 head（每行单色）。这就是「序列切 ↔ head 切」的换轴。</div>
+</div>
+
+<p>因为每卡拿到了整条序列，<strong>注意力就是普通的标准算子，不用 online softmax、不用改 kernel</strong>。通信只有两次 all-to-all（进注意力换成 head 切、出注意力换回序列切），量小且随 cp 增大每卡通信量还下降。代价是<strong>并行度被 head 数卡死</strong>：head 要能均分到各卡，所以 $\text{cp}\le\text{head 数}$（GQA 下受更少的 KV-head 数限制）。head 少时 CP 度就上不去。</p>
+
+<h3>路线 C：all-gather（算前一次性凑齐全 KV）</h3>
+<p>最直白的一条路：Q 仍然按序列切、留在本地，但在进注意力<strong>之前先做一次 <code>all-gather</code></strong>，把各卡的 K/V 分片拼成<strong>完整的 K/V</strong>。于是每卡手里是「本地 <code>[S/cp]</code> 的 Q + 完整 <code>[S]</code> 的 K/V」，直接跑一次标准注意力（每张卡只算自己那段 query 的输出）即可——不用环形传递、也不用 online softmax。</p>
+<div class="diagram">
+<svg viewBox="0 0 820 180" role="img" aria-label="all-gather：算注意力前先把各卡 KV 拼成完整 KV">
+  <defs><marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4ade80"/></marker></defs>
+  <!-- four KV shards -->
+  <g font-size="10.5" text-anchor="middle">
+    <rect x="30"  y="30" width="72" height="34" rx="5" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="66"  y="51" fill="#e6ebff">卡0 KV₀</text>
+    <rect x="30"  y="72" width="72" height="34" rx="5" fill="rgba(74,222,128,0.16)"  stroke="#4ade80"/><text x="66"  y="93" fill="#e6ebff">卡1 KV₁</text>
+    <rect x="30"  y="114" width="72" height="34" rx="5" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="66"  y="135" fill="#e6ebff">卡2 KV₂</text>
+    <rect x="30"  y="156" width="72" height="18" rx="5" fill="rgba(244,114,182,0.16)" stroke="#f472b6"/><text x="66"  y="169" fill="#e6ebff" font-size="9">卡3 KV₃</text>
+  </g>
+  <path d="M110,90 L210,90" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+  <text x="160" y="80" text-anchor="middle" fill="#86efac" font-size="11">all-gather</text>
+  <!-- full KV on every card -->
+  <g font-size="10" text-anchor="middle">
+    <rect x="230" y="34" width="150" height="112" rx="8" fill="#161922" stroke="#4ade80"/>
+    <text x="305" y="56" fill="#bbf7d0" font-size="11.5" font-weight="700">每张卡都拿到完整 KV</text>
+    <rect x="246" y="66" width="118" height="16" rx="3" fill="rgba(124,147,255,0.18)" stroke="#7c93ff"/><text x="305" y="78" fill="#e6ebff" font-size="8.5">KV₀</text>
+    <rect x="246" y="86" width="118" height="16" rx="3" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="305" y="98" fill="#e6ebff" font-size="8.5">KV₁</text>
+    <rect x="246" y="106" width="118" height="16" rx="3" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="305" y="118" fill="#e6ebff" font-size="8.5">KV₂</text>
+    <rect x="246" y="126" width="118" height="16" rx="3" fill="rgba(244,114,182,0.16)" stroke="#f472b6"/><text x="305" y="138" fill="#e6ebff" font-size="8.5">KV₃</text>
+  </g>
+  <path d="M388,90 L470,90" fill="none" stroke="#4ade80" stroke-width="2" marker-end="url(#ag)"/>
+  <text x="429" y="80" text-anchor="middle" fill="#86efac" font-size="10.5">标准注意力</text>
+  <text x="429" y="104" text-anchor="middle" fill="#9aa3b2" font-size="9.5">本地 Q 段</text>
+  <rect x="482" y="52" width="150" height="76" rx="8" fill="rgba(74,222,128,0.08)" stroke="#4ade80"/>
+  <text x="557" y="80" text-anchor="middle" fill="#bbf7d0" font-size="11.5" font-weight="700">O 的本地段</text>
+  <text x="557" y="102" text-anchor="middle" fill="#9aa3b2" font-size="10">[S/cp, d]</text>
+  <rect x="654" y="34" width="150" height="112" rx="8" fill="rgba(251,191,36,0.05)" stroke="#fbbf24"/>
+  <text x="729" y="60" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="700">代价</text>
+  <text x="729" y="84" text-anchor="middle" fill="#9aa3b2" font-size="10">显存持完整 K/V</text>
+  <text x="729" y="102" text-anchor="middle" fill="#9aa3b2" font-size="10">同步、不可重叠</text>
+  <text x="729" y="120" text-anchor="middle" fill="#9aa3b2" font-size="10">实现最简单</text>
+</svg>
+<div class="cap">all-gather：进注意力前把 4 张卡的 K/V 分片拼成完整 K/V，人人一份；Q 仍是本地那段，跑一次普通注意力算出本地输出段。</div>
+</div>
+<p>好处是<strong>实现最简单</strong>——不改注意力 kernel、逻辑上就是「先凑齐再照常算」。缺点也明显：K/V 要在每张卡上<strong>物化成完整长度</strong>，把「省 K/V 显存」这个收益让掉了一大半（只剩省 Q 和注意力中间激活）；而且 all-gather 是<strong>同步</strong>的，通信和计算难以重叠。它更适合序列没那么极端、图省事的场景，或作为对拍其它路线正确性的 baseline。</p>
+
+<h3>三条路线怎么选</h3>
 <table>
-<thead><tr><th>维度</th><th>Ring（p2p，Colossal-AI 路线）</th><th>Ulysses（a2a，DeepSpeed 路线）</th></tr></thead>
+<thead><tr><th>维度</th><th>Ring（p2p）</th><th>Ulysses（a2a）</th><th>all-gather</th></tr></thead>
 <tbody>
-<tr><td>注意力时切哪一维</td><td><strong>序列 sequence</strong></td><td><strong>注意力头 head</strong></td></tr>
-<tr><td>通信原语</td><td>Ring P2P 逐块传 KV</td><td>前后两次 all-to-all</td></tr>
-<tr><td>并行度上限</td><td>基本不受限，可切超长</td><td><strong>≤ head 数</strong>（GQA 看 KV-head）</td></tr>
-<tr><td>通信量</td><td>随序列 $S$ 增长</td><td>小，且随 cp 增大每卡下降</td></tr>
-<tr><td>注意力算子</td><td>需 online-softmax 分块实现</td><td>标准算子，不用改</td></tr>
-<tr><td>causal 负载均衡</td><td>需 zigzag 重排（见下节）</td><td>天然均衡</td></tr>
-<tr><td>attention 期间每卡显存</td><td>只持 $1/\text{cp}$ 序列</td><td>持完整序列、$1/\text{cp}$ 的 head</td></tr>
+<tr><td>注意力时切哪一维</td><td><strong>序列 sequence</strong></td><td><strong>注意力头 head</strong></td><td>Q 切序列，K/V 不切（凑齐）</td></tr>
+<tr><td>通信原语</td><td>Ring P2P 逐块传 KV</td><td>前后两次 all-to-all</td><td>算前一次 all-gather</td></tr>
+<tr><td>并行度上限</td><td>基本不受限，可切超长</td><td><strong>≤ head 数</strong>（GQA 看 KV-head）</td><td>基本不受限</td></tr>
+<tr><td>通信量</td><td>随序列 $S$ 增长</td><td>小，且随 cp 增大每卡下降</td><td>随 $S$ 增长（一次拉全 KV）</td></tr>
+<tr><td>能否重叠</td><td>P2P 异步，可与计算重叠</td><td>a2a 前后同步</td><td><strong>同步，不可重叠</strong></td></tr>
+<tr><td>注意力算子</td><td>需 online-softmax 分块实现</td><td>标准算子，不用改</td><td>标准算子，不用改</td></tr>
+<tr><td>causal 负载均衡</td><td>需 zigzag 重排（见下节）</td><td>天然均衡</td><td>需 zigzag（Q 段负载不均）</td></tr>
+<tr><td>attention 期间每卡 K/V 显存</td><td>只持 $1/\text{cp}$</td><td>持完整序列、$1/\text{cp}$ 的 head</td><td><strong>持完整 K/V</strong>（收益打折）</td></tr>
 </tbody>
 </table>
 <div class="callout">
