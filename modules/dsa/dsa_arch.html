@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>DSA / MLA 结构图 + 参数说明</title>
+<style>
+  :root{--bg:#f7f8fa;--text:#1e293b;--muted:#64748b;--card:#fff;--border:#e2e8f0;
+        --blue:#3b82f6;--blbg:#dbeafe;--orange:#f97316;--orbg:#ffedd5;--red:#ef4444;--rdbg:#fee2e2;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+       line-height:1.7;padding:28px}
+  .wrap{max-width:1040px;margin:0 auto}
+  h1{font-size:1.5rem;margin:0 0 4px}
+  h2{font-size:1.15rem;margin:34px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+  p.sub{color:var(--muted);margin:0 0 18px;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;overflow-x:auto;margin-bottom:8px}
+  .card svg{max-width:100%;height:auto;display:block;margin:0 auto}
+  .chips{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0 4px;font-size:13.5px}
+  .chip{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:15px;height:15px;border-radius:4px;border:1.5px solid}
+  table{width:100%;border-collapse:collapse;margin:10px 0 6px;font-size:14px}
+  th,td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#f1f5f9;font-weight:600}
+  tr:nth-child(even) td{background:#fafbfc}
+  code{background:#eef2f7;padding:1.5px 6px;border-radius:5px;font-family:"JetBrains Mono",Menlo,Consolas,monospace;font-size:.9em}
+  .note{border-left:3px solid var(--orange);background:#fff7ed;border-radius:0 10px 10px 0;padding:10px 16px;margin:14px 0;font-size:14px}
+  .note.red{border-color:var(--red);background:#fef2f2}
+  .intro{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin:14px 0;font-size:14px}
+</style></head>
+<body><div class="wrap">
+<h1>DeepSeek Sparse Attention · 结构图与参数说明</h1>
+<p class="sub">论文风格整体架构（参考 DeepSeek-V3.2 官方图重画）：底部为完整 Transformer 堆栈（×61），中部展开 MLA 的数学记号，顶部红框为 MHA 核心，右侧绿色为 DSA 新增的 Lightning Indexer。</p>
+<div class="chips">
+  <span class="chip"><span class="sw" style="background:#fdf7e3;border-color:#cbb884"></span>MLA 数学模块</span>
+  <span class="chip"><span class="sw" style="background:#fde8ec;border-color:#e79bb0"></span>推理缓存张量</span>
+  <span class="chip"><span class="sw" style="background:#86efac;border-color:#16a34a"></span>Lightning Indexer（DSA 新增）</span>
+  <span class="chip"><span class="sw" style="background:#fef2f2;border-color:#dc2626"></span>MHA 核心（Mask 注入点）</span>
+</div>
+<div class="card">
+<img src="dsa_arch.svg" alt="DeepSeek-V3.2 DSA 论文风格架构图" style="width:100%;height:auto;display:block;margin:0 auto"/>
+</div>
+
+<div class="intro">
+图里每个方框第二行是一个 <b>张量的形状</b>，例如 <code>[B, S, 128, 192]</code>。
+把张量想象成一个<b>多维表格</b>，方括号里每个数字就是它的一根"轴"（有多长）。下面把所有符号拆开讲。
+</div>
+
+<h2>① 数据规模：张量的四根基本轴</h2>
+<table>
+<tr><th>符号</th><th>含义</th><th>直觉</th></tr>
+<tr><td><code>B</code></td><td>batch size，一次同时处理几条序列</td><td>你一次喂给模型几段文本</td></tr>
+<tr><td><code>S</code></td><td>当前要计算的 query token 数</td><td><b>预填充</b>阶段 = 整段输入长度；<b>逐字生成</b>阶段 = 1（只算新吐的那个字）</td></tr>
+<tr><td><code>T</code></td><td>历史 KV 长度，已经见过的 token 数</td><td>模型要"回头看"的上下文多长，<code>T ≥ S</code>。<b>稀疏注意力省的就是它</b></td></tr>
+<tr><td><code>d</code></td><td>模型隐藏维度（hidden size）</td><td>每个 token 被表示成多长的向量（DeepSeek-V3 系列约 7168）</td></tr>
+</table>
+
+<h2>② 基础 MLA 的结构参数（图中米黄色数学模块）</h2>
+<p class="sub">MLA 的核心技巧是<b>低秩压缩</b>：先把高维向量压小再算，省显存、省 KV Cache。</p>
+<table>
+<tr><th>符号 / 数字</th><th>含义</th><th>为什么是这样</th></tr>
+<tr><td><code>Rq</code> = <code>q_lora_rank</code> ≈ 1536</td><td>Query 先被压缩到的中间维度</td><td>不直接从 <code>d</code>(7168) 生成 Query，先压到 1536，省参数</td></tr>
+<tr><td><code>kv_lora_rank</code> = 512</td><td>KV 压缩后的"潜向量"长度</td><td><b>MLA 的灵魂</b>：KV Cache 每个 token 只存这 512 维，而不是完整 K、V</td></tr>
+<tr><td><code>qk_rope_head_dim</code> = 64</td><td>每头里<b>带</b> RoPE 位置编码的那小段</td><td>RoPE 负责告诉模型 token 的先后顺序</td></tr>
+<tr><td><code>qk_nope_head_dim</code> = 128</td><td>每头里<b>不带</b>位置编码的那段</td><td>负责纯语义匹配</td></tr>
+<tr><td><code>qk_head_dim</code> = 192</td><td>每个注意力头 Q/K 的总长 = 128 + 64</td><td>两段拼起来（"解耦 RoPE"设计）</td></tr>
+<tr><td><code>v_head_dim</code> = 128</td><td>每个头 Value 的长度</td><td></td></tr>
+<tr><td>主注意力头数 = 128</td><td>128 个"注意力头"并行看不同关注模式</td><td><code>128×192</code>、<code>128×256</code>、<code>128×128</code> 里的 128 都是它</td></tr>
+</table>
+<div class="note">
+<b>派生数字怎么来的：</b><code>wq_b</code> 输出 <code>128×192</code> = 头数 × 每头Q维；
+<code>wkv_a</code> 输出 <code>512+64</code> = 压缩KV(512) + 一份所有头共享的 RoPE key(64)；
+<code>wkv_b</code> 把 512 维解压成 <code>128×256</code> = 128头 ×(K的128 + V的128)；
+<code>wo</code> 输入 <code>128×128</code> = 128头 × 每头V的128。
+</div>
+
+<h2>③ DSA 新增的索引器参数（图中绿色 Lightning Indexer）</h2>
+<p class="sub">索引器是个"轻量筛选网络"，参数被<b>故意做小</b>以求快。</p>
+<table>
+<tr><th>符号 / 数字</th><th>含义</th><th>为什么</th></tr>
+<tr><td>索引头数 = 64</td><td>索引器只有 64 个头</td><td>只有主注意力(128)的一半，够用就行，越少越快</td></tr>
+<tr><td><code>index_head_dim</code> = 128</td><td>索引器每个头的维度（低维）</td><td>只用来快速打分，不需要高精度</td></tr>
+<tr><td><code>index_topk</code> = 2048（即 <code>k</code>）</td><td>每个 query 最终只挑 2048 个历史 token 参与真正的注意力</td><td>不管 <code>T</code> 多长（哪怕 128K），每个字只跟最相关的 2048 个算——这就是"稀疏"</td></tr>
+</table>
+
+<h2>④ 图里出现的中间张量（数据流上的临时结果）</h2>
+<table>
+<tr><th>名字</th><th>是什么</th></tr>
+<tr><td><code>qr</code></td><td>Query 的低秩表示（压缩版 Query）。索引器直接借用它，省一次投影</td></tr>
+<tr><td><code>q_nope</code> / <code>q_pe</code></td><td>Query 拆成 无位置编码 / 带 RoPE 两部分</td></tr>
+<tr><td><code>kv</code></td><td>压缩后的 KV 潜向量(512维)，<code>kv_cache</code> 存的就是它</td></tr>
+<tr><td><code>k_pe</code></td><td>一份带 RoPE 的 key（所有头共享，64维）</td></tr>
+<tr><td><code>k_idx</code> / <code>q_idx</code></td><td>索引器<b>专用</b>的 key / query，和主注意力完全分开、独立缓存</td></tr>
+<tr><td><code>w_idx</code></td><td>每个索引头的重要性权重（由 <code>weights_proj</code> 产生）</td></tr>
+<tr><td><code>index_score</code> (<code>I</code>)</td><td>query 对每个历史 token 的"相关性打分" <code>[B,S,T]</code></td></tr>
+<tr><td><code>topk_indices</code></td><td>每个 query 选出的 2048 个最相关 token 的<b>位置编号</b></td></tr>
+<tr><td><code>index_mask</code></td><td>把没被选中的位置设成 <code>-inf</code> 的掩码；加到分数上，softmax 后这些位置权重≈0，于是"只看被选中的 token"</td></tr>
+</table>
+
+<div class="note red">
+<b>红框 MHA 里的 <code>Mask</code> 是 DSA 唯一改动基础 MLA 的地方</b>：索引器算出的 Top-k 稀疏结果（绿色虚线），就通过改写这一步的掩码"注入"进原本的注意力（代码里即 <code>scores += index_mask</code>）。<br>
+上图是 <b>prefill（预填充）</b> 路径；<b>decode（逐字生成）</b> 时会对 <code>wkv_b</code> 做"权重吸收"优化，Query 直接和压缩的 <code>kv_cache</code> 点积，维度略有不同但含义一致。
+</div>
+
+</div></body></html>

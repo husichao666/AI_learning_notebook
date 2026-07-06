@@ -46,45 +46,162 @@ DSA 的解决思路是构建一个 **两级注意力架构**：
 
 关键洞察：**筛选网络不需要完美，只需要足够快且大致准确**。即使漏掉少量重要 token，主注意力的高精度计算也能弥补；而筛选网络的低开销确保了整体效率的提升。
 
+### 4. 用一张矩阵图看懂稀疏化
+
+在钻进公式和代码之前，先用一张图建立**直觉**。注意力的本质就是一张矩阵：**行是当前要算的 query（第 t 个 token），列是它能回头看的 key（第 s 个历史 token）**，每个格子是一次 query·key 打分。因果掩码让每个 query 只能看自己及更早的 token，所以有效格子构成一个**下三角**。下面这张图把 DSA 对这张矩阵做的三件事一字排开（示例设 8 个 token、每行只保留 Top-`k`=3）：
+
+<div align="center">
+<img src="dsa_sparsity.svg" alt="DSA 稀疏化流程：标准注意力 → 闪电索引器打分 + Top-k → 细粒度稀疏注意力" width="960"/>
+</div>
+
+**按流程读这三张矩阵：**
+
+1. **标准注意力（左·蓝）**：下三角**每一个格子都要真算**一次 query·key 点积再 softmax。格子数随序列长度 L 成 `L²/2` 增长——这就是 O(L²) 的来源，也是长序列下算不动、存不下的根本原因。
+
+2. **① 闪电索引器打分（中·橙，"海选"）**：索引器用**低维、低精度**的一套独立 Q/K，把**整张**下三角矩阵快速打一遍分 `I[t,s]`（颜色越深分越高）。注意它算的是**便宜的估分**，不是真注意力——目的只是判断"哪些列值得看"。打完分后**逐行**取分数最高的 `k` 个格子（打 ✓ 的粗框格），其余丢弃。图里能看出选中的规律：**第 0 列（注意力汇聚点 sink）几乎每行都留、对角线附近（最近的 token）也留**，再加零星几个中距离的"语义命中"。
+
+3. **② 细粒度稀疏注意力（右·蓝，"精算"）**：**只在上一步选中的格子上**执行完整精度的真注意力，其余位置直接置 `−∞`（图中灰格），经 softmax 后权重≈0、等于没看。于是真正参与昂贵计算的格子从满下三角的 36 个降到 21 个；当序列拉长到 128K 时，每行被 `k`=2048 死死钉住，复杂度从 O(L²) 变成 **O(L·k)**。
+
+一句话串起来：**索引器把"该看谁"这个决定，从昂贵的主注意力里剥离出来，用一张廉价的打分矩阵替代**；主注意力只需照着 Top-k 的稀疏图案去算。后面第二部分的 `index_mask`、`topk_indices` 等张量，就是这张图里"粗框 → −∞ 灰格"这一步在代码里的形态。
+
+#### 换成具体数字：DSA 到底改了哪一步？
+
+上面的热力图给的是"规模感"，但稀疏化到底怎么落到每个数字上，还是得**用真数字手算一遍**。下面这张图沿用一个 4 token、维度 3 的最小例子（q、k、v 的数字与很多教程里画标准注意力时用的是同一组），把镜头拉近到**逐格算**：
+
+<div align="center">
+<img src="dsa_numeric.svg" alt="用具体数字看懂 DSA：q·kᵀ 主分数 → 闪电索引分数取 Top-2 → DSA mask → 输出" width="1000"/>
+</div>
+
+顺着五列读，就能看清 DSA 相对标准注意力**只动了 mask 这一步**：
+
+1. **query 向量 `q_t`（粉）**：第 t 个 token 的查询向量，例如 `q_1=[1,2,3]`。
+2. **① 主注意力分数 `q_t·k_sᵀ`（蓝）**：这是**真算、也是最贵**的一步。`q_1·k_1ᵀ = 1×2+2×1+3×4 = 16`，一路算出 `16, 24, 32…`。标准注意力里，下三角每一个蓝格**都要留着**送进 softmax。
+3. **② 闪电索引分数 `I[t,s]`（橙）**：注意这是**另一套便宜的打分器**，数值和左边的主分数**没有关系**（它用低维、FP8 的独立 Q/K 现算），只干一件事——**每行挑出分数最高的 Top-`k`（这里 k=2，粗框 ✓ 的格子）**。第 3 行它选中 `s=2,3`、丢掉 `s=1`；第 4 行选中 `s=3,4`、丢掉 `s=1,2`。
+4. **③ DSA mask 后（蓝/−∞）**：把上一步**没选中**的位置直接置 `−∞`。对比第 2 列可以看到：标准注意力这里是**满下三角**，DSA 则每行最多只留 `k` 个真格子。**主分数的算法一个字没改，改的只是"哪些格子活下来"。**
+5. **④ 输出 `o_t`（黄绿）**：用活下来的分数对 `v` 加权求和。前两行历史太短（≤k）、和 dense 完全一样；**第 3、4 行因为丢了低分列，输出 `≠dense`**——但被丢掉的都是分数很小的格子，softmax 后本就接近 0，所以真实模型里这点差异极小，这正是"稀疏几乎不掉点"的直觉来源。
+
+把这张具体数字图和上面的热力图合起来看：**热力图告诉你"省了多少"（O(L²)→O(L·k)），数字图告诉你"具体省在哪一格、代价是什么"。** 二者对应的就是第二部分代码里 `index_mask`（非 Top-k 置 `-inf`）加到注意力分数上这一行。
+
 ---
 
 ## 第二部分：DSA 核心架构详解
 
 ### 1. 整体架构
 
-DSA 基于 DeepSeek 系列的 MLA（Multi-head Latent Attention）架构实现，整体流程如下：
+DSA 基于 DeepSeek 系列的 MLA（Multi-head Latent Attention）架构实现。下图是**论文风格的整体架构**：**底部**是完整的 Transformer 堆栈（`Embedding → [RMSNorm → MLA → Add → RMSNorm → MOE/MLP → Add] × 61 → Output Head`），**中部**把其中的 MLA 用数学记号展开（`h_t` 经三路降维 `c_t^Q / k_t^R / c_t^KV`，再解压出每头的 `q/k/v`），**顶部红框**是 MHA 核心（`MatMul → Mask → SoftMax → MatMul`），**右侧绿色**是 DSA 新增的 Lightning Indexer。**绿色虚线**清楚地画出了 DSA 的全部改动：索引器从 `h_t / RMSNorm` 取低维 q·k 打分，取 Top-k 后去**改写 Mask**——除此之外主注意力算法一个字没变。每个张量框都标了 `[B, S, ·]` 形状。
+
+<div align="center">
+<img src="dsa_arch.svg" alt="DeepSeek-V3.2 DSA 论文风格架构图：底部 Transformer 堆栈×61，中部 MLA 数学记号展开，顶部红框 MHA，右侧绿色 Lightning Indexer 用绿色虚线改写 Mask" width="1000"/>
+</div>
+
+> 上图是**论文视角**（数学记号、模块级）。如果想对到**代码里的每个张量**（`wq_a`、`wkv_a`、`indexer.wk`、`index_score`、`topk_indices`…），展开下面这份 mermaid 数据流图——它是同一套逻辑的**代码级细粒度版本**，也是第二部分源码解读的路线图。
+
+<details>
+<summary>📄 查看 mermaid 源码（GitHub 可原生渲染）</summary>
 
 ```mermaid
 graph TD
-    Input["输入 Token h_t"] --> QProj["Query 低秩投影<br/>wq_a → q_norm → wq_b"]
-    Input --> KVProj["KV 投影<br/>wkv → kv_norm"]
+    X["输入 x&#160;&#160;[B, S, d=7168]"]
 
-    QProj --> QSplit["Query 拆分<br/>带 RoPE / 不带 RoPE"]
-    QSplit --> IndexQuery["索引查询 q^I<br/>低维投影 + RoPE"]
+    X --> WQA["wq_a: Linear(d=7168 → Rq=1536)<br/>[B, S, Rq=1536]"]
+    WQA --> QN["q_norm (RMSNorm)<br/>qr: [B, S, Rq=1536]"]
+    QN --> WQB["wq_b: Linear(Rq=1536 → 128×192)<br/>[B, S, n_h=128, qk_d=192]"]
+    WQB --> QS["split + RoPE<br/>q_nope[B,S,128,nope=128] / q_pe[B,S,128,rope=64]"]
 
-    KVProj --> KVCache["KV Cache<br/>所有历史 Token"]
+    X --> WKVA["wkv_a: Linear(d=7168 → 512+64)<br/>[B, S, kv_r+rope=576]"]
+    WKVA --> KVN["split + kv_norm<br/>kv[B,S,kv_r=512] / k_pe[B,S,rope=64]"]
+    KVN --> KVC["kv_cache [B,T,kv_r=512]<br/>pe_cache [B,T,rope=64]"]
+    KVC --> WKVB["wkv_b: Linear(kv_r=512 → 128×256)<br/>k,v: [B, T, n_h=128, nope+v_d=256]"]
 
-    subgraph IndexerPhase [闪电索引器阶段]
-        IndexQuery --> ScoreCalc["索引分数计算<br/>I_t,s = Σ w * ReLU(q^I · k^I)"]
-        KVCache --> IndexKV["索引用 KV<br/>独立压缩缓存"]
-        IndexKV --> ScoreCalc
-        ScoreCalc --> TopK["Top-k 选择<br/>k=2048"]
-    end
+    X --> IWK["indexer.wk: Linear(d=7168 → idx_d=128)<br/>+ k_norm → k_idx [B,S,idx_d=128]"]
+    IWK --> KCI["k_cache_idx [B, T, idx_d=128]"]
+    QN --> IWQB["indexer.wq_b: Linear(Rq=1536 → 64×128)<br/>q_idx [B,S,idx_h=64,idx_d=128]（复用 qr）"]
+    X --> WP["weights_proj: Linear(d=7168 → idx_h=64)<br/>w_idx [B, S, idx_h=64]"]
+    KCI --> ISC["einsum bshd,btd→bsht<br/>index_score [B,S,idx_h=64,T]"]
+    IWQB --> ISC
+    ISC --> RL["ReLU × w_idx, sum(heads)<br/>I: [B, S, T]"]
+    WP --> RL
+    RL --> TK["topk(k=2048)<br/>topk_indices [B,S,k=2048]"]
+    TK --> IM["index_mask [B,S,T]<br/>非 Top-k 置 -inf"]
 
-    TopK --> SparseKV["稀疏 KV 条目<br/>仅 Top-k 个"]
-    KVCache --> SparseKV
-    QSplit --> MainQ["主注意力 Query"]
+    QS --> SC["scores = q·kᵀ<br/>[B, S, n_h=128, T]"]
+    WKVB --> SC
+    SC --> ADD["scores += index_mask<br/>[B, S, n_h=128, T]"]
+    IM --> ADD
+    ADD --> SM["softmax<br/>[B, S, n_h=128, T]"]
+    SM --> AV["× v<br/>[B, S, n_h=128, v_d=128]"]
+    WKVB --> AV
+    AV --> WO["wo: Linear(128×128 → d=7168)<br/>u_t: [B, S, d=7168]"]
 
-    subgraph AttnPhase [细粒度稀疏注意力阶段]
-        MainQ --> SparseAttn["稀疏 MLA 注意力<br/>仅对 Top-k KV 计算"]
-        SparseKV --> SparseAttn
-    end
+    classDef mla fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a,stroke-width:1.5px;
+    classDef dsa fill:#ffedd5,stroke:#f97316,color:#7c2d12,stroke-width:1.5px;
+    classDef inj fill:#fee2e2,stroke:#ef4444,color:#991b1b,stroke-width:2px;
+    classDef inp fill:#f1f5f9,stroke:#94a3b8,color:#334155,stroke-width:1.5px;
 
-    SparseAttn --> Output["注意力输出 u_t"]
-
-    style IndexerPhase fill:#ffe6cc,stroke:#d79b00
-    style AttnPhase fill:#d5e8d4,stroke:#82b366
+    class X inp;
+    class WQA,QN,WQB,QS,WKVA,KVN,KVC,WKVB,SC,SM,AV,WO mla;
+    class IWK,KCI,IWQB,WP,ISC,RL,TK,IM dsa;
+    class ADD inj;
 ```
+
+</details>
+
+#### 图中参数都代表什么？（零基础视角）
+
+图里每个方框的第二行都是一个**张量的形状**，比如 `[B, S, 128, 192]`。可以把张量想象成一个**多维表格**，方括号里每个数字是表格的一根"轴"（有多长）。下面把所有符号拆开讲。
+
+**① 数据规模：张量的四根基本轴**
+
+| 符号 | 含义 | 直觉 |
+|------|------|------|
+| `B` | batch size，一次同时处理几条序列 | 你一次喂给模型几段文本 |
+| `S` | 当前要计算的 query token 数 | **预填充**阶段=整段输入长度；**逐字生成**阶段=1（只算新吐的那个字） |
+| `T` | 历史 KV 长度，已经见过的 token 数 | 模型要"回头看"的上下文有多长，`T ≥ S`。稀疏注意力省的就是它 |
+| `d` | 模型隐藏维度（hidden size） | 每个 token 被表示成一个多长的向量（DeepSeek-V3 系列约 7168） |
+
+**② 基础 MLA 的结构参数（蓝色框）**
+
+MLA 的核心技巧是**低秩压缩**：先把高维向量压小再算，省显存、省 KV Cache。
+
+| 符号 / 数字 | 含义 | 为什么是这样 |
+|------|------|------|
+| `Rq` = `q_lora_rank` ≈ 1536 | Query 先被压缩到的中间维度 | 不直接从 `d`(7168) 生成 Query，而是先压到 1536，省参数 |
+| `kv_lora_rank` = 512 | KV 压缩后的"潜向量"长度 | **MLA 的灵魂**：KV Cache 里每个 token 只存这 512 维，而不是完整的 K、V |
+| `qk_rope_head_dim` = 64 | 每个头里**带**旋转位置编码(RoPE)的那一小段 | RoPE 负责告诉模型 token 的先后顺序 |
+| `qk_nope_head_dim` = 128 | 每个头里**不带**位置编码的那段 | 负责纯语义匹配 |
+| `qk_head_dim` = 192 | 每个注意力头 Q/K 的总长度 = 128 + 64 | 两段拼起来（这叫"解耦 RoPE"） |
+| `v_head_dim` = 128 | 每个头 Value 的长度 | |
+| 主注意力头数 = 128 | 有 128 个"注意力头"并行看不同的关注模式 | `128×192`、`128×256`、`128×128` 里的 128 都是它 |
+
+> 顺带解释几个派生数字：`wq_b` 输出 `128×192` = 头数 × 每头Q维；`wkv_a` 输出 `512+64` = 压缩KV(512) + 一份所有头共享的 RoPE key(64)；`wkv_b` 把 512 维解压成 `128×256`=128头×(K的128 + V的128)；`wo` 输入 `128×128` = 128头×每头V的128。
+
+**③ DSA 新增的索引器参数（橙色框）**
+
+索引器是个"轻量筛选网络"，参数被**故意做小**以求快：
+
+| 符号 / 数字 | 含义 | 为什么 |
+|------|------|------|
+| 索引头数 = 64 | 索引器只有 64 个头 | 只有主注意力(128)的一半，够用就行，越少越快 |
+| `index_head_dim` = 128 | 索引器每个头的维度（低维） | 只用来快速打分，不需要高精度 |
+| `index_topk` = 2048（即 `k`） | 每个 query 最终只挑 2048 个历史 token 参与真正的注意力 | 不管 `T` 有多长（哪怕 128K），每个字只跟最相关的 2048 个算——这就是"稀疏" |
+
+**④ 图里出现的中间张量（数据流上的临时结果）**
+
+| 名字 | 是什么 |
+|------|--------|
+| `qr` | Query 的低秩表示（压缩版 Query）。索引器直接借用它，省一次投影 |
+| `q_nope` / `q_pe` | Query 拆成 无位置编码 / 带 RoPE 两部分 |
+| `kv` | 压缩后的 KV 潜向量(512维)，`kv_cache` 存的就是它 |
+| `k_pe` | 一份带 RoPE 的 key（所有头共享，64维） |
+| `k_idx` / `q_idx` | 索引器**专用**的 key / query，和主注意力完全分开、独立缓存 |
+| `w_idx` | 每个索引头的重要性权重（由 `weights_proj` 产生） |
+| `index_score` (`I`) | query 对每个历史 token 的"相关性打分" `[B,S,T]` |
+| `topk_indices` | 每个 query 选出的 2048 个最相关 token 的**位置编号** |
+| `index_mask` | 把没被选中的位置设成 `-inf` 的掩码；加到注意力分数上，经 softmax 后这些位置权重≈0，于是"只看被选中的 token" |
+
+> **红色框 `scores += index_mask` 是 DSA 唯一改动基础 MLA 的地方**：索引器算出的稀疏结果，就通过这一步"注入"进原本的注意力。
+>
+> 上图是 **prefill（预填充）** 路径；**decode（逐字生成）** 时会对 `wkv_b` 做"权重吸收"优化，Query 直接和压缩的 `kv_cache` 点积（对应 §2.4 代码 `else` 分支），维度会略有不同，但含义一致。
 
 ### 2. 闪电索引器（Lightning Indexer）
 
@@ -96,7 +213,10 @@ graph TD
 
 - **少头设计**：索引头数量（ `index_n_heads=64` ）远少于主注意力头数（ `n_heads=128` ），直接减少并行计算冗余
 - **低维投影**：将 Query 和 Key 投影到极低维度（ `index_head_dim=128` ），使相似度计算异常高效
+- **单 Key 共享**：在下面 2.2 的索引分数公式里，$q_{t,j}^I$ 带头下标 $j$、而 $k_s^I$ **不带**——每个历史 token 只有**一个** Key 向量，被全部 64 个索引头共享，进一步省掉了多头 Key 的投影与缓存
 - **FP8/FP4 精度**：索引器的所有计算均可使用低精度实现，在保证索引分数准确性的前提下大幅降低计算和存储开销
+
+> **一句话抓住索引器**：它的 Q/K 计算和 MLA 几乎一样，就是个**"微缩版 MLA"**——头数 64（vs MLA 的 128）、每头维度 128（vs MLA 的 576），算量大约只有 MLA 对应部分的 **1/9**。所以"海选"这一步虽然仍是 O(L²)，但常数极小，几乎不占成本。
 
 #### 2.2 索引分数计算
 
@@ -291,26 +411,28 @@ class MLA(nn.Module):
         return x
 ```
 
-**MLA 中 Indexer 的协同流程：**
+**MLA 中 Indexer 的协同流程（带模块与 shape）：**
 
 ```
-输入 x ──→ wq_a → q_norm → wq_b ──→ q_nope, q_pe (主注意力 Query)
-              │                         │
-              └──→ qr (低秩表示) ──→ Indexer.wq_b ──→ q^I (索引查询)
-                    │                                     │
-输入 x ──→ wkv_a → kv_norm ──→ kv_cache (主 KV Cache)    │
-              │                                             │
-              └──→ Indexer.wk → k_norm ──→ k_cache (索引 KV Cache)
-                                                    │
-                              Indexer: q^I · k_cache → ReLU → 加权求和 → Top-k
-                                                                      │
-                                                              topk_indices
-                                                                      │
-                              ┌───────────────────────────────────────┘
-                              ↓
-                    index_mask: 非 Top-k 位置设为 -inf
-                              ↓
-                    scores += index_mask → softmax → 稀疏注意力输出
+输入 x [B,S,d]
+  │
+  ├─ wq_a:Linear(d,Rq) → q_norm → qr [B,S,Rq]
+  │        ├─ wq_b:Linear(Rq,128×192) ─→ q_nope[B,S,128,128] / q_pe[B,S,128,64]   （主注意力 Query）
+  │        └─ indexer.wq_b:Linear(Rq,64×128) ─→ q^I [B,S,64,128]                  （索引查询，复用 qr）
+  │
+  ├─ wkv_a:Linear(d,512+64) → 拆分/kv_norm ─→ kv_cache[B,T,512] + pe_cache[B,T,64]  （主 KV Cache）
+  │
+  └─ indexer.wk:Linear(d,128) → k_norm ─→ k_cache^I [B,T,128]                       （索引 KV Cache，独立）
+
+索引器:  q^I[B,S,64,128] · k_cache^I[B,T,128]
+         → einsum bshd,btd→bsht [B,S,64,T] → ReLU × w^I → sum(heads) → I[B,S,T]
+         → topk(2048) → topk_indices [B,S,2048]
+                              │
+                              ▼
+主注意力: scores = q·kᵀ [B,S,128,T]
+         + index_mask[B,S,T]（非 Top-k 置 -inf）
+         → softmax → ×v [B,S,128,128]
+         → wo:Linear(128×128,d) → u_t [B,S,d]
 ```
 
 **关键设计要点：**
@@ -341,6 +463,7 @@ DSA 直接基于 MLA 的 **MQA（Multi-Query Attention）模式** 实现，而�
 V3.2 并非从零开始训练，而是在 V3.1-Terminus 的 128K 上下文检查点基础上继续训练。如何让已适应密集注意力的模型平滑过渡到稀疏模式？
 
 ```mermaid
+%%{init: {'theme':'default'}}%%
 graph LR
     subgraph Phase1 [阶段一: Dense Warm-up]
         D1["冻结主模型参数"] --> D2["只训练 Lightning Indexer"]
@@ -351,7 +474,7 @@ graph LR
     subgraph Phase2 [阶段二: Sparse Training]
         S1["解冻主模型参数"] --> S2["引入 Top-k 选择机制"]
         S2 --> S3["梯度解耦:<br/>索引器按 KL 损失更新<br/>主模型按 LM 损失更新"]
-        S3 --> S4["15000 步 / 9437B tokens"]
+        S3 --> S4["15000 步 / 943.7B tokens"]
     end
 
     Phase1 --> Phase2
@@ -366,15 +489,17 @@ graph LR
 
 $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{indexer}})$$
 
-这个阶段用学习率训练 1000 步，总计约 2.1B tokens。本质上是让索引器先学会"像旧模型那样看世界"。
+这个阶段学习率设为 `1e-3`，仅训练索引器 1000 步，每步 16 个 128K 长度序列，总计约 2.1B tokens。本质上是让索引器先学会"像旧模型那样看世界"。
 
 **阶段二：Sparse Training**
 
 引入 Top-k 选择机制，解冻主模型参数，让主模型和索引器同时更新。关键设计是 **梯度解耦**：
 
 - 索引器的输入从计算图中 `detach`，主模型只根据语言建模损失反向传播
-- 索引器只根据 KL 损失更新
+- 索引器只根据 KL 损失更新（此时 KL 只在被选中的 Top-k token 集合上对齐）
 - 这避免了"索引器改了导致主模型改变，主模型改变又导致索引器需要重新适配"的恶性循环
+
+这个阶段学习率设为 `7.3e-6`，每个 query token 选 2048 个 KV，主模型与索引器同时训练 15000 步，每步 480 个 128K 长度序列，总计约 943.7B tokens。
 
 ---
 
@@ -421,6 +546,7 @@ $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{index
 ## 第五部分：从 NSA 到 DSA 到 DSA2 的技术谱系
 
 ```mermaid
+%%{init: {'theme':'default'}}%%
 graph LR
     NSA["NSA<br/>Native Sparse Attention<br/>ACL 2025 最佳论文<br/>北大 × DeepSeek"] --> DSA["DSA<br/>DeepSeek Sparse Attention<br/>V3.2-Exp 首次引入<br/>Lightning Indexer + Top-k"]
     DSA --> CSA["CSA<br/>Compressed Sparse Attention<br/>V4: KV 压缩 + 稀疏选择"]
@@ -444,4 +570,4 @@ graph LR
 
 DSA 的核心思想是 **用轻量筛选换计算效率**。通过 Lightning Indexer 做"海选"、细粒度 Top-k 选择做"精算"，DSA 将注意力复杂度从 O(L²) 降至 O(L×k)，同时通过两阶段训练策略确保了从密集注意力到稀疏注意力的平滑过渡。
 
-在 V3.2-Exp 上的实验验证了这一思路的可行性：DSA 在几乎不影响模型性能的前提下，将长文本推理成本降低 50% 以上，甚至在部分任务上带来了性能提升。在 V4 中，DSA 进一步与 KV 压缩机制结合，演化为 CSA + HCA 混合架构，使百万 Token 上下文成为现实。
+在 V3.2-Exp 上的实验验证了这一思路的可行性：在 H800 集群上，无论 prefilling 还是 decoding，单位 token 成本都大幅下降，**在 128K 长上下文下单位 token 成本最高降低达 60%~70%**，且几乎不影响模型性能，部分任务上甚至带来提升。在 V4 中，DSA 进一步与 KV 压缩机制结合，演化为 CSA + HCA 混合架构，使百万 Token 上下文成为现实。
