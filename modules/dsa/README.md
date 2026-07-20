@@ -96,8 +96,12 @@ DSA 基于 DeepSeek 系列的 MLA（Multi-head Latent Attention）架构实现�
 
 > 上图是**论文视角**（数学记号、模块级）。如果想对到**代码里的每个张量**（`wq_a`、`wkv_a`、`indexer.wk`、`index_score`、`topk_indices`…），展开下面这份 mermaid 数据流图——它是同一套逻辑的**代码级细粒度版本**，也是第二部分源码解读的路线图。
 
-<details>
-<summary>📄 查看 mermaid 源码（GitHub 可原生渲染）</summary>
+<!--
+Mermaid 必须在可见容器中完成首次布局。这里保留 details 以便读者收起长图，
+但默认展开，避免部分 Markdown 预览器在隐藏状态下得到错误尺寸而裁切图形。
+-->
+<details open>
+<summary>📄 DSA 代码级 Mermaid 数据流图（可收起）</summary>
 
 ```mermaid
 graph TD
