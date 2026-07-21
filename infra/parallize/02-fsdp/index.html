@@ -70,18 +70,18 @@
 <div class="wrap">
 
 <h2 class="section" id="motivation"><span class="num">01</span>动机：DP 的冗余</h2>
-<p>上一章的结论：纯 DDP 下每张卡都存<strong>完整的</strong>参数（$2P$）、梯度（$2P$）、优化器状态（$12P$），共 $16P$ 字节，完全不随卡数下降。但仔细想——这 N 份副本<strong>内容完全相同</strong>，为什么每张卡都要存一整份？</p>
+<p>上一章的结论：Megatron 默认 BF16 + Adam 的纯 DDP 下，每张卡都存<strong>完整的</strong>BF16 参数（$2P$）、FP32 <code>main_grad</code>（$4P$）、优化器状态（$12P$），共 $18P$ 字节，完全不随卡数下降。但仔细想——这 N 份副本<strong>内容完全相同</strong>，为什么每张卡都要存一整份？</p>
 <p>ZeRO（Zero Redundancy Optimizer）的答案：<strong>不存了，切开</strong>。每张卡只持有 $1/N$ 的模型状态，需要完整参数时临时用 <code>all-gather</code> 拼起来，用完即丢。这样显存随卡数线性下降，代价只是多一点通信。</p>
 
 <h2 class="section" id="stages"><span class="num">02</span>ZeRO 三阶段：一刀一刀往下切</h2>
-<p>ZeRO 切的是<strong>静态显存</strong>——每 step 都常驻、内容在各卡完全相同的那三块「模型状态」（参数、梯度、优化器状态）。它<strong>不碰动态显存</strong>（激活值，那是每卡各不相同的中间结果，得靠激活重计算 / 序列并行去省）。三个阶段按「切得越来越多」排序，先切最大的那块（优化器状态占了 75%）：</p>
+<p>ZeRO 切的是<strong>静态显存</strong>——每 step 都常驻、内容在各卡完全相同的那三块「模型状态」（参数、梯度、优化器状态）。它<strong>不碰动态显存</strong>（激活值，那是每卡各不相同的中间结果，得靠激活重计算 / 序列并行去省）。三个阶段按「切得越来越多」排序，先切最大的那块（优化器状态占 $12/18 \approx 66.7\%$）：</p>
 <table>
 <thead><tr><th>阶段</th><th>在 ZeRO-1 基础上再切什么</th><th>每卡静态显存</th><th>对应实现</th></tr></thead>
 <tbody>
-<tr><td>baseline DDP</td><td>啥都不切</td><td>$2P + 2P + 12P = 16P$</td><td>普通 DP</td></tr>
-<tr><td><strong>ZeRO-1</strong></td><td>切<strong>优化器状态</strong></td><td>$2P + 2P + 12P/N$</td><td>Megatron <code>DistributedOptimizer</code> · Megatron-FSDP <code>optim</code></td></tr>
-<tr><td><strong>ZeRO-2</strong></td><td>再切<strong>梯度</strong></td><td>$2P + (2P + 12P)/N$</td><td>Megatron-FSDP <code>optim_grads</code> · DeepSpeed</td></tr>
-<tr><td><strong>ZeRO-3</strong></td><td>再切<strong>参数</strong></td><td>$(2P+2P+12P)/N = 16P/N$</td><td><strong>FSDP</strong>（PyTorch <code>fully_shard</code>）· Megatron-FSDP <code>optim_grads_params</code></td></tr>
+<tr><td>baseline DDP</td><td>啥都不切</td><td>$2P + 4P + 12P = 18P$</td><td>普通 DP</td></tr>
+<tr><td><strong>ZeRO-1</strong></td><td>切<strong>优化器状态</strong></td><td>$2P + 4P + 12P/N = 6P + 12P/N$</td><td>Megatron <code>DistributedOptimizer</code> · Megatron-FSDP <code>optim</code></td></tr>
+<tr><td><strong>ZeRO-2</strong></td><td>再切<strong>梯度</strong></td><td>$2P + (4P + 12P)/N = 2P + 16P/N$</td><td>Megatron-FSDP <code>optim_grads</code> · DeepSpeed</td></tr>
+<tr><td><strong>ZeRO-3</strong></td><td>再切<strong>参数</strong></td><td>$(2P+4P+12P)/N = 18P/N$</td><td><strong>FSDP</strong>（PyTorch <code>fully_shard</code>）· Megatron-FSDP <code>optim_grads_params</code></td></tr>
 </tbody>
 </table>
 
@@ -90,33 +90,33 @@
   <text x="20" y="26" fill="#eaeefb" font-size="15" font-weight="700">每卡「静态显存」= 模型状态（N=8）</text>
   <!-- legend -->
   <rect x="352" y="15" width="15" height="14" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/><text x="373" y="27" fill="#9aa3b2" font-size="13">参数 2P</text>
-  <rect x="452" y="15" width="15" height="14" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/><text x="473" y="27" fill="#9aa3b2" font-size="13">梯度 2P</text>
-  <rect x="552" y="15" width="15" height="14" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="573" y="27" fill="#9aa3b2" font-size="13">优化器状态 12P</text>
+  <rect x="452" y="15" width="15" height="14" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/><text x="473" y="27" fill="#9aa3b2" font-size="13">FP32 梯度 4P</text>
+  <rect x="600" y="15" width="15" height="14" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="621" y="27" fill="#9aa3b2" font-size="13">优化器状态 12P</text>
   <g font-size="14.5">
     <!-- DDP -->
     <text x="20" y="80" fill="#d7dbe4">DDP</text>
-    <rect x="162" y="60" width="67"  height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
-    <rect x="229" y="60" width="67"  height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
-    <rect x="296" y="60" width="404" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
-    <text x="710" y="80" fill="#9aa3b2">16P</text>
+    <rect x="162" y="60" width="60"  height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
+    <rect x="222" y="60" width="120" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
+    <rect x="342" y="60" width="358" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
+    <text x="710" y="80" fill="#9aa3b2">18P</text>
     <!-- ZeRO-1 -->
     <text x="20" y="138" fill="#d7dbe4">ZeRO-1</text>
-    <rect x="162" y="118" width="67" height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
-    <rect x="229" y="118" width="67" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
-    <rect x="296" y="118" width="51" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
-    <text x="357" y="138" fill="#9aa3b2">4P + 12P/8 = 5.5P</text>
+    <rect x="162" y="118" width="60" height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
+    <rect x="222" y="118" width="120" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
+    <rect x="342" y="118" width="45" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
+    <text x="397" y="138" fill="#9aa3b2">6P + 12P/8 = 7.5P</text>
     <!-- ZeRO-2 -->
     <text x="20" y="196" fill="#d7dbe4">ZeRO-2</text>
-    <rect x="162" y="176" width="67" height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
-    <rect x="229" y="176" width="9"  height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
-    <rect x="238" y="176" width="51" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
-    <text x="299" y="196" fill="#9aa3b2">2P + 14P/8 = 3.75P</text>
+    <rect x="162" y="176" width="60" height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
+    <rect x="222" y="176" width="15" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
+    <rect x="237" y="176" width="45" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
+    <text x="292" y="196" fill="#9aa3b2">2P + 16P/8 = 4P</text>
     <!-- ZeRO-3 (FSDP) -->
     <text x="20" y="254" fill="#4ade80" font-weight="700">ZeRO-3（FSDP）</text>
-    <rect x="162" y="234" width="9"  height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
-    <rect x="171" y="234" width="9"  height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
-    <rect x="180" y="234" width="51" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
-    <text x="241" y="254" fill="#86efac" font-weight="700">16P/8 = 2P（降到 1/8）</text>
+    <rect x="162" y="234" width="8"  height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
+    <rect x="170" y="234" width="15" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
+    <rect x="185" y="234" width="45" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
+    <text x="240" y="254" fill="#86efac" font-weight="700">18P/8 = 2.25P（降到 1/8）</text>
   </g>
   <text x="20" y="300" fill="#4ade80" font-size="13.5">✅ ZeRO 切的是<tspan font-weight="700">静态显存</tspan>（模型状态）：参数/梯度/优化器状态随卡数线性降到 1/N。</text>
   <text x="20" y="322" fill="#fbbf24" font-size="13.5">⚠️ 不动<tspan font-weight="700">动态显存</tspan>：激活值仍是每卡一份，得靠激活重计算 / 序列并行另行解决。</text>
@@ -129,7 +129,7 @@
 <p>三个阶段每个 step 都是同一套骨架——<strong>forward → backward → 同步梯度 → 更新 → 拼回完整参数</strong>——区别只在<strong>谁被切、何时做 all-gather</strong>。逐个看：</p>
 
 <h3>ZeRO-1：参数、梯度全量常驻，只切优化器状态</h3>
-<p>参数在每张卡上是<strong>完整</strong>的，所以前向/反向都不需要临时 all-gather，直接算。梯度用 all-reduce 求平均（每卡都拿到全量平均梯度），但每张卡<strong>只用自己那 $1/N$</strong> 去更新它负责的那片参数和优化器状态；更新后各卡只有自己 $1/N$ 参数是新的，末尾再 all-gather 一次把完整参数拼回，供下一个 step。</p>
+<p>参数在每张卡上是<strong>完整</strong>的，所以前向/反向都不需要临时 all-gather，直接算。经典 ZeRO-1 可以用 all-reduce 得到全量平均梯度；Megatron DistributedOptimizer 则用 reduce-scatter 归约每个 rank 负责的区间，但仍保留全尺寸 FP32 梯度 buffer。每张卡<strong>只用自己那 $1/N$</strong> 去更新它负责的参数、master 参数和 Adam 状态，随后 all-gather 更新后的 BF16 参数，供下一个 step 使用。</p>
 <div class="diagram">
 <svg viewBox="0 0 820 126" role="img" aria-label="ZeRO-1 一个 step 的流程">
   <defs><marker id="z1" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
@@ -137,20 +137,20 @@
     <rect x="14"  y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="86"  y="60" fill="#cdd5ff" font-size="14">参数：全量常驻</text><text x="86"  y="80" fill="#9aa3b2" font-size="12">2P · 不切</text>
     <rect x="171" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="243" y="60" fill="#d7dbe4" font-size="14">forward</text><text x="243" y="80" fill="#9aa3b2" font-size="12">直接算 · 无通信</text>
     <rect x="328" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="400" y="60" fill="#d7dbe4" font-size="14">backward</text><text x="400" y="80" fill="#9aa3b2" font-size="12">算全量梯度</text>
-    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(251,191,36,0.14)" stroke="#fbbf24"/><text x="557" y="60" fill="#fde68a" font-size="14">all-reduce</text><text x="557" y="80" fill="#9aa3b2" font-size="12">梯度全量平均 · 2P</text>
+    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(251,191,36,0.14)" stroke="#fbbf24"/><text x="557" y="60" fill="#fde68a" font-size="14">all-reduce / RS</text><text x="557" y="80" fill="#9aa3b2" font-size="12">FP32 梯度 · 常驻 4P</text>
     <rect x="642" y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="714" y="60" fill="#cdd5ff" font-size="14">step + all-gather</text><text x="714" y="80" fill="#9aa3b2" font-size="12">更新1/N→拼回参数</text>
     <line x1="159" y1="64" x2="171" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="316" y1="64" x2="328" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="473" y1="64" x2="485" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="630" y1="64" x2="642" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
   </g>
-  <text x="14" y="118" fill="#fbbf24" font-size="13">参数、梯度都<tspan font-weight="700">全量常驻</tspan>，只有优化器状态省到 1/N；通信 = all-reduce ≈ 2P（同 DDP）。</text>
+  <text x="14" y="118" fill="#fbbf24" font-size="13">参数、梯度都<tspan font-weight="700">全量常驻</tspan>；只有优化器状态降到 1/N。Megatron 用 RS + 参数 AG 实现更新同步。</text>
 </svg>
 <div class="cap">ZeRO-1：参数、梯度都全量常驻，只有优化器状态降到 1/N。前向/反向无需 all-gather。</div>
 </div>
 
 <h3>ZeRO-2：backward 边算边 reduce-scatter，梯度也降到 1/N</h3>
-<p>唯一的变化在梯度同步：把 all-reduce 换成 <strong>reduce-scatter</strong>——反向每算完一个 bucket 的梯度就立即 reduce-scatter，每张卡<strong>只保留自己那 $1/N$ 的梯度、其余立刻释放</strong>。于是梯度显存从 $2P$ 降到 $2P/N$。参数依然全量常驻，前向/反向仍不需要 all-gather，通信量与 ZeRO-1 相同。</p>
+<p>唯一的变化在梯度存储：反向每算完一个 bucket 的梯度就立即 reduce-scatter，每张卡<strong>只保留自己那 $1/N$ 的梯度、其余立刻释放</strong>。于是 FP32 梯度显存从 $4P$ 降到 $4P/N$。参数依然全量常驻，前向/反向仍不需要为计算临时 all-gather 参数；完成分片更新后仍需同步更新后的参数。</p>
 <div class="diagram">
 <svg viewBox="0 0 820 126" role="img" aria-label="ZeRO-2 一个 step 的流程">
   <defs><marker id="z2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
@@ -165,13 +165,13 @@
     <line x1="473" y1="64" x2="485" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
     <line x1="630" y1="64" x2="642" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
   </g>
-  <text x="14" y="118" fill="#4ade80" font-size="13">相比 ZeRO-1：梯度也降到 1/N（边算边 reduce-scatter，只留自己那份）；参数仍全量，通信仍 ≈ 2P。</text>
+  <text x="14" y="118" fill="#4ade80" font-size="13">相比 ZeRO-1：FP32 梯度也降到 1/N（4P → 4P/N）；BF16 参数仍全量常驻。</text>
 </svg>
 <div class="cap">ZeRO-2：把 all-reduce 换成 reduce-scatter，梯度也切到 1/N。参数依旧全量常驻。</div>
 </div>
 
 <h3>ZeRO-3 = FSDP：连参数也切，用到哪层才 all-gather 哪层</h3>
-<p>FSDP 的核心节奏：<strong>参数平时是切碎的，用到哪层才把那层 all-gather 成完整，算完立刻丢回切片态</strong>。代价是<strong>前向也要 all-gather 一次参数</strong>（通信升到 3P），换来参数也降到 $1/N$。</p>
+<p>FSDP 的核心节奏：<strong>参数平时是切碎的，用到哪层才把那层 all-gather 成完整，算完立刻丢回切片态</strong>。代价是<strong>前向也要 all-gather 一次参数</strong>；若暂时忽略 dtype、按等宽元素计数，通信由 DDP 的 2P 升到 3P。换来的是参数也降到 $1/N$。</p>
 <div class="diagram">
 <svg viewBox="0 0 820 258" role="img" aria-label="FSDP 一层的前向反向通信序列">
   <defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
@@ -219,24 +219,24 @@
   <rect x="612" y="13" width="15" height="14" fill="rgba(148,163,184,0.12)" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="633" y="25" fill="#9aa3b2" font-size="12.5">all-gather 峰值</text>
   <g font-size="14">
     <text x="20" y="90" fill="#d7dbe4">N=1</text>
-    <rect x="150" y="66" width="400" height="34" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="350" y="88" text-anchor="middle" fill="#ffd0ad" font-size="12.5">静态 16P</text>
+    <rect x="150" y="66" width="400" height="34" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="350" y="88" text-anchor="middle" fill="#ffd0ad" font-size="12.5">静态 18P</text>
     <rect x="550" y="66" width="200" height="34" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="650" y="88" text-anchor="middle" fill="#c4b5fd" font-size="12.5">激活</text>
     <text x="20" y="150" fill="#d7dbe4">N=8</text>
-    <rect x="150" y="126" width="50"  height="34" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="175" y="148" text-anchor="middle" fill="#ffd0ad" font-size="11">2P</text>
+    <rect x="150" y="126" width="50"  height="34" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="175" y="148" text-anchor="middle" fill="#ffd0ad" font-size="11">2.25P</text>
     <rect x="200" y="126" width="200" height="34" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="300" y="148" text-anchor="middle" fill="#c4b5fd" font-size="12.5">激活（不变）</text>
     <rect x="400" y="126" width="50"  height="34" fill="rgba(148,163,184,0.12)" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="425" y="148" text-anchor="middle" fill="#94a3b8" font-size="10">峰值</text>
   </g>
-  <text x="20" y="188" fill="#9aa3b2" font-size="13.5">静态显存随卡数线性缩小（橙 16P→2P），激活值几乎不变（紫）——<tspan fill="#c4b5fd" font-weight="700">大 N 下峰值由激活主导</tspan>。（激活宽度为示意）</text>
+  <text x="20" y="188" fill="#9aa3b2" font-size="13.5">静态显存随卡数线性缩小（橙 18P→2.25P），激活值几乎不变（紫）——<tspan fill="#c4b5fd" font-weight="700">大 N 下峰值由激活主导</tspan>。（激活宽度为示意）</text>
 </svg>
 <div class="cap">ZeRO 把静态那截压扁，动态（激活）那截纹丝不动。卡越多，OOM 的元凶越是激活而非模型状态。</div>
 </div>
 
 <div class="callout warn">
-<p><span class="label">⚠️ 常见误区</span> 「上了 ZeRO-3/FSDP 显存就够了」——不对。ZeRO 把<strong>静态</strong>降到 $16P/N$，但<strong>激活值</strong>不随卡数下降（还会因 global batch 变大而上升）。真实峰值经常由<strong>激活值</strong>主导，尤其长序列。所以 FSDP 几乎总要配<strong>激活重计算</strong>，长序列还得叠 SP / CP。</p>
+<p><span class="label">⚠️ 常见误区</span> 「上了 ZeRO-3/FSDP 显存就够了」——不对。在本章的 Megatron BF16 账本下，ZeRO 把<strong>静态</strong>降到 $18P/N$，但<strong>激活值</strong>不随卡数下降（还会因 global batch 变大而上升）。真实峰值经常由<strong>激活值</strong>主导，尤其长序列。所以 FSDP 几乎总要配<strong>激活重计算</strong>，长序列还得叠 SP / CP。</p>
 </div>
 <div class="callout key">
 <p><span class="label">🔑 一个 step 的显存峰值（ZeRO-3）</span></p>
-<p style="margin:8px 0 0">峰值 ≈ <strong>16P/N</strong>（静态，已切）+ <strong>激活值</strong>（动态，不随 N 降）+ <strong>1~2 个 unit 的完整参数</strong>（all-gather 瞬时）+ 通信缓冲。<br>ZeRO 只压第一项；后面 TP / PP / SP / CP 各章，很大程度上就是在压第二项。</p>
+<p style="margin:8px 0 0">峰值 ≈ <strong>18P/N</strong>（静态，已切）+ <strong>激活值</strong>（动态，不随 N 降）+ <strong>1~2 个 unit 的完整参数</strong>（all-gather 瞬时）+ 通信缓冲。<br>ZeRO 只压第一项；后面 TP / PP / SP / CP 各章，很大程度上就是在压第二项。</p>
 </div>
 
 <h2 class="section" id="megatron"><span class="num">05</span>Megatron：DistributedOptimizer（ZeRO-1）与 Megatron-FSDP（ZeRO-2/3）</h2>
@@ -269,13 +269,13 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
 --data-parallel-sharding-strategy optim_grads_params  # ZeRO-3：再切参数（= FSDP）</code></pre>
 <p>所以准确的说法是：<strong>DistributedOptimizer 停在 ZeRO-1，而 Megatron-FSDP 能一路做到 ZeRO-3</strong>——Megatron 生态里 ZeRO 三档都有，只是分属两套实现。</p>
 
-<h2 class="section" id="comm"><span class="num">06</span>通信量：为什么 FSDP ≈ DP 的 1.5×</h2>
-<p>回忆 M0 的恒等式 <strong>all-reduce = reduce-scatter + all-gather</strong>，每个的通信量都是 $P$ 量级：</p>
+<h2 class="section" id="comm"><span class="num">06</span>通信量：1.5× 是等宽 dtype 下的元素口径</h2>
+<p>回忆 M0 的恒等式 <strong>all-reduce = reduce-scatter + all-gather</strong>。先假设参数与梯度使用相同 dtype，并忽略环形通信共同的 $(N-1)/N$ 系数，按传输元素数计算：</p>
 <ul>
 <li><strong>DDP</strong>：每 step 一次梯度 all-reduce ≈ $2P$（reduce-scatter $P$ + all-gather $P$）。</li>
 <li><strong>FSDP / ZeRO-3</strong>：前向 all-gather 参数（$P$）+ 反向 all-gather 参数（$P$）+ 反向 reduce-scatter 梯度（$P$）= $3P$。</li>
 </ul>
-<p>$3P / 2P = 1.5$。<strong>多出的那 0.5× 是前向那次额外的参数 all-gather</strong>，换来的是参数、梯度、优化器状态全部降到 $1/N$。在显存吃紧时这笔交易非常划算——而且这些 all-gather 可以靠<strong>预取（prefetch）</strong>与计算重叠，实际墙钟开销远小于 1.5×。</p>
+<p>在这个简化口径下，$3P / 2P = 1.5$。但 Megatron 默认是 <strong>BF16 参数 + FP32 梯度</strong>，必须换算成字节：DDP 的 FP32 梯度 all-reduce 约为 $2 \times 4P = 8P$ 字节；FSDP 两次 BF16 参数 all-gather 加一次 FP32 梯度 reduce-scatter，约为 $2P + 2P + 4P = 8P$ 字节。因此默认 dtype 下不能宣称网络字节固定增加 50%。实际墙钟差异还取决于 collective 次数与粒度、拓扑、预取以及计算通信重叠程度。</p>
 
 <h2 class="section" id="equiv"><span class="num">07</span>FSDP ≡ ZeRO-3</h2>
 <p>两者算法<strong>完全等价</strong>：参数、梯度、优化器状态全部沿 DP 维切成 $1/N$；用到完整参数时临时 all-gather、用完丢弃；梯度 reduce-scatter 后各管各的 shard。差异只在实现：</p>
@@ -292,7 +292,7 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
 <div class="two-col">
   <div class="card mega"><h4><span class="badge mega">Megatron</span> DistributedOptimizer（ZeRO-1）</h4>
     <ul>
-      <li>只切优化器状态 → $4P + 12P/N$</li>
+      <li>只切优化器状态 → $6P + 12P/N$</li>
       <li>梯度 reduce-scatter，参数仍完整</li>
       <li><code>--use-distributed-optimizer</code></li>
       <li><code>--overlap-grad-reduce</code> / <code>--overlap-param-gather</code></li>
@@ -301,7 +301,7 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
   </div>
   <div class="card"><h4>PyTorch FSDP（ZeRO-3）</h4>
     <ul>
-      <li>切参数 + 梯度 + 优化器状态 → $16P/N$</li>
+      <li>切参数 + 梯度 + 优化器状态 → $18P/N$</li>
       <li>per-parameter DTensor 分片（<code>fully_shard</code>）</li>
       <li>逐层 <code>fully_shard(block, mesh=dp_mesh)</code></li>
       <li><code>reshard_after_forward</code> 控制前向后是否丢弃完整参数</li>
@@ -313,7 +313,7 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
 <p><span class="label">✅ 学完自测</span></p>
 <p>1. ZeRO-1/2/3 分别切什么？为什么先切优化器状态？<br>
 2. FSDP 前向为什么用完参数要立刻 reshard 丢弃？省的是什么显存？<br>
-3. 为什么 FSDP 通信量约是 DDP 的 1.5×？多出来的 0.5× 是哪一步？<br>
+3. FSDP/DDP 的 1.5× 通信比值基于什么 dtype 前提？换成 BF16 参数、FP32 梯度后，按字节应如何重算？<br>
 4. Megatron 的 <code>DistributedOptimizer</code> 和 FSDP 等价吗？差在哪一块显存？</p>
 </div>
 
@@ -324,7 +324,7 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
 
 <footer>
   <p>并行训练学习手册 · M2 FSDP / ZeRO · <code>infra/parallize/02-fsdp</code></p>
-  <p class="footnote">显存系数为标准混合精度 + Adam 估算；代码片段引自 Megatron-LM 真实源码。</p>
+  <p class="footnote">显存系数采用 Megatron 默认 BF16 参数、FP32 main_grad 与 FP32 Adam 状态口径；代码片段引自 Megatron-LM 真实源码。</p>
 </footer>
 </div>
 <script>hljs.highlightAll();</script>

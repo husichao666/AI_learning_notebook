@@ -133,7 +133,7 @@
 <p>Megatron 自己实现了一套经典 DDP，是把机制讲透的最佳样本。它的精髓不在「all-reduce 梯度」这句话，而在<strong>怎么把通信藏进反向计算里</strong>。三个关键设计：</p>
 
 <h3>① 连续梯度 buffer + bucket 分桶</h3>
-<p>所有参数的梯度不是各自为政，而是预分配进<strong>一整块连续显存</strong>，每个 <code>param.main_grad</code> 指向其中一段切片。再把参数按<strong>反向传播的逆序</strong>切成若干 bucket：</p>
+<p>所有参数的梯度不是各自为政，而是预分配进<strong>一整块连续显存</strong>，每个 <code>param.main_grad</code> 指向其中一段切片。Megatron 默认 BF16 训练会把这个累积与通信 buffer 设为 FP32，因此它虽然只有 $P$ 个元素，却占 $4P$ 字节。再把参数按<strong>反向传播的逆序</strong>切成若干 bucket：</p>
 <div class="code-label">Megatron-LM · param_and_grad_buffer.py（连续 buffer 分配 :1068）</div>
 <pre><code class="language-python">self.grad_data = torch.zeros(self.numel, dtype=self.grad_dtype,
     device=torch.cuda.current_device(), requires_grad=False)
@@ -176,13 +176,13 @@ def no_sync(self):
             bucket_group.is_last_microbatch = True</code></pre>
 
 <h2 class="section" id="nomem"><span class="num">03</span>为什么 DP 省不了显存</h2>
-<p>这是 DP 最重要的局限，也是后面所有「切模型状态」并行存在的理由。在纯 DDP 下，每张卡都持有<strong>完整的</strong>：参数（$2P$）、梯度（$2P$）、优化器状态（$12P$）。all-reduce 只是让梯度数值一致，并没有让任何一张卡少存东西：</p>
+<p>这是 DP 最重要的局限，也是后面所有「切模型状态」并行存在的理由。在 Megatron 默认 BF16 + Adam 的纯 DDP 下，每张卡都持有<strong>完整的</strong>：BF16 参数（$2P$）、FP32 <code>main_grad</code>（$4P$）、优化器状态（$12P$）。all-reduce 只是让梯度数值一致，并没有让任何一张卡少存东西：</p>
 <div class="code-label">Megatron-LM · param_and_grad_buffer.py:1068（grad buffer 按整模型 numel 分配）</div>
 <pre><code class="language-python"># grad_data 的大小 = 整个模型的参数量，每张卡都分配这么大
 self.grad_data = torch.zeros(self.numel, ...)   # numel = 完整模型参数数
 # all_reduce 后每 rank 仍持有完整梯度，参数/优化器状态也不分片</code></pre>
 <div class="callout warn">
-<p><span class="label">⚠️ 结论</span> N 卡 DP 的<strong>单卡显存 = 单卡训练的显存</strong>（约 $16P$ 字节模型状态 + 激活），完全不随 N 下降。DP 切的是<em>数据和计算</em>，不切<em>模型状态</em>。想让 $16P$ 也摊薄到 $16P/N$，就得进入下一章——把优化器状态、梯度、参数也切开（FSDP / ZeRO）。</p>
+<p><span class="label">⚠️ 结论</span> N 卡 DP 的<strong>单卡显存 = 单卡训练的显存</strong>（约 $18P$ 字节模型状态 + 激活），完全不随 N 下降。DP 切的是<em>数据和计算</em>，不切<em>模型状态</em>。想让这 $18P$ 继续下降，就得进入下一章——按 ZeRO 的不同阶段切分优化器状态、梯度和参数。</p>
 </div>
 
 <h2 class="section" id="compare"><span class="num">04</span>Megatron-LM 手写 DDP 要点回顾</h2>

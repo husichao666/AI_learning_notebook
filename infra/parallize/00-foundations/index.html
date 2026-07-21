@@ -60,7 +60,7 @@
   <h1>显存花在哪、卡之间怎么传数据</h1>
   <p class="lead">在学任何一种并行之前，先建立两块地基：一次训练 step 的<strong>显存账本</strong>，以及卡间通信的<strong>集合通信原语</strong>。后面 DP / FSDP / TP / PP / CP / EP 全是在这两件事上做文章。</p>
   <div class="meta-row">
-    <span class="tag">🧮 16 字节/参数</span>
+    <span class="tag">🧮 Megatron BF16：18 字节/参数</span>
     <span class="tag">🔁 all-reduce = reduce-scatter + all-gather</span>
     <span class="tag">🔌 NVLink vs InfiniBand</span>
     <span class="tag">📊 显存账本 / MFU / overlap</span>
@@ -137,41 +137,41 @@
 <h2 class="section" id="memory"><span class="num">03</span>显存账本：一次训练 step 的显存去向</h2>
 <p>对照上一节那张 step 图，训练显存就是它碰到的四样东西。记参数量为 $P$：</p>
 <table>
-<thead><tr><th>组成</th><th>是什么</th><th>混合精度 + Adam 下的大小</th></tr></thead>
+<thead><tr><th>组成</th><th>是什么</th><th>Megatron 默认 BF16 + Adam 下的大小</th></tr></thead>
 <tbody>
-<tr><td><strong>参数 weights</strong></td><td>前向用的模型权重（bf16/fp16）</td><td>$2P$ 字节</td></tr>
-<tr><td><strong>梯度 gradients</strong></td><td>反向算出的梯度（bf16/fp16）</td><td>$2P$ 字节</td></tr>
+<tr><td><strong>参数 weights</strong></td><td>前向使用的 BF16 模型权重</td><td>$2P$ 字节</td></tr>
+<tr><td><strong>梯度 gradients</strong></td><td>累积、通信和更新使用的 FP32 <code>main_grad</code></td><td>$4P$ 字节</td></tr>
 <tr><td><strong>优化器状态 optimizer states</strong></td><td>fp32 master 权重 + Adam 一阶 $m$ + 二阶 $v$</td><td>$4P + 4P + 4P = 12P$ 字节</td></tr>
 <tr><td><strong>激活值 activations</strong></td><td>前向中间结果，反向要用</td><td>单独计算，∝ batch × seq × 层数</td></tr>
 </tbody>
 </table>
 
-<p>把前三项（<em>模型状态</em>）加起来，每个参数要 <strong>16 字节</strong>：</p>
+<p>把前三项（<em>模型状态</em>）加起来，每个参数要 <strong>18 字节</strong>。反向算子产生的临时梯度可以是 BF16，但 Megatron 默认把它累积进 FP32 连续梯度 buffer（<code>param.main_grad</code>），随后释放临时的 <code>param.grad</code>；显存账本应按常驻的 4B 梯度计算：</p>
 
 <div class="diagram">
-<svg viewBox="0 0 820 150" role="img" aria-label="混合精度 Adam 下每参数 16 字节的构成">
-  <text x="20" y="30" fill="#eaeefb" font-size="14" font-weight="600">每个参数的「模型状态」开销 = 16 字节</text>
-  <!-- bar segments, total width 760 for 16 bytes => 47.5/byte -->
+<svg viewBox="0 0 820 150" role="img" aria-label="Megatron 默认 BF16 加 Adam 下每参数 18 字节的构成">
+  <text x="20" y="30" fill="#eaeefb" font-size="14" font-weight="600">每个参数的「模型状态」开销 = 18 字节</text>
+  <!-- bar segments, total width 768 for 18 bytes => about 42.7/byte -->
   <g font-size="12.5" text-anchor="middle">
-    <rect x="20"  y="48" width="95"  height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="67"  y="70" fill="#cdd5ff">fp16 权重</text><text x="67"  y="86" fill="#9aa3b2">2B</text>
-    <rect x="117" y="48" width="95"  height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="164" y="70" fill="#cdd5ff">fp16 梯度</text><text x="164" y="86" fill="#9aa3b2">2B</text>
-    <rect x="214" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="309" y="70" fill="#bbf7d0">fp32 master 权重</text><text x="309" y="86" fill="#86efac">4B</text>
-    <rect x="406" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="501" y="70" fill="#bbf7d0">Adam 一阶 m</text><text x="501" y="86" fill="#86efac">4B</text>
-    <rect x="598" y="48" width="190" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="693" y="70" fill="#bbf7d0">Adam 二阶 v</text><text x="693" y="86" fill="#86efac">4B</text>
+    <rect x="20"  y="48" width="84"  height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="62"  y="70" fill="#cdd5ff">BF16 权重</text><text x="62"  y="86" fill="#9aa3b2">2B</text>
+    <rect x="106" y="48" width="169" height="46" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="190" y="70" fill="#cdd5ff">FP32 main_grad</text><text x="190" y="86" fill="#9aa3b2">4B</text>
+    <rect x="277" y="48" width="169" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="361" y="70" fill="#bbf7d0">FP32 master 权重</text><text x="361" y="86" fill="#86efac">4B</text>
+    <rect x="448" y="48" width="169" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="532" y="70" fill="#bbf7d0">Adam 一阶 m</text><text x="532" y="86" fill="#86efac">4B</text>
+    <rect x="619" y="48" width="169" height="46" rx="5" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="703" y="70" fill="#bbf7d0">Adam 二阶 v</text><text x="703" y="86" fill="#86efac">4B</text>
   </g>
-  <path d="M20 100 L20 107 L212 107 L212 100" fill="none" stroke="#9aa3b2" stroke-width="1"/>
-  <text x="116" y="122" text-anchor="middle" fill="#9aa3b2" font-size="12.5">参数 2B + 梯度 2B</text>
-  <path d="M214 100 L214 107 L788 107 L788 100" fill="none" stroke="#4ade80" stroke-width="1"/>
-  <text x="501" y="122" text-anchor="middle" fill="#86efac" font-size="12.5">优化器状态 12B（最大头）= master 4B + 一阶 m 4B + 二阶 v 4B</text>
+  <path d="M20 100 L20 107 L275 107 L275 100" fill="none" stroke="#9aa3b2" stroke-width="1"/>
+  <text x="147" y="122" text-anchor="middle" fill="#9aa3b2" font-size="12.5">参数 2B + FP32 main_grad 4B</text>
+  <path d="M277 100 L277 107 L788 107 L788 100" fill="none" stroke="#4ade80" stroke-width="1"/>
+  <text x="532" y="122" text-anchor="middle" fill="#86efac" font-size="12.5">优化器状态 12B = master 4B + 一阶 m 4B + 二阶 v 4B</text>
   <text x="20" y="142" fill="#fbbf24" font-size="12">激活值不在此图内，单独占显存，且随 batch×seq 增长——长序列训练的另一大头。</text>
 </svg>
-<div class="cap">7B 模型：模型状态 = 7e9 × 16B ≈ <strong>112 GB</strong>，单卡放不下。注意「优化器状态」占了 12/16 = 75%——这正是 ZeRO/FSDP 第一刀切它的原因。</div>
+<div class="cap">7B 模型：模型状态 = 7e9 × 18B ≈ <strong>126 GB</strong>，单卡放不下。优化器状态占 12/18 ≈ 66.7%，仍然是最大的单项，因此 ZeRO 的第一阶段先切它。</div>
 </div>
 
 <div class="callout warn">
 <p><span class="label">🧮 把这笔账算到底：7B 模型上单卡</span></p>
-<p style="margin:8px 0 0">模型状态 = 7e9 × 16B = <strong>112 GB</strong>。一张 H100 只有 80GB——<strong>光是参数+梯度+优化器状态就溢出 32GB，激活值还没算</strong>。这就是「显存墙」具体长什么样。<br>
-切谁最划算？优化器状态占 12/16 = 75%，所以 ZeRO/FSDP 第一刀就切它：把 112GB 摊到 8 卡，每卡只剩 14GB，墙瞬间消失。<strong>这一笔账，就是后面所有「省显存」并行的出发点。</strong></p>
+<p style="margin:8px 0 0">模型状态 = 7e9 × 18B = <strong>126 GB</strong>。一张 80GB H100 上，<strong>光是参数+梯度+优化器状态就溢出约 46GB，激活值还没算</strong>。这就是「显存墙」具体长什么样。<br>
+切谁最划算？Megatron DistributedOptimizer 先只切优化器状态（近似 ZeRO-1）：8 卡时每卡为 $6P + 12P/8 = 7.5P$，7B 模型约 <strong>52.5GB/卡</strong>。若参数、梯度、优化器状态全部切分（ZeRO-3/FSDP），理想下界才是 $18P/8$，约 <strong>15.75GB/卡</strong>。这些数字都还没有计入激活值、通信临时 buffer、对齐填充和显存碎片。<strong>这一笔账，就是后面所有「省显存」并行的出发点。</strong></p>
 </div>
 
 <div class="callout key">
