@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" role="img" aria-labelledby="title desc" font-family="-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif">
+  <title id="title">Token-Level Compressor</title>
+  <desc id="desc">CSA 通过当前块和前一块的两个分支进行重叠四比一压缩，HCA 对一百二十八个 token 做非重叠压缩。权重按特征维逐一计算，不是简单平均池化。</desc>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker>
+    <linearGradient id="gate" x1="0" x2="1"><stop offset="0" stop-color="#dbeafe"/><stop offset="1" stop-color="#bfdbfe"/></linearGradient>
+  </defs>
+  <rect width="1240" height="720" fill="#f8fafc"/>
+  <text x="620" y="48" text-anchor="middle" font-size="28" font-weight="700" fill="#0f172a">Token-Level Compressor：每个特征维度都能“投票”</text>
+  <text x="620" y="78" text-anchor="middle" font-size="15" fill="#64748b">C = H·Wᴷⱽ　·　Z = H·Wᶻ　·　S = Softmax_token(Z + positional bias)</text>
+
+  <rect x="54" y="112" width="1132" height="356" rx="18" fill="#ffffff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="82" y="149" font-size="23" font-weight="700" fill="#1d4ed8">CSA：4:1 重叠压缩</text>
+  <text x="82" y="176" font-size="14" fill="#475569">输出 i 同时参考“前一块的 b 分支”和“当前块的 a 分支”，边界不被硬切断</text>
+
+  <text x="96" y="222" font-size="14" font-weight="700" fill="#334155">前一组 tokens</text>
+  <text x="96" y="330" font-size="14" font-weight="700" fill="#334155">当前组 tokens</text>
+  <g text-anchor="middle" font-size="14" font-weight="700">
+    <rect x="94" y="240" width="74" height="52" rx="9" fill="#f3e8ff" stroke="#a855f7"/><text x="131" y="271" fill="#6b21a8">p₀</text>
+    <rect x="178" y="240" width="74" height="52" rx="9" fill="#f3e8ff" stroke="#a855f7"/><text x="215" y="271" fill="#6b21a8">p₁</text>
+    <rect x="262" y="240" width="74" height="52" rx="9" fill="#f3e8ff" stroke="#a855f7"/><text x="299" y="271" fill="#6b21a8">p₂</text>
+    <rect x="346" y="240" width="74" height="52" rx="9" fill="#f3e8ff" stroke="#a855f7"/><text x="383" y="271" fill="#6b21a8">p₃</text>
+    <rect x="94" y="348" width="74" height="52" rx="9" fill="#dbeafe" stroke="#3b82f6"/><text x="131" y="379" fill="#1e40af">t₀</text>
+    <rect x="178" y="348" width="74" height="52" rx="9" fill="#dbeafe" stroke="#3b82f6"/><text x="215" y="379" fill="#1e40af">t₁</text>
+    <rect x="262" y="348" width="74" height="52" rx="9" fill="#dbeafe" stroke="#3b82f6"/><text x="299" y="379" fill="#1e40af">t₂</text>
+    <rect x="346" y="348" width="74" height="52" rx="9" fill="#dbeafe" stroke="#3b82f6"/><text x="383" y="379" fill="#1e40af">t₃</text>
+  </g>
+
+  <rect x="490" y="230" width="244" height="180" rx="14" fill="url(#gate)" stroke="#2563eb" stroke-width="2"/>
+  <text x="612" y="260" text-anchor="middle" font-size="18" font-weight="700" fill="#1d4ed8">逐维门控 + 位置偏置</text>
+  <text x="612" y="288" text-anchor="middle" font-size="14" fill="#334155">[Zᵇ(prev)+Bᵇ ; Zᵃ(cur)+Bᵃ]</text>
+  <text x="612" y="318" text-anchor="middle" font-size="14" font-weight="700" fill="#1e40af">对 8 个候选位置做 softmax</text>
+  <g transform="translate(532 342)">
+    <rect x="0" y="0" width="18" height="42" fill="#2563eb" opacity=".18"/>
+    <rect x="24" y="0" width="18" height="42" fill="#2563eb" opacity=".32"/>
+    <rect x="48" y="0" width="18" height="42" fill="#2563eb" opacity=".65"/>
+    <rect x="72" y="0" width="18" height="42" fill="#2563eb" opacity=".22"/>
+    <rect x="96" y="0" width="18" height="42" fill="#2563eb" opacity=".45"/>
+    <rect x="120" y="0" width="18" height="42" fill="#2563eb" opacity=".88"/>
+    <rect x="144" y="0" width="18" height="42" fill="#2563eb" opacity=".28"/>
+  </g>
+  <path d="M420 266H476" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M420 374H454V320H476" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="818" y="250" width="300" height="142" rx="16" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+  <text x="968" y="283" text-anchor="middle" font-size="19" font-weight="700" fill="#15803d">1 个 Compressed KV</text>
+  <text x="968" y="311" text-anchor="middle" font-size="15" fill="#334155">Cᶜᵒᵐᵖᵢ = Σ Sⱼ ⊙ Cⱼ</text>
+  <text x="968" y="340" text-anchor="middle" font-size="14" fill="#475569">形状：[512]</text>
+  <text x="968" y="367" text-anchor="middle" font-size="13" font-weight="700" fill="#15803d">8 个位置 → 1 条；步长仍是 4</text>
+  <path d="M734 320H804" stroke="#16a34a" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <rect x="54" y="500" width="1132" height="170" rx="18" fill="#ffffff" stroke="#a78bfa" stroke-width="2"/>
+  <text x="82" y="538" font-size="23" font-weight="700" fill="#6d28d9">HCA：128:1 非重叠压缩</text>
+  <g fill="#ede9fe" stroke="#8b5cf6">
+    <rect x="92" y="574" width="34" height="48" rx="6"/><rect x="132" y="574" width="34" height="48" rx="6"/>
+    <rect x="172" y="574" width="34" height="48" rx="6"/><rect x="212" y="574" width="34" height="48" rx="6"/>
+    <rect x="252" y="574" width="34" height="48" rx="6"/><rect x="292" y="574" width="34" height="48" rx="6"/>
+  </g>
+  <text x="319" y="607" font-size="24" fill="#6d28d9">…</text>
+  <g fill="#ede9fe" stroke="#8b5cf6">
+    <rect x="352" y="574" width="34" height="48" rx="6"/><rect x="392" y="574" width="34" height="48" rx="6"/>
+  </g>
+  <text x="260" y="651" text-anchor="middle" font-size="13" fill="#475569">128 个 token 候选</text>
+
+  <rect x="500" y="558" width="260" height="86" rx="14" fill="#f5f3ff" stroke="#8b5cf6"/>
+  <text x="630" y="590" text-anchor="middle" font-size="17" font-weight="700" fill="#6d28d9">同样的逐维 gated pooling</text>
+  <text x="630" y="617" text-anchor="middle" font-size="14" fill="#475569">无 overlap · 无第二分支</text>
+  <path d="M426 598H486" stroke="#7c3aed" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="856" y="558" width="260" height="86" rx="14" fill="#ecfdf5" stroke="#16a34a"/>
+  <text x="986" y="590" text-anchor="middle" font-size="17" font-weight="700" fill="#15803d">1 个 Compressed KV</text>
+  <text x="986" y="617" text-anchor="middle" font-size="14" fill="#475569">输出步长 = 128</text>
+  <path d="M760 601H842" stroke="#16a34a" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="54" y="686" width="1132" height="26" rx="8" fill="#fef3c7"/>
+  <text x="620" y="705" text-anchor="middle" font-size="14" font-weight="700" fill="#92400e">关键：softmax 沿 token 维逐特征计算，所以 Compressor 不是 mean pooling，也不是先写一段自然语言摘要</text>
+</svg>

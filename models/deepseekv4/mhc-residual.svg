@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc" font-family="-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif">
+  <title id="title">mHC 四路残差流</title>
+  <desc id="desc">四路残差由 A 预混合成一份模块输入，经 Attention 或 MoE 后由 C 写回；旧残差经双随机矩阵 B 重新分配，两条路径相加。</desc>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker>
+    <marker id="ab" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#2563eb"/></marker>
+    <marker id="ag" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#16a34a"/></marker>
+  </defs>
+  <rect width="1200" height="760" fill="#f8fafc"/>
+  <text x="600" y="46" text-anchor="middle" font-size="28" font-weight="700" fill="#0f172a">mHC：把“残差相加”变成受约束的动态混合</text>
+  <text x="600" y="76" text-anchor="middle" font-size="15" fill="#64748b">昂贵模块仍只处理一份 d 维向量；4d 只存在于残差通路</text>
+
+  <text x="88" y="128" font-size="17" font-weight="700" fill="#334155">输入残差 Xₗ [4,d]</text>
+  <g>
+    <rect x="74" y="154" width="176" height="50" rx="10" fill="#dbeafe" stroke="#3b82f6"/>
+    <rect x="74" y="218" width="176" height="50" rx="10" fill="#dcfce7" stroke="#22c55e"/>
+    <rect x="74" y="282" width="176" height="50" rx="10" fill="#ffedd5" stroke="#f97316"/>
+    <rect x="74" y="346" width="176" height="50" rx="10" fill="#f3e8ff" stroke="#a855f7"/>
+    <text x="162" y="185" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">车道 x₁</text>
+    <text x="162" y="249" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">车道 x₂</text>
+    <text x="162" y="313" text-anchor="middle" font-size="16" font-weight="700" fill="#9a3412">车道 x₃</text>
+    <text x="162" y="377" text-anchor="middle" font-size="16" font-weight="700" fill="#6b21a8">车道 x₄</text>
+  </g>
+
+  <rect x="344" y="166" width="200" height="100" rx="14" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="444" y="198" text-anchor="middle" font-size="21" font-weight="700" fill="#1d4ed8">A · Pre-mix</text>
+  <text x="444" y="224" text-anchor="middle" font-size="14" fill="#334155">4 条流加权读成 1 条</text>
+  <text x="444" y="247" text-anchor="middle" font-size="14" fill="#334155">A = sigmoid(Ã)</text>
+  <path d="M250 244H330" stroke="#2563eb" stroke-width="2.2" marker-end="url(#ab)"/>
+
+  <rect x="612" y="148" width="228" height="136" rx="14" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+  <text x="726" y="183" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">Fₗ</text>
+  <text x="726" y="212" text-anchor="middle" font-size="16" fill="#334155">RMSNorm</text>
+  <text x="726" y="239" text-anchor="middle" font-size="17" font-weight="700" fill="#334155">Attention 或 MoE</text>
+  <text x="726" y="264" text-anchor="middle" font-size="13" fill="#64748b">输入/输出都是 [d]</text>
+  <path d="M544 216H598" stroke="#475569" stroke-width="2.2" marker-end="url(#a)"/>
+
+  <rect x="918" y="166" width="204" height="100" rx="14" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+  <text x="1020" y="198" text-anchor="middle" font-size="21" font-weight="700" fill="#15803d">C · Post-write</text>
+  <text x="1020" y="224" text-anchor="middle" font-size="14" fill="#334155">新输出写回 4 条流</text>
+  <text x="1020" y="247" text-anchor="middle" font-size="14" fill="#334155">C = 2 sigmoid(C̃)</text>
+  <path d="M840 216H904" stroke="#16a34a" stroke-width="2.2" marker-end="url(#ag)"/>
+
+  <rect x="344" y="414" width="496" height="270" rx="16" fill="#ffffff" stroke="#f59e0b" stroke-width="2"/>
+  <text x="592" y="450" text-anchor="middle" font-size="22" font-weight="700" fill="#b45309">B · Residual mixing</text>
+  <text x="592" y="476" text-anchor="middle" font-size="14" fill="#475569">旧的 4 条流先重新分配，再与 C·Fₗ(A·Xₗ) 相加</text>
+
+  <g transform="translate(438 500)" font-size="15" text-anchor="middle">
+    <text x="-30" y="66" font-size="30" fill="#475569">B =</text>
+    <g fill="#fef3c7" stroke="#f59e0b">
+      <rect x="24" y="0" width="48" height="42"/><rect x="76" y="0" width="48" height="42"/><rect x="128" y="0" width="48" height="42"/><rect x="180" y="0" width="48" height="42"/>
+      <rect x="24" y="46" width="48" height="42"/><rect x="76" y="46" width="48" height="42"/><rect x="128" y="46" width="48" height="42"/><rect x="180" y="46" width="48" height="42"/>
+      <rect x="24" y="92" width="48" height="42"/><rect x="76" y="92" width="48" height="42"/><rect x="128" y="92" width="48" height="42"/><rect x="180" y="92" width="48" height="42"/>
+      <rect x="24" y="138" width="48" height="42"/><rect x="76" y="138" width="48" height="42"/><rect x="128" y="138" width="48" height="42"/><rect x="180" y="138" width="48" height="42"/>
+    </g>
+    <g fill="#92400e">
+      <text x="48" y="27">b₁₁</text><text x="100" y="27">b₁₂</text><text x="152" y="27">b₁₃</text><text x="204" y="27">b₁₄</text>
+      <text x="48" y="73">b₂₁</text><text x="100" y="73">b₂₂</text><text x="152" y="73">b₂₃</text><text x="204" y="73">b₂₄</text>
+      <text x="48" y="119">b₃₁</text><text x="100" y="119">b₃₂</text><text x="152" y="119">b₃₃</text><text x="204" y="119">b₃₄</text>
+      <text x="48" y="165">b₄₁</text><text x="100" y="165">b₄₂</text><text x="152" y="165">b₄₃</text><text x="204" y="165">b₄₄</text>
+    </g>
+  </g>
+  <g fill="#334155" font-size="15">
+    <text x="708" y="520">非负：B ≥ 0</text>
+    <text x="708" y="552">每行之和 = 1</text>
+    <text x="708" y="584">每列之和 = 1</text>
+    <text x="708" y="616" font-weight="700" fill="#b45309">Sinkhorn × 20</text>
+  </g>
+
+  <path d="M250 360H302V534H330" fill="none" stroke="#f59e0b" stroke-width="2.2" marker-end="url(#a)"/>
+  <path d="M1020 266V356H888V534H854" fill="none" stroke="#16a34a" stroke-width="2.2" marker-end="url(#ag)"/>
+
+  <circle cx="912" cy="534" r="24" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+  <text x="912" y="542" text-anchor="middle" font-size="26" fill="#334155">+</text>
+  <path d="M840 534H878" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M936 534H1022" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+  <rect x="1034" y="490" width="108" height="88" rx="12" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>
+  <text x="1088" y="524" text-anchor="middle" font-size="17" font-weight="700" fill="#075985">Xₗ₊₁</text>
+  <text x="1088" y="550" text-anchor="middle" font-size="14" fill="#334155">[4,d]</text>
+
+  <rect x="74" y="700" width="1068" height="40" rx="12" fill="#e2e8f0"/>
+  <text x="608" y="726" text-anchor="middle" font-size="16" font-weight="700" fill="#334155">Xₗ₊₁ = BₗXₗ + CₗFₗ(AₗXₗ)　·　同一 Block 中 Attention 与 MoE 各执行一次</text>
+</svg>
