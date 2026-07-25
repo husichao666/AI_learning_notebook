@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-labelledby="title desc" font-family="-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif">
+  <title id="title">DeepSeek-V3 与 V4 的 MoE 路由变化</title>
+  <desc id="desc">V3 前三层是 Dense FFN，V4 前三层改用 token id 哈希选择六个专家；更深层按隐藏状态亲和度 Top-6 路由。所有 V4 MoE 层都额外使用一个共享专家。</desc>
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#475569"/></marker>
+    <marker id="ao" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#ea580c"/></marker>
+  </defs>
+  <rect width="1200" height="700" fill="#f8fafc"/>
+  <text x="600" y="48" text-anchor="middle" font-size="28" font-weight="700" fill="#0f172a">DeepSeekMoE：框架延续，早期层与路由函数变化</text>
+  <text x="600" y="78" text-anchor="middle" font-size="15" fill="#64748b">每层都有 shared expert；V4 每 token 选择 6 个 routed experts</text>
+
+  <rect x="54" y="112" width="1092" height="170" rx="18" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="86" y="150" font-size="22" font-weight="700" fill="#334155">V3</text>
+  <rect x="150" y="132" width="290" height="112" rx="14" fill="#f1f5f9" stroke="#94a3b8"/>
+  <text x="295" y="169" text-anchor="middle" font-size="20" font-weight="700" fill="#334155">Block 0–2</text>
+  <text x="295" y="199" text-anchor="middle" font-size="18" fill="#334155">Dense FFN</text>
+  <text x="295" y="224" text-anchor="middle" font-size="13" fill="#64748b">所有 token 走同一组参数</text>
+  <rect x="518" y="132" width="560" height="112" rx="14" fill="#ecfdf5" stroke="#22c55e"/>
+  <text x="798" y="164" text-anchor="middle" font-size="20" font-weight="700" fill="#166534">Block 3+</text>
+  <text x="798" y="194" text-anchor="middle" font-size="17" fill="#334155">hidden → Sigmoid affinity → Top-8 routed</text>
+  <text x="798" y="220" text-anchor="middle" font-size="14" fill="#334155">8 routed experts + 1 shared expert</text>
+  <path d="M440 188H504" stroke="#475569" stroke-width="2" marker-end="url(#a)"/>
+
+  <rect x="54" y="310" width="1092" height="326" rx="18" fill="#ffffff" stroke="#fdba74" stroke-width="2"/>
+  <text x="86" y="348" font-size="22" font-weight="700" fill="#c2410c">V4</text>
+
+  <rect x="104" y="374" width="430" height="214" rx="16" fill="#fff7ed" stroke="#f97316"/>
+  <text x="319" y="408" text-anchor="middle" font-size="20" font-weight="700" fill="#c2410c">Block 0–2 · Hash Routing</text>
+  <rect x="134" y="438" width="136" height="52" rx="10" fill="#ffffff" stroke="#f97316"/>
+  <text x="202" y="470" text-anchor="middle" font-size="16" font-weight="700" fill="#9a3412">token_id</text>
+  <rect x="350" y="426" width="150" height="76" rx="10" fill="#ffedd5" stroke="#f97316"/>
+  <text x="425" y="455" text-anchor="middle" font-size="16" font-weight="700" fill="#9a3412">tid2eid 查表</text>
+  <text x="425" y="480" text-anchor="middle" font-size="13" fill="#9a3412">固定 6 个专家 ID</text>
+  <path d="M270 464H336" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+  <text x="319" y="532" text-anchor="middle" font-size="14" fill="#475569">hidden affinity 仍决定这 6 个专家的混合权重</text>
+  <text x="319" y="558" text-anchor="middle" font-size="14" font-weight="700" fill="#c2410c">便宜、稳定的词法级入口</text>
+
+  <rect x="594" y="374" width="502" height="214" rx="16" fill="#ecfdf5" stroke="#22c55e"/>
+  <text x="845" y="408" text-anchor="middle" font-size="20" font-weight="700" fill="#166534">Block 3+ · Learned Routing</text>
+  <rect x="624" y="438" width="126" height="52" rx="10" fill="#ffffff" stroke="#22c55e"/>
+  <text x="687" y="470" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">hidden</text>
+  <rect x="818" y="426" width="244" height="76" rx="10" fill="#dcfce7" stroke="#22c55e"/>
+  <text x="940" y="455" text-anchor="middle" font-size="15" font-weight="700" fill="#166534">√Softplus affinity</text>
+  <text x="940" y="480" text-anchor="middle" font-size="13" fill="#166534">上下文相关 Top-6</text>
+  <path d="M750 464H804" stroke="#16a34a" stroke-width="2" marker-end="url(#a)"/>
+  <text x="845" y="532" text-anchor="middle" font-size="14" fill="#475569">selection bias 只影响选谁，不改变实际混合权重</text>
+  <text x="845" y="558" text-anchor="middle" font-size="14" font-weight="700" fill="#166534">深层根据语义动态分工</text>
+
+  <rect x="176" y="612" width="848" height="62" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text x="600" y="638" text-anchor="middle" font-size="16" font-weight="700" fill="#075985">两条路径最后相同：Σ gateᵢ · Expertᵢ(x)　+　SharedExpert(x)</text>
+  <text x="600" y="661" text-anchor="middle" font-size="13" fill="#334155">V4-Flash：256 routed experts　·　V4-Pro：384 routed experts　·　shared expert：1</text>
+</svg>
