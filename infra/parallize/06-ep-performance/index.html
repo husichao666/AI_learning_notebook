@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M6-3 · EP 优化：常见问题、根因与 Megatron 解法</title>
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css" />
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/python.min.js"></script>
+<style>
+  :root{ --bg:#0f1117; --panel:#161922; --panel-2:#1c2030; --text:#d7dbe4; --muted:#9aa3b2; --accent:#7c93ff; --accent-2:#4ade80; --warn:#fbbf24; --danger:#ff6b6b; --border:#262b3a; --code-bg:#0d1017; --max-width:980px; }
+  *{ box-sizing:border-box; } html{ scroll-behavior:smooth; }
+  body{ margin:0; background:radial-gradient(1200px 600px at 80% -10%, #1a2030 0%, var(--bg) 55%); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei","Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.75; font-size:16px; }
+  .wrap{ max-width:var(--max-width); margin:0 auto; padding:0 24px 120px; }
+  header.hero{ padding:64px 24px 36px; border-bottom:1px solid var(--border); background:linear-gradient(180deg, rgba(74,222,128,.06), transparent); }
+  header.hero .inner{ max-width:var(--max-width); margin:0 auto; }
+  .kicker{ display:inline-block; font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent-2); border:1px solid var(--border); border-radius:999px; padding:4px 14px; margin-bottom:20px; background:var(--panel); }
+  header.hero h1{ font-size:2.15rem; line-height:1.25; margin:0 0 16px; letter-spacing:-.01em; }
+  header.hero p.lead{ font-size:1.1rem; color:var(--muted); margin:0; max-width:800px; }
+  .meta-row{ margin-top:24px; display:flex; flex-wrap:wrap; gap:10px; }
+  .tag{ font-size:13px; color:var(--muted); background:var(--panel); border:1px solid var(--border); padding:4px 12px; border-radius:8px; }
+  h2.section{ font-size:1.7rem; margin:60px 0 18px; padding-top:14px; letter-spacing:-.01em; }
+  h2.section .num{ color:var(--accent-2); font-weight:700; margin-right:12px; }
+  h3{ font-size:1.22rem; margin:36px 0 12px; color:#eaeefb; }
+  h4{ color:#eef1fb; }
+  p{ margin:14px 0; } a{ color:var(--accent); } strong{ color:#fff; } em{ color:var(--accent-2); font-style:normal; }
+  code:not(pre code){ background:var(--panel-2); color:#ffd9a8; padding:2px 7px; border-radius:6px; font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; font-size:.9em; border:1px solid var(--border); }
+  pre{ background:var(--code-bg)!important; border:1px solid var(--border); border-radius:12px; padding:18px 20px; overflow-x:auto; margin:18px 0; font-size:13.5px; line-height:1.6; }
+  pre code{ font-family:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace; background:transparent!important; padding:0; }
+  .code-label{ font-size:12px; color:var(--muted); margin:22px 0 -10px; font-family:"JetBrains Mono",monospace; display:flex; align-items:center; gap:8px; }
+  .code-label::before{ content:""; width:8px; height:8px; border-radius:2px; background:var(--accent-2); }
+  .callout{ border-left:3px solid var(--accent); background:var(--panel); border-radius:0 12px 12px 0; padding:14px 20px; margin:22px 0; }
+  .callout.key{ border-color:var(--accent-2); } .callout.warn{ border-color:var(--warn); } .callout.danger{ border-color:var(--danger); }
+  .callout p:first-child{ margin-top:0; } .callout p:last-child{ margin-bottom:0; } .callout .label{ font-weight:700; color:#fff; }
+  .scroll{ overflow-x:auto; margin:24px 0; } .scroll table{ margin:0; }
+  table{ width:100%; border-collapse:collapse; margin:24px 0; font-size:14.5px; }
+  th,td{ border:1px solid var(--border); padding:11px 14px; text-align:left; vertical-align:top; }
+  th{ background:var(--panel-2); color:#fff; font-weight:600; } tr:nth-child(even) td{ background:rgba(255,255,255,.012); } td code{ font-size:.85em; }
+  .diagram{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:26px; margin:26px 0; text-align:center; overflow-x:auto; }
+  .diagram svg{ width:100%; height:auto; max-width:860px; display:block; margin:0 auto; }
+  .diagram .cap{ color:var(--muted); font-size:13.5px; margin-top:14px; text-align:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0; }
+  .card{ background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px 22px; } .card h4{ margin-top:0; }
+  .footnote{ color:var(--muted); font-size:13.5px; }
+  ul,ol{ padding-left:24px; } li{ margin:7px 0; }
+  footer{ border-top:1px solid var(--border); margin-top:80px; padding-top:28px; color:var(--muted); font-size:14px; }
+  .chap-nav{ display:flex; justify-content:space-between; gap:16px; margin-top:40px; }
+  .chap-nav a{ flex:1; text-decoration:none; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 18px; transition:.15s; }
+  .chap-nav a:hover{ border-color:var(--accent); } .chap-nav .nl{ font-size:12px; color:var(--muted); } .chap-nav .nt{ font-weight:600; margin-top:3px; } .chap-nav .next{ text-align:right; }
+  @media (max-width:720px){ .two-col{ grid-template-columns:1fr; } header.hero h1{ font-size:1.6rem; } }
+</style>
+</head>
+<body>
+<header class="hero"><div class="inner">
+  <span class="kicker">Module 6 · EP 三部曲 3/3 · 性能篇</span>
+  <h1>EP 优化：常见问题、根因与 Megatron 解法</h1>
+  <p class="lead">专家并行的性能问题不是单一的“通信慢”：路由偏斜会制造慢 rank，All-to-All 会撞上拓扑墙，细粒度专家会把大矩阵切成小 GEMM，动态路由还会引入重排、同步和显存波动。本章先解释问题为什么发生，再把每类问题映射到 Megatron 的具体算法与实现。</p>
+  <div class="meta-row">
+    <span class="tag">⚖️ Load balance</span>
+    <span class="tag">🌐 All-to-All</span>
+    <span class="tag">⚡ Small GEMM</span>
+    <span class="tag">🧩 Dynamic shape</span>
+    <span class="tag">🪄 Overlap</span>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2 class="section" id="overview"><span class="num">01</span>EP 到底慢在哪里：四类常见问题</h2>
+<p>先把一层 MoE 的前向主链路写出来：</p>
+<p style="text-align:center;font-size:1.03rem"><strong>Router → Permute → Dispatch A2A → Expert GEMM → Combine A2A → Unpermute</strong></p>
+<p>反向还会再走一遍相反方向的数据依赖。于是总时间可以粗略拆为：</p>
+<p style="text-align:center;font-size:1.03rem"><strong>$t_{moe}=t_{route}+t_{permute}+t_{A2A}+t_{expert}+t_{A2A}+t_{unpermute}+t_{wait}$</strong></p>
+<p>最后一项 $t_{wait}$ 很关键：集合通信按最慢 rank 收尾，所以 EP 的性能不是“平均专家有多快”，而是“最忙专家所在 rank 何时完成”。常见问题可以归成下面四类。</p>
+
+<div class="scroll"><table>
+<tr><th>常见问题</th><th>直接症状</th><th>根因</th><th>Megatron 对应解法</th></tr>
+<tr><td><strong>① 负载不均与慢 rank</strong></td><td><code>tokens_per_expert</code> 的 max/mean 很高，collective 前后出现长等待</td><td>学习式 top-k 天然会偏向少数专家；统计范围、batch 太小和专家放置会进一步放大偏斜</td><td>aux loss、seq/global aux loss、expert bias、capacity</td></tr>
+<tr><td><strong>② A2A 通信墙</strong></td><td>dispatch/combine 占比高，跨节点后陡增</td><td>每个 token 被复制给 top-k 专家；EP 越大 peer 越多；网络层级不一致</td><td>All-to-All / Flex Dispatcher、DeepEP/HybridEP、分组路由、FP8、overlap</td></tr>
+<tr><td><strong>③ 专家 GEMM 太小</strong></td><td>大量短 GEMM，Tensor Core 利用率低，launch 密集</td><td>token 被拆到多个专家；ETP 又切窄矩阵；单专家的 M 维很小且不规则</td><td>Grouped GEMM、ETP=1 优先、增大 token 粒度、tile padding</td></tr>
+<tr><td><strong>④ 重排、动态 shape 与显存</strong></td><td>permute kernel 碎、D2H/host gap、显存峰值抖动、CUDA Graph 难捕获</td><td>每步路由图和接收 token 数变化；两次重排需要索引和临时 buffer</td><td>router/permute fusion、capacity/padding、部分 Graph、recompute/offload</td></tr>
+</table></div>
+
+<div class="callout key"><p><span class="label">贯穿全章的判断方法</span> 先定位是 <strong>skew、network、GEMM 还是 launch/shape</strong>，再选算法。把所有 MoE 开关一起打开，会掩盖因果关系，也可能因为 padding、资源争抢或额外调度反而变慢。</p></div>
+
+<h2 class="section" id="balance"><span class="num">02</span>问题一：负载不均，为什么所有 rank 都会被一个热点拖慢？</h2>
+<h3>问题与成因</h3>
+<p>Top-k router 是一个学习系统，不是均匀随机数发生器。语义相近的 token 会集中到少数专家；训练早期的微小偏好又会形成正反馈：热门专家收到更多样本、更新更充分，随后更容易继续被选中。有限的 micro-batch、局部统计口径以及热点专家恰好落在同一 rank，也会让 per-rank skew 比 per-expert skew 更严重。</p>
+<p>负载偏斜会同时放大三项成本：</p>
+<ul>
+  <li><strong>通信</strong>：热点 rank 的 <code>output_splits</code> 更大，接收和发回更多激活。</li>
+  <li><strong>计算</strong>：该 rank 上专家 GEMM 的 M 维更大。</li>
+  <li><strong>等待</strong>：其他 rank 先算完也不能越过后续同步点，最终 step time 由长尾决定。</li>
+</ul>
+<p>Dropless 只保证 token 不被丢弃，并不保证负载均匀；在严重偏斜时，它反而会忠实保留热点带来的变长通信、计算和显存峰值。</p>
+
+<h3>解法 A：aux loss，用梯度纠正 router</h3>
+<p>Switch/GShard 风格的辅助损失同时约束“专家被选中的频率”和“router 给专家的平均概率”。某个专家既被频繁选择、概率又高时，损失会变大，梯度把 router 从持续塌缩的方向拉回来。Megatron 提供三个统计口径：</p>
+<div class="scroll"><table>
+<tr><th>算法</th><th>统计范围</th><th>适用点</th><th>代价 / 风险</th></tr>
+<tr><td><code>aux_loss</code></td><td>当前路由域 / micro-batch</td><td>通用基线，反馈快</td><td>系数过大会干扰主任务目标</td></tr>
+<tr><td><code>seq_aux_loss</code></td><td>每条 sequence 单独均衡</td><td>避免单条样本把专家打偏</td><td>约束更强，短序列统计噪声更大</td></tr>
+<tr><td><code>global_aux_loss</code></td><td>跨 rank 的 global batch</td><td>局部 batch 很小、希望用更稳定统计</td><td>反馈更滞后，并需要跨组归约</td></tr>
+</table></div>
+<pre><code class="language-python">--moe-router-load-balancing-type aux_loss
+--moe-aux-loss-coeff 1e-2
+
+# 也可按模型需要选择 seq_aux_loss / global_aux_loss</code></pre>
+
+<h3>解法 B：aux-loss-free expert bias，用反馈控制代替辅助目标</h3>
+<p>如果不希望辅助损失改变语言模型目标，可以为每个专家维护一个不参与优化器更新的 bias。每个 global batch 统计实际 assignment 数：低于平均值的专家加 bias，高于平均值的专家减 bias。bias 只改变“选谁”，最终 combine 的路由权重仍来自原始 score。</p>
+<p style="text-align:center;font-size:1.03rem"><strong>$b_i \leftarrow b_i+\eta\cdot\mathrm{sign}(\bar n-n_i)$</strong></p>
+<div class="code-label">Megatron-LM · transformer/moe/moe_utils.py · get_updated_expert_bias</div>
+<pre><code class="language-python">all_reduce(tokens_per_expert, group=tp_dp_cp_group)
+average = tokens_per_expert.sum() / num_experts
+offset = average - tokens_per_expert
+expert_bias += sign(offset) * bias_update_rate</code></pre>
+<pre><code class="language-python">--moe-router-score-function sigmoid
+--moe-router-enable-expert-bias
+--moe-router-bias-update-rate 1e-3</code></pre>
+<div class="callout warn"><p><span class="label">它不是“免费”</span> aux-loss-free 的意思是“不把均衡项加到训练 loss”，不是没有均衡机制。当前 Megatron 仅允许 expert bias 搭配 <code>sigmoid</code> 或 <code>sqrtsoftplus</code> score；更新率太大会让专家负载来回振荡，太小则追不上路由分布漂移。</p></div>
+
+<h3>解法 C：capacity 是最后的硬边界，不是负载均衡算法</h3>
+<p>Capacity factor 给每个专家设上限。超限 assignment 可以按概率或位置丢弃；配合 <code>--moe-pad-expert-input-to-capacity</code> 还能把专家输入补到固定形状。它能限制最坏延迟和显存，但容量太小会丢 token，容量太大又会空算。</p>
+<pre><code class="language-python">--moe-expert-capacity-factor 1.2
+--moe-token-drop-policy probs
+--moe-pad-expert-input-to-capacity</code></pre>
+<div class="callout key"><p><span class="label">推荐观测值</span> 每层记录 <code>tokens_per_expert</code> 和每 rank 的收发量，至少比较 max/mean、P95/P50、drop rate。全模型平均很容易把某一层的专家塌缩隐藏掉。</p></div>
+
+<h2 class="section" id="communication"><span class="num">03</span>问题二：两次 All-to-All 为什么会成为通信墙？</h2>
+<h3>问题与成因</h3>
+<p>每个本地 token 都要被发送给 top-k 个专家，专家输出还要沿原路径发回。设每 rank 有 $T$ 个 token、top-k=$k$、隐藏维 $H$、通信 dtype 每元素 $b$ 字节；在近似均匀路由下，dispatch + combine 的跨 rank payload 为：</p>
+<p style="text-align:center;font-size:1.05rem"><strong>$V_{A2A,rank}\approx2\,T\,k\,H\,b\left(1-\dfrac{1}{EP}\right)$</strong></p>
+<p>因此 top-k 或隐藏维翻倍会近似线性增加流量。EP 增大虽然让每卡少存专家，却让远端比例趋近 1、peer 数量增加；一旦 EP group 跨越 NVLink、节点和 IB/RoCE 等不同网络层级，最慢一层链路会暴露出来。</p>
+<p>Megatron 的标准 dispatcher 还需要先从 <code>routing_map</code> 算出变长的 <code>input_splits/output_splits</code>。这些 metadata 决定 A2A buffer 大小，某些配置下需要 D2H 与同步；所以 timeline 上的空洞不一定是“网络没带宽”，也可能是动态 shape 的准备开销。</p>
+
+<div class="code-label">Megatron-LM · transformer/moe/token_dispatcher.py · MoEAlltoAllTokenDispatcher</div>
+<pre><code class="language-python"># dispatch
+global_input_tokens = all_to_all(
+    ep_group, permuted_tokens, output_splits, input_splits)
+
+# experts ...
+
+# combine：沿相反方向再做一次 all-to-all
+local_output = all_to_all(
+    ep_group, expert_output, input_splits, output_splits)</code></pre>
+
+<h3>解法 A：从标准 A2A 到 DeepEP / HybridEP</h3>
+<p>三条路线做的是同一件事：把 token 送到专家所在 rank，再把专家输出送回原 rank。差别不在数学，而在<strong>是否理解分层拓扑、跨域 token 是否去重、重排与通信融合到什么边界</strong>。</p>
+
+<h4>1. 标准 NCCL All-to-All：先排好，再交换</h4>
+<p>Megatron 的标准路径先把 token 按目标 EP rank 排列，计算每个 peer 的变长 split，再调用 NCCL A2A；接收端还要把 token 从“按来源 rank 连续”重新排成“按本地 expert 连续”。Combine 完全逆序执行：</p>
+<div class="diagram">
+<svg viewBox="0 0 900 180" role="img" aria-label="标准 All-to-All 的两次重排和通信">
+<text x="450" y="26" fill="#eaeefb" font-size="16" font-weight="700" text-anchor="middle">标准 A2A：通信算子看不到 expert 语义</text>
+<rect x="25" y="62" width="135" height="50" rx="8" fill="#6f57bd"/><text x="92" y="92" fill="#fff" font-size="12" text-anchor="middle">routing_map</text>
+<rect x="185" y="62" width="150" height="50" rx="8" fill="#b9703f"/><text x="260" y="84" fill="#fff" font-size="12" text-anchor="middle">按目标 rank</text><text x="260" y="101" fill="#fff" font-size="12" text-anchor="middle">permute</text>
+<rect x="360" y="62" width="150" height="50" rx="8" fill="#293b91"/><text x="435" y="92" fill="#fff" font-size="12" text-anchor="middle">NCCL A2A</text>
+<rect x="535" y="62" width="150" height="50" rx="8" fill="#b9703f"/><text x="610" y="84" fill="#fff" font-size="12" text-anchor="middle">按 local expert</text><text x="610" y="101" fill="#fff" font-size="12" text-anchor="middle">permute</text>
+<rect x="710" y="62" width="165" height="50" rx="8" fill="#1f7a4d"/><text x="792" y="92" fill="#fff" font-size="12" text-anchor="middle">Grouped GEMM</text>
+<path d="M160 87H185M335 87H360M510 87H535M685 87H710" stroke="#9aa3b2" stroke-width="2"/>
+<text x="450" y="151" fill="#9aa3b2" font-size="12.5" text-anchor="middle">两次重排、split metadata 和通信分别落地；跨节点时 NCCL 负责传输，但不知道多个目的 expert 是否属于同一节点。</text>
+</svg>
+</div>
+<pre><code class="language-python">--moe-token-dispatcher-type alltoall
+--moe-permute-fusion</code></pre>
+
+<h4>2. DeepEP：按节点分层转发，融合通信侧的重排</h4>
+<p>DeepEP 不把 EP group 当成一张均匀的全连接网，而是区分<strong>机内 NVLink/NVSwitch 域</strong>与<strong>机间 RDMA 域</strong>。它接收稀疏的 <code>[token, top-k expert]</code> 索引，先计算通信 layout，再用自定义 dispatch kernel 完成打包和分层转发：</p>
+<ol>
+  <li><strong>机内聚合</strong>：按目标节点把 token 汇聚到能走 RDMA 的发送路径。</li>
+  <li><strong>机间传输</strong>：同一 token 若在同一远端节点命中多个 expert，可跨 RDMA 只发送该节点需要的一份，再在目标节点复制；避免按目标 rank 重复穿越慢链路。</li>
+  <li><strong>机内散发</strong>：到达目标节点后，再经 NVLink/NVSwitch 送到具体 expert rank。</li>
+</ol>
+<div class="diagram">
+<svg viewBox="0 0 920 410" role="img" aria-label="DeepEP 节点级聚合减少跨节点重复 token">
+<text x="460" y="26" fill="#eaeefb" font-size="16" font-weight="700" text-anchor="middle">例：token x 同时命中远端节点 B 上的 E4 与 E5</text>
+
+<text x="22" y="83" fill="#ffb0b0" font-size="13" font-weight="700">按 rank 直接发送</text>
+<rect x="120" y="51" width="245" height="116" rx="12" fill="#1c2030" stroke="#39405a"/>
+<text x="242" y="74" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 A · NVLink 域</text>
+<rect x="190" y="91" width="105" height="48" rx="8" fill="#6f57bd"/>
+<text x="242" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU0 · x</text>
+<rect x="555" y="51" width="245" height="116" rx="12" fill="#1c2030" stroke="#39405a"/>
+<text x="677" y="74" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 B · NVLink 域</text>
+<rect x="580" y="91" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="621" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU4 · E4</text>
+<rect x="692" y="91" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="733" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU5 · E5</text>
+<path d="M295 106C395 65 475 65 580 106" fill="none" stroke="#ff6b6b" stroke-width="3"/>
+<path d="M295 124C410 165 570 165 692 124" fill="none" stroke="#ff6b6b" stroke-width="3"/>
+<text x="460" y="92" fill="#ffb0b0" font-size="11.5" text-anchor="middle">RDMA：发送 x</text>
+<text x="500" y="157" fill="#ffb0b0" font-size="11.5" text-anchor="middle">RDMA：再次发送 x</text>
+<text x="460" y="188" fill="#ffb0b0" font-size="12.5" text-anchor="middle">同一份 H 维激活两次穿越慢链路：约 2Hb 字节</text>
+
+<line x1="30" y1="211" x2="890" y2="211" stroke="#39405a" stroke-width="1"/>
+
+<text x="22" y="266" fill="#86efac" font-size="13" font-weight="700">DeepEP 分层转发</text>
+<rect x="120" y="232" width="245" height="116" rx="12" fill="#1c2030" stroke="#4ade80"/>
+<text x="242" y="255" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 A · NVLink 聚合</text>
+<rect x="145" y="273" width="82" height="48" rx="8" fill="#6f57bd"/><text x="186" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU0 · x</text>
+<rect x="257" y="273" width="82" height="48" rx="8" fill="#293b91"/><text x="298" y="294" fill="#fff" font-size="11.5" text-anchor="middle">RDMA</text><text x="298" y="310" fill="#fff" font-size="11.5" text-anchor="middle">forwarder</text>
+<path d="M227 297H257" stroke="#7c93ff" stroke-width="3"/>
+
+<rect x="555" y="232" width="245" height="116" rx="12" fill="#1c2030" stroke="#4ade80"/>
+<text x="677" y="255" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 B · NVLink 散发</text>
+<rect x="580" y="273" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="621" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU4 · E4</text>
+<rect x="692" y="273" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="733" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU5 · E5</text>
+<path d="M339 297H555" stroke="#4ade80" stroke-width="4"/>
+<text x="447" y="286" fill="#86efac" font-size="11.5" text-anchor="middle">RDMA：x 只跨一次</text>
+<path d="M555 297H580M555 297C620 350 675 350 692 297" fill="none" stroke="#7c93ff" stroke-width="3"/>
+<text x="460" y="377" fill="#86efac" font-size="12.5" text-anchor="middle">慢链路约 Hb 字节；复制留给更快的 NVLink/NVSwitch 域完成</text>
+<text x="460" y="399" fill="#9aa3b2" font-size="11.5" text-anchor="middle">示意图忽略 metadata；真实实现可有多个 RDMA rank / NIC 并行转发。</text>
+</svg>
+</div>
+<p><strong>为什么要这样做？</strong> 因为 EP 的通信域是非对称的：机内 NVLink/NVSwitch 带宽通常显著高于跨节点 RDMA，而 top-k 又可能让同一 token 在一个远端节点命中多个专家。若按目标 rank 独立发送，昂贵的 H 维激活会重复穿越最慢链路；先按节点去重、跨节点搬一次、到达后再机内复制，才能让 RDMA 字节量更接近“访问了多少个节点”，而不是“命中了多少个远端专家”。</p>
+<p>这与 group-limited routing 很契合：把 expert group 对齐到节点，router 先限制每个 token 访问的节点数，DeepEP 再高效完成节点内外转发。它的通信 kernel 可以控制占用的 SM 数，在吞吐与“给 expert GEMM 留多少 SM”之间调节。</p>
+<p>在本章对应的 Megatron <code>deepep</code> backend 中，<code>fused_dispatch</code> 已融合第一次 token 重排与跨 rank 通信，并返回一个 <code>handle</code> 保存逆向 combine 所需的路由信息；但接收后仍要把 token 从通信布局再排成本地 expert 连续布局：</p>
+<div class="code-label">Megatron-LM · token_dispatcher.py · _DeepepManager</div>
+<pre><code class="language-python"># 稠密 routing_map -> 稀疏 top-k indices / probs
+token_probs, token_indices = torch.topk(probs, router_topk, dim=-1)
+
+# 融合通信侧 permute + 分层 dispatch，handle 留给 combine
+hidden, recv_indices, recv_probs, counts, handle = fused_dispatch(...)
+
+# Megatron 仍需按 local expert 做第二次 permute
+hidden, permuted_probs, reversed_mapping, ... = permute(
+    hidden, dispatched_routing_map, probs=dispatched_probs, ...)
+
+# combine 使用同一 handle 走逆向路径
+hidden, _ = fused_combine(hidden, group, handle, ...)</code></pre>
+
+<h4>3. HybridEP：把两侧重排也并入层次化通信</h4>
+<p>HybridEP 面向大 NVLink 域和多节点拓扑，把 scale-up 与 scale-out 放进同一条 token 搬运流水：NVLink/MNNVL 侧使用 TMA 等机制降低搬运所需 SM，跨节点侧使用 IBGDA/RDMA 直接访问通信 buffer，并允许分别控制 preprocess、permute、dispatch/combine 占用的 SM / block 数。</p>
+<p>它与上面 DeepEP 路径最关键的区别，是<strong>融合边界更大</strong>：</p>
+<p style="text-align:center;font-size:1.03rem"><strong>dispatch_with_permute = 按通信目标重排 + 分层 A2A + 按 local expert 重排</strong></p>
+<p style="text-align:center;font-size:1.03rem"><strong>combine_with_unpermute = 逆 expert 重排 + 分层 A2A + 恢复原 token 顺序</strong></p>
+<div class="diagram">
+<svg viewBox="0 0 940 430" role="img" aria-label="HybridEP 扩大融合边界并减少 HBM 中间落地">
+<text x="470" y="27" fill="#eaeefb" font-size="16" font-weight="700" text-anchor="middle">为什么还需要 HybridEP：通信快了以后，独立重排与 SM 占用会进入关键路径</text>
+
+<text x="18" y="81" fill="#ffcf8a" font-size="13" font-weight="700">Megatron DeepEP 路径</text>
+<rect x="35" y="101" width="105" height="52" rx="8" fill="#6f57bd"/><text x="87" y="132" fill="#fff" font-size="11.5" text-anchor="middle">top-k indices</text>
+<rect x="165" y="101" width="175" height="52" rx="8" fill="#293b91"/><text x="252" y="123" fill="#fff" font-size="11.5" text-anchor="middle">fused dispatch</text><text x="252" y="140" fill="#fff" font-size="10.5" text-anchor="middle">pack + NVLink/RDMA</text>
+<rect x="365" y="101" width="130" height="52" rx="8" fill="#4b5563"/><text x="430" y="123" fill="#fff" font-size="11" text-anchor="middle">通信布局</text><text x="430" y="140" fill="#fbbf24" font-size="10.5" text-anchor="middle">写回 HBM</text>
+<rect x="520" y="101" width="145" height="52" rx="8" fill="#b9703f"/><text x="592" y="123" fill="#fff" font-size="11" text-anchor="middle">local-expert</text><text x="592" y="140" fill="#fff" font-size="11" text-anchor="middle">permute</text>
+<rect x="690" y="101" width="120" height="52" rx="8" fill="#1f7a4d"/><text x="750" y="132" fill="#fff" font-size="11.5" text-anchor="middle">Expert GEMM</text>
+<rect x="835" y="101" width="90" height="52" rx="8" fill="#b9703f"/><text x="880" y="123" fill="#fff" font-size="10.5" text-anchor="middle">local</text><text x="880" y="140" fill="#fff" font-size="10.5" text-anchor="middle">unpermute</text>
+<path d="M140 127H165M340 127H365M495 127H520M665 127H690M810 127H835" stroke="#9aa3b2" stroke-width="2"/>
+<path d="M430 155V185H592V155" fill="none" stroke="#ff6b6b" stroke-width="2.5"/>
+<text x="511" y="202" fill="#ffb0b0" font-size="11.5" text-anchor="middle">额外 HBM 读写 + 独立 kernel launch</text>
+<text x="470" y="226" fill="#9aa3b2" font-size="11.5" text-anchor="middle">通信结果还不是 Grouped GEMM 需要的 expert-contiguous layout。</text>
+
+<line x1="25" y1="249" x2="915" y2="249" stroke="#39405a" stroke-width="1"/>
+
+<text x="18" y="291" fill="#86efac" font-size="13" font-weight="700">HybridEP 路径</text>
+<rect x="35" y="311" width="105" height="52" rx="8" fill="#6f57bd"/><text x="87" y="342" fill="#fff" font-size="11.5" text-anchor="middle">routing_map</text>
+<rect x="165" y="286" width="500" height="102" rx="12" fill="#20352f" stroke="#4ade80" stroke-width="2"/>
+<text x="415" y="308" fill="#86efac" font-size="12.5" font-weight="700" text-anchor="middle">dispatch_with_permute · 一个融合边界</text>
+<rect x="188" y="326" width="130" height="42" rx="7" fill="#42595a"/><text x="253" y="352" fill="#fff" font-size="10.8" text-anchor="middle">通信目标 permute</text>
+<rect x="338" y="326" width="130" height="42" rx="7" fill="#293b91"/><text x="403" y="344" fill="#fff" font-size="10.8" text-anchor="middle">TMA · scale-up</text><text x="403" y="359" fill="#fff" font-size="10.2" text-anchor="middle">IBGDA · scale-out</text>
+<rect x="488" y="326" width="150" height="42" rx="7" fill="#42595a"/><text x="563" y="352" fill="#fff" font-size="10.8" text-anchor="middle">local-expert permute</text>
+<rect x="690" y="311" width="120" height="52" rx="8" fill="#1f7a4d"/><text x="750" y="342" fill="#fff" font-size="11.5" text-anchor="middle">Expert GEMM</text>
+<rect x="835" y="286" width="90" height="102" rx="10" fill="#293b91"/><text x="880" y="328" fill="#fff" font-size="10.8" text-anchor="middle">combine</text><text x="880" y="345" fill="#fff" font-size="10.8" text-anchor="middle">with</text><text x="880" y="362" fill="#fff" font-size="10.8" text-anchor="middle">unpermute</text>
+<path d="M140 337H165M665 337H690M810 337H835" stroke="#4ade80" stroke-width="3"/>
+<text x="470" y="416" fill="#86efac" font-size="12.5" text-anchor="middle">通信输出直接进入 GEMM；逆向也一次完成，减少中间 buffer、HBM 往返和 SM 竞争。</text>
+</svg>
+</div>
+<p><strong>为什么要扩大融合边界？</strong> DeepEP 已经缓解跨节点网络瓶颈后，独立的 local-expert permute/unpermute 会暴露出来：每次都要把整块 token 激活写回 HBM、重新读取、启动索引 kernel，而且这些 CUDA kernel 会占用本可留给专家 GEMM 的 SM。HybridEP 用 TMA 承担大 NVLink 域的数据搬运、用 IBGDA/RDMA 完成 scale-out，并让 token 在通信过程中直接落到 expert-contiguous 位置；它优化的不只是“网络带宽”，而是<strong>网络 + HBM + SM + launch</strong>组成的整条 dispatch/combine 路径。</p>
+<p>因此 HybridEP 输出已经是 Grouped GEMM 可直接消费的 expert-contiguous layout；Megatron 的 <code>get_permuted_hidden_states_by_experts()</code> 和恢复函数在这条路径上直接返回输入，不再单独发起第二套 permute/unpermute kernel。</p>
+<div class="code-label">Megatron-LM · token_dispatcher.py · _HybridEPManager</div>
+<pre><code class="language-python">dispatched_hidden, dispatched_probs, _, tokens_per_expert, handle = (
+    hybrid_ep_dispatch(
+        x=hidden_states,
+        routing_map=routing_map,
+        probs=token_probs,
+        fused=moe_permute_fusion_into_hybridep,
+        num_permuted_tokens=static_budget,
+    )
+)
+
+# 已按本地 expert 排好，专家层直接消费
+def get_permuted_hidden_states_by_experts(hidden_states):
+    return hidden_states, dispatched_probs
+
+# combine 同时完成逆重排和返回原 rank
+hidden_states = hybrid_ep_combine(x=expert_output, handle=handle, ...)</code></pre>
+<p>动态 dropless 模式下，实际接收 token 数仍可能触发 D2H 同步来决定 buffer 大小。给 HybridEP 提供静态的 rank capacity / <code>num_permuted_tokens</code> 可以提前分配并走 non-blocking 路径，但预算过小会 overflow 或丢 token，必须监控。</p>
+
+<div class="scroll"><table>
+<tr><th>对比项</th><th>标准 A2A</th><th>DeepEP backend</th><th>HybridEP backend</th></tr>
+<tr><td>拓扑模型</td><td>交给 NCCL collective</td><td>显式区分 NVLink 与 RDMA，分层转发</td><td>面向更大 NVLink/MNNVL 域，TMA + IBGDA/RDMA</td></tr>
+<tr><td>跨节点副本</td><td>按目标 rank 发送</td><td>按目标节点聚合，避免同节点多个 expert 重复跨 RDMA</td><td>同样做层次化搬运，并扩展大 scale-up 域</td></tr>
+<tr><td>融合边界</td><td>通信与重排分离</td><td>融合通信前打包；接收后仍有 local-expert permute</td><td>两侧 permute/unpermute 与 dispatch/combine 一体化</td></tr>
+<tr><td>当前 Megatron 集成约束</td><td>通用基线</td><td>依赖 DeepEP；routing probs 使用 FP32</td><td>依赖 hybrid-ep；routing probs 使用 FP32；该基线暂不支持 FP8 dispatch</td></tr>
+<tr><td>优先场景</td><td>单机或建立可比较 baseline</td><td>跨节点细粒度 MoE、RDMA 是主瓶颈</td><td>GB200 NVL72、Multi-Node NVLink 等大 NVLink 域</td></tr>
+</table></div>
+<pre><code class="language-python"># DeepEP
+--moe-token-dispatcher-type flex
+--moe-flex-dispatcher-backend deepep
+--moe-router-dtype fp32
+
+# HybridEP
+--moe-token-dispatcher-type flex
+--moe-flex-dispatcher-backend hybridep
+--moe-router-dtype fp32
+--moe-permute-fusion-into-hybridep</code></pre>
+<div class="callout warn"><p><span class="label">版本边界</span> DeepEP 项目本身还在演进，并已有新的 <code>ElasticBuffer</code>/V2 路线；Megatron 也单独暴露了 <code>deepepv2</code> backend。上面的 DeepEP 与 HybridEP 对比严格对应本文固定的 Megatron <code>88894e3ee</code> 集成，不能把不同分支的参数和能力直接混用。</p></div>
+
+<h3>解法 B：减少跨域流量</h3>
+<ul>
+  <li><strong>Group-limited routing</strong>：先选 expert group，再只在选中的组内选专家；若 group 与节点对齐，就能限制单 token 的跨节点目的地。Megatron 对应 <code>--moe-router-num-groups</code> 与 <code>--moe-router-group-topk</code>。</li>
+  <li><strong>通信低精度</strong>：支持 FP8 dispatch 的路径可减少 token 激活字节，并同时加速专家 Tensor Core GEMM；但 router logits/probs 通常保留 FP32。注意本文源码基线的 HybridEP 集成暂不支持 FP8 dispatch，不能只凭模型开启 FP8 就假设 A2A payload 已减半。</li>
+</ul>
+
+<h3>解法 C：把通信藏到独立计算后面</h3>
+<p>Overlap 的第一原则是数据依赖：同一 micro-batch 的 routed expert 输入来自 dispatch，所以自己的 expert GEMM 不可能覆盖自己的 dispatch；combine 又依赖 expert 输出，也不能提前。Megatron 使用的窗口有两类：<strong>同一 micro-batch 的 shared expert 分支</strong>，以及<strong>相邻 micro-batch 的前向/反向计算</strong>。</p>
+
+<h4>1. Shared expert overlap：利用同层的第二条独立分支</h4>
+<p>Shared expert 和 routed experts 都读取同一份 MoE 输入，但 shared expert 不需要 router 的 top-k 结果，也不需要 EP dispatch。两条分支只在层末把输出相加，因此中间可以并行。</p>
+<div class="diagram">
+<svg viewBox="0 0 900 300" role="img" aria-label="Shared expert 与 EP 通信重叠">
+<text x="450" y="25" fill="#eaeefb" font-size="16" font-weight="700" text-anchor="middle">同一 micro-batch：两条分支直到输出相加前都独立</text>
+<text x="20" y="86" fill="#cdd5ff" font-size="12.5">主 stream</text>
+<rect x="105" y="55" width="135" height="48" rx="8" fill="#b9703f"/><text x="172" y="84" fill="#fff" font-size="11.5" text-anchor="middle">Permute</text>
+<rect x="240" y="55" width="175" height="48" rx="8" fill="#293b91"/><text x="327" y="84" fill="#fff" font-size="11.5" text-anchor="middle">Dispatch A2A</text>
+<rect x="415" y="55" width="205" height="48" rx="8" fill="#1f7a4d"/><text x="517" y="84" fill="#fff" font-size="11.5" text-anchor="middle">Routed Expert GEMM</text>
+<rect x="620" y="55" width="175" height="48" rx="8" fill="#293b91"/><text x="707" y="84" fill="#fff" font-size="11.5" text-anchor="middle">Combine A2A</text>
+<text x="20" y="178" fill="#86efac" font-size="12.5">shared stream</text>
+<rect x="105" y="147" width="135" height="48" rx="8" fill="#6f57bd"/><text x="172" y="176" fill="#fff" font-size="11.5" text-anchor="middle">TP AG / gate</text>
+<rect x="240" y="147" width="175" height="48" rx="8" fill="#8a5a2e"/><text x="327" y="176" fill="#fff" font-size="11.5" text-anchor="middle">Shared FC1 + Act</text>
+<rect x="620" y="147" width="175" height="48" rx="8" fill="#8a5a2e"/><text x="707" y="168" fill="#fff" font-size="11.5" text-anchor="middle">Shared FC2</text><text x="707" y="184" fill="#fff" font-size="11.5" text-anchor="middle">+ TP RS</text>
+<path d="M240 122V208M415 122V208M620 122V208M795 122V208" stroke="#4ade80" stroke-width="1.5" stroke-dasharray="5 4"/>
+<rect x="810" y="101" width="70" height="48" rx="8" fill="#4b5563"/><text x="845" y="130" fill="#fff" font-size="11.5" text-anchor="middle">Add</text>
+<path d="M795 79H845V101M795 171H845V149" fill="none" stroke="#9aa3b2" stroke-width="2"/>
+<text x="450" y="246" fill="#9aa3b2" font-size="12.5" text-anchor="middle">Dispatch 启动后插入 shared FC1；Combine 启动后插入 shared FC2/TP 通信；最后只在 Add 前等待 shared stream。</text>
+<text x="450" y="272" fill="#fbbf24" font-size="12.5" text-anchor="middle">绿色虚线表示可重叠窗口，不表示两条路径耗时一定相等。</text>
+</svg>
+</div>
+<p>Megatron 的实现不是简单地把整个 shared MLP 丢到另一个 stream：</p>
+<ol>
+  <li><code>pre_forward_comm()</code> 先在 shared stream 做 sequence-parallel All-Gather 和可选 gate。</li>
+  <li>主 stream 启动 token A2A 后，shared stream 执行 FC1 + activation；这样 FC1 覆盖 dispatch。</li>
+  <li>主 stream 启动 combine A2A 后，shared stream 执行 FC2 和 TP Reduce-Scatter；这样 FC2/TP 通信覆盖 combine。</li>
+  <li><code>get_output()</code> 才让主 stream 等待 shared stream，并把两路输出相加。</li>
+</ol>
+<p>反向中，源码还会调整 autograd sequence number 并插入 stream wait，让 routed 路径的通信尽早发射、shared FC 的反向排在正确窗口，避免前向看似并发、反向却重新串行。</p>
+<pre><code class="language-python">--moe-shared-expert-intermediate-size 2048
+--moe-shared-expert-overlap</code></pre>
+<p class="footnote">当前实现要求 dispatcher 为 <code>alltoall</code> 或 <code>flex</code>，且 shared-expert recompute 不能与这条 overlap 路径同时启用。</p>
+
+<h4>2. Batch-level EP overlap：用相邻 micro-batch 的计算覆盖 A2A</h4>
+<p>如果没有 shared expert，仍可利用训练的 1F1B：micro-batch $m+1$ 做 forward 时，micro-batch $m$ 已经可以 backward。Megatron 不再执行完整的 <code>F(m+1)</code> 再执行完整的 <code>B(m)</code>，而是把两者拆到 Transformer layer / schedule node 粒度后共同调度：</p>
+<div class="scroll"><table>
+<tr><th>阶段</th><th>Forward $m+1$</th><th>Backward $m$</th><th>谁覆盖谁</th></tr>
+<tr><td>Warmup</td><td>单独执行第一个 forward</td><td>尚不可用</td><td>没有 overlap，属于不可隐藏尾部</td></tr>
+<tr><td>稳态窗口 A</td><td>发射 routed-token dispatch/combine</td><td>执行 attention / MLP 的反向 GEMM</td><td>Backward compute 覆盖 Forward A2A</td></tr>
+<tr><td>稳态窗口 B</td><td>执行 attention / MLP 的前向 GEMM</td><td>发射 MoE backward 中对应的 combine/dispatch</td><td>Forward compute 覆盖 Backward A2A</td></tr>
+<tr><td>Drain</td><td>已结束</td><td>单独执行最后一个 backward</td><td>没有 overlap，属于不可隐藏尾部</td></tr>
+</table></div>
+<p>这就是 <code>combined_1f1b</code> 的核心：相邻 micro-batch 没有激活依赖，可以把一边的 A2A 放在通信 stream，把另一边的 attention/MLP 放在计算 stream。PP&gt;1 时还要多 warmup 一个 micro-batch，确保进入稳态后配对的 forward 与 backward 真正独立。</p>
+
+<h4>3. 为什么还要 delay wgrad？</h4>
+<p>线性层反向包含两类 GEMM：</p>
+<ul>
+  <li><strong>dgrad</strong>：计算输入梯度，上一层反向立即依赖它，不能随意延后。</li>
+  <li><strong>wgrad</strong>：计算权重梯度，只需在本 step 的 optimizer 更新前完成，调度自由度更高。</li>
+</ul>
+<p><code>--delay-wgrad-compute</code> 把原本绑在一起的 dgrad/wgrad 拆开：先执行关键路径上的 dgrad，把 wgrad 保存成独立 schedule node，等后续 A2A 发射后再拿它填通信窗口。Megatron 的 schedule 用 <code>x.5</code> 节点表示被拆出的 wgrad：</p>
+<div class="code-label">Megatron-LM · pipeline_parallel/schedules.py</div>
+<pre><code class="language-python"># 先把 chunk 展开成逐层 F/B 节点，再插入独立 wgrad 节点
+new_order = get_overlap_moe_expert_parallel_comm_order(
+    order, num_layers_per_chunk, capture_wgrad_graph=True)
+
+# 示例：-3 是 layer 3 backward 的 dgrad，-3.5 是延后的 wgrad
+new_order = [..., -3, -3.5, -2, -2.5, -1, -1.5, ...]</code></pre>
+<pre><code class="language-python">--overlap-moe-expert-parallel-comm
+--delay-wgrad-compute
+
+# 可选：让 A2A stream 使用 CUDA 高优先级
+--high-priority-a2a-comm-stream</code></pre>
+
+<div class="scroll"><table>
+<tr><th>约束 / 代价</th><th>原因</th></tr>
+<tr><td>EP&gt;1，dispatcher 为 <code>alltoall</code> 或 <code>flex</code></td><td>没有 EP A2A 就没有要隐藏的通信</td></tr>
+<tr><td>BF16/FP16；PyTorch ≥ 2.6；<code>CUDA_DEVICE_MAX_CONNECTIONS &gt; 1</code></td><td>当前 combined schedule 与并发通信路径的实现约束</td></tr>
+<tr><td>PP&gt;1 时必须配置 VPP</td><td>需要足够细的 layer/chunk 调度和独立 micro-batch 窗口</td></tr>
+<tr><td>不能与 <code>--moe-shared-expert-overlap</code> 同开</td><td>当前 Megatron 明确将两套 stream/schedule overlap 路径设为互斥</td></tr>
+<tr><td>不能 full/MoE recompute</td><td>重算会破坏保存的 schedule plan、依赖和激活生命周期</td></tr>
+<tr><td>可能提高峰值显存</td><td>相邻 micro-batch 同时在途，延后 wgrad 也让部分输入/激活活得更久</td></tr>
+<tr><td>可能出现 SM/HBM 争抢</td><td>A2A kernel 不是“免费 copy”；若占用太多 SM，反而会拖慢用于遮挡它的 GEMM</td></tr>
+</table></div>
+<div class="callout key"><p><span class="label">怎样确认真的藏住了</span> 看关键路径上的 A2A exposed time，而不只是 NCCL kernel 是否与 GEMM 发生时间重叠。若两者并发后各自都变慢、step time 没降，说明资源竞争抵消了 overlap；应继续调通信 SM 数、A2A stream 优先级或 micro-batch 粒度。</p></div>
+
+<h2 class="section" id="compute"><span class="num">04</span>问题三：专家计算量不少，为什么 GPU 仍吃不满？</h2>
+<h3>问题与成因</h3>
+<p>Dense FFN 用一个大 GEMM 处理所有 token；MoE 则先把 token 拆给不同专家。第 $i$ 个本地专家实际执行：</p>
+<p style="text-align:center;font-size:1.03rem"><strong>$(n_i,H)\times(H,F)$</strong></p>
+<p>其中 $n_i$ 不仅小，而且每步变化。专家数量越多、micro-batch 越小，单专家的 M 维越薄。如果再使用较大的 Expert Tensor Parallel（ETP），$H$ 或 $F$ 也被切窄，同时增加专家内部的 all-gather / reduce-scatter。结果是 FLOPs 看起来不少，但 Tensor Core tile、occupancy 和 kernel launch 都不经济。</p>
+
+<h3>解法 A：Grouped GEMM</h3>
+<p>Grouped GEMM 不要求所有专家拥有相同的 $n_i$，而是把多个不同 M 维的专家 GEMM 作为一组提交，减少逐专家 launch，并由后端统一调度。Megatron 的 <code>TEGroupedMLP</code> 用 Transformer Engine <code>GroupedLinear</code> 同时表达多个本地专家。</p>
+<div class="code-label">Megatron-LM · transformer/moe/experts.py · TEGroupedMLP</div>
+<pre><code class="language-python">class TEGroupedMLP(MegatronModule):
+    """Executes multiple experts in parallel."""
+
+    self.linear_fc1 = GroupedLinear(num_local_experts, H, F, ...)
+    self.linear_fc2 = GroupedLinear(num_local_experts, F, H, ...)</code></pre>
+<pre><code class="language-python">--moe-grouped-gemm</code></pre>
+<p>它主要解决“多个小 GEMM 分别启动”的问题，不能凭空增大单专家 M 维。若每个专家只有极少 token，Grouped GEMM 之后仍可能受小矩阵效率限制。</p>
+
+<h3>解法 B：先调并行粒度，再调 kernel</h3>
+<div class="scroll"><table>
+<tr><th>手段</th><th>为什么有效</th><th>需要检查</th></tr>
+<tr><td><strong>能放下时优先 ETP=1</strong></td><td>保留完整 H/F 维，避免专家内部 TP 通信</td><td>单卡专家权重与 optimizer state 是否放得下</td></tr>
+<tr><td><strong>增加每次参与路由的 token</strong></td><td>提高每专家期望 $n_i\approx T\cdot k/E$</td><td>micro-batch、序列长度、梯度累积和显存的联动</td></tr>
+<tr><td><strong>量化 routing-map padding</strong></td><td>把专家 M 维对齐到 16/32 等 tile，减少 FP8/FP4 量化与 GEMM 尾块浪费</td><td>padding 的额外 FLOPs 是否小于 kernel 收益</td></tr>
+<tr><td><strong>融合 FC1 + activation + FC2</strong></td><td>减少中间张量落 HBM 和 launch</td><td>Transformer Engine 版本、激活函数和配置是否满足融合约束</td></tr>
+</table></div>
+<pre><code class="language-python">--expert-tensor-parallel-size 1
+--moe-router-padding-for-quantization
+--use-transformer-engine-op-fuser</code></pre>
+
+<h2 class="section" id="dynamic"><span class="num">05</span>问题四：router 不重，为什么重排、动态 shape 和显存仍很贵？</h2>
+<h3>问题与成因</h3>
+<p>Router 的投影本身通常不大，贵的是它产生了一张动态路由图。标准 A2A dispatcher 要完成两级重排：先按目标 EP rank 排列 token，A2A 后再按本地 expert 排列；combine 时反向恢复原 token 顺序。Megatron 的源码注释把完整流程列成：</p>
+<ol>
+  <li>preprocess counts / splits；</li>
+  <li>permute → EP All-to-All；</li>
+  <li>必要时 TP All-Gather → 按 local expert 再排序；</li>
+  <li>专家计算；</li>
+  <li>逆排序 → TP Reduce-Scatter → EP All-to-All → unpermute。</li>
+</ol>
+<p>Dropless 下本地发出的 assignment 总数通常是固定的 $T\cdot k$，但每个 rank 接收多少、每个本地专家分到多少仍是动态的。因此 expert GEMM 的 M 维、接收 buffer 和部分 metadata 会波动；这会带来索引读写、临时内存、同步点，并让完整 CUDA Graph 捕获变难。</p>
+
+<h3>解法 A：融合 router 与 permutation</h3>
+<pre><code class="language-python">--moe-router-fusion
+--moe-permute-fusion</code></pre>
+<p><code>router-fusion</code> 把 score、top-k 和相关路由操作压成更少 kernel；<code>permute-fusion</code> 融合索引生成、复制与逆重排。它们减少的是 launch、中间读写和额外 buffer，不会减少 top-k 产生的 A2A payload。</p>
+
+<h3>解法 B：用 padding 换静态形状，或只捕获稳定模块</h3>
+<div class="scroll"><table>
+<tr><th>策略</th><th>收益</th><th>代价</th></tr>
+<tr><td>Dropless 动态 shape</td><td>不丢 assignment，不按固定 capacity 空算</td><td>专家 M 维和接收量动态，Graph 与 buffer 管理更复杂</td></tr>
+<tr><td>Capacity + pad</td><td>固定专家输入 shape，最坏显存可控，更适合 CUDA Graph</td><td>空算；capacity 不足时还会 drop</td></tr>
+<tr><td>只 capture attention</td><td>保留 MoE 动态性，同时消除稠密区 launch</td><td>MoE 部分仍在 Graph 外</td></tr>
+</table></div>
+<pre><code class="language-python"># 固定 MoE shape
+--moe-expert-capacity-factor 1.2
+--moe-pad-expert-input-to-capacity
+
+# 或让动态 MoE 留在图外
+--cuda-graph-impl transformer_engine
+--cuda-graph-modules attn</code></pre>
+
+<h3>解法 C：显存不够时，只重算 / 卸载最贵的 expert activation</h3>
+<p>MoE 激活会被 top-k 扩张，还要保留 permutation mapping 和通信 buffer。Megatron 支持按模块重算 <code>moe_act</code>，也支持把 <code>expert_fc1</code>、<code>moe_act</code> 等激活异步 offload 到 CPU。前者用额外计算换显存，后者用 PCIe/NVLink-C2C 带宽换显存。</p>
+<pre><code class="language-python">--recompute-granularity selective
+--recompute-modules moe_act
+
+# 或细粒度 activation offload
+--fine-grained-activation-offloading
+--offload-modules expert_fc1 moe_act</code></pre>
+
+<h2 class="section" id="workflow"><span class="num">06</span>把问题映射到方案：一条可执行的优化顺序</h2>
+<div class="scroll"><table>
+<tr><th>Profile 证据</th><th>先验证什么</th><th>第一候选方案</th><th>不要先做什么</th></tr>
+<tr><td>per-rank token 数严重偏斜</td><td>每层 max/mean、持续热点、统计组是否正确</td><td>aux loss / expert bias；再看 placement</td><td>先换通信 backend</td></tr>
+<tr><td>A2A 随跨节点扩展急剧变慢</td><td>EP rank 拓扑、消息大小、跨域比例</td><td>group-limited routing、Flex + DeepEP/HybridEP</td><td>盲目继续增大 EP</td></tr>
+<tr><td>A2A 已接近链路上限且占主导</td><td>payload 是否符合 $T k H b$ 估算</td><td>FP8、模型允许时调整 top-k、shared/batch overlap</td><td>只做 permute fusion</td></tr>
+<tr><td>大量小 GEMM、SM 利用率低</td><td>每专家 $n_i$、ETP、tile 对齐</td><td>Grouped GEMM、ETP=1、增大 token 粒度、padding</td><td>先做复杂 schedule overlap</td></tr>
+<tr><td>timeline 有 D2H / host gap</td><td>counts/splits 同步点、动态 buffer</td><td>permute fusion、capacity/padding、Flex backend</td><td>把空洞全部归因于网络</td></tr>
+<tr><td>显存峰值随路由波动</td><td>热点层、dispatch buffer、保存的 expert activation</td><td>先均衡；再 capacity、<code>moe_act</code> recompute/offload</td><td>只看平均 allocated memory</td></tr>
+</table></div>
+
+<ol>
+  <li><strong>固定 baseline</strong>：模型、并行度、micro-batch、序列长度和路由输入不变，丢掉 warmup，比较稳态中位数与 P90。</li>
+  <li><strong>先处理负载</strong>：它同时影响通信、计算和等待，是其他测量成立的前提。</li>
+  <li><strong>再修本地计算粒度</strong>：Grouped GEMM、ETP 和 token/expert 数决定 GEMM 能否吃满。</li>
+  <li><strong>再处理拓扑与字节</strong>：检查 EP group 放置，选择 dispatcher，评估 FP8 与分组路由。</li>
+  <li><strong>最后做 overlap</strong>：只有确认存在独立计算窗口后，才值得承担更复杂调度和更高显存。</li>
+</ol>
+<div class="callout key"><p><span class="label">验收标准</span> 优化必须同时满足：稳态 step time / tokens/s 改善，loss 与模型质量可接受，drop rate 和显存峰值在预算内。单个 NCCL kernel 变短、某个 GEMM TFLOPS 变高或 timeline 看起来更并发，都不能单独证明端到端加速。</p></div>
+
+<div class="callout key">
+<p><span class="label">✅ 学完自测</span></p>
+<p>1. 为什么负载不均会同时放大 A2A、GEMM 和 rank 等待？<br>
+2. aux loss、expert bias 与 capacity 各自在哪一层解决问题？<br>
+3. A2A payload 为什么近似正比于 $T\cdot k\cdot H\cdot b$？<br>
+4. DeepEP 为什么能减少跨节点冗余副本？HybridEP 又把融合边界扩到了哪里？<br>
+5. Grouped GEMM 能消除 launch 开销，为什么仍不能保证小专家高效？<br>
+6. Shared expert overlap 与 batch-level overlap 分别利用哪一种独立性？<br>
+7. delay wgrad 为什么不阻塞上一层反向，却能制造更大的通信遮挡窗口？<br>
+8. Dropless 下本地 assignment 总数固定，为什么专家 GEMM shape 仍然动态？</p>
+</div>
+
+<div class="chap-nav">
+  <a href="#" onclick="parent.location.hash='#/ep-source';return false;"><div class="nl">← EP 三部曲 · 上一篇</div><div class="nt">M6-2 · Megatron EP 源码</div></a>
+  <a class="next" href="#" onclick="parent.location.hash='#/nd';return false;"><div class="nl">下一模块 →</div><div class="nt">M7 · nD 组合 + 工程</div></a>
+</div>
+
+<footer>
+  <p>并行训练学习手册 · M6-3 EP 性能篇 · <code>infra/parallize/06-ep-performance</code></p>
+  <p class="footnote">源码基线：NVIDIA/Megatron-LM <code>88894e3ee</code>。主要参考 <a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/transformer/moe/router.py">router.py</a>、<a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/transformer/moe/token_dispatcher.py">token_dispatcher.py</a>、<a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/transformer/moe/fused_a2a.py">fused_a2a.py</a>、<a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/transformer/moe/shared_experts.py">shared_experts.py</a>、<a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/pipeline_parallel/combined_1f1b.py">combined_1f1b.py</a>、<a href="https://github.com/NVIDIA/Megatron-LM/blob/88894e3ee06a26861fcd11143566577f216d5adf/megatron/core/pipeline_parallel/schedules.py">schedules.py</a>，以及 DeepEP 的 <a href="https://github.com/deepseek-ai/DeepEP">主线说明</a>与 <a href="https://github.com/deepseek-ai/DeepEP/tree/hybrid-ep">HybridEP 分支</a>。参数与后端会随版本变化，性能结论需在目标模型、拓扑和稳态 workload 上重新验证。</p>
+</footer>
+</div>
+<script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -145,17 +145,19 @@
 
 ---
 
-## Module 6 · 专家并行 EP（Expert Parallel · MoE）★★★★☆
+## Module 6 · 专家并行 EP 三部曲（Expert Parallel · MoE）★★★★☆
 
-**核心问题：MoE 模型专家很多，把**不同专家**放到不同卡。**
+**核心问题：MoE 如何把专家切到不同卡，Megatron 如何执行，性能瓶颈又如何定位和优化？**
 
-- MoE 简介：router / gating、top-k 路由、稀疏激活
-- **EP**：不同 expert 放不同卡，靠 `all-to-all` 做 token 的 dispatch / combine
-- 与 TP/DP 组合：EP×TP、容量因子 capacity factor、负载均衡 loss
-  - **负载均衡 aux_loss 深入** 👉 **本系列已发布：[moe_aux_loss](./moe_aux_loss/)**（mindformers pynative 与 Megatron-LM 逐行对照）
-- 工程难点：token 分布不均导致的通信倾斜
+- **M6-1 原理篇**：[EP 原理：路由、分发与负载均衡](./06-ep/)
+  - MoE、top-k、稀疏激活、dispatch / combine、capacity、aux loss、expert bias
+- **M6-2 源码篇**：[Megatron EP Router、Dispatcher 与 Experts 执行链路](./06-ep-source/)
+  - `MoELayer → Router → TokenDispatcher → Experts`、关键函数下钻、张量 shape 与执行不变量
+- **M6-3 性能篇**：[EP 加速：通信、计算与重叠](./06-ep-performance/)
+  - 负载长尾、A2A 字节与拓扑、Grouped GEMM、DeepEP/Flex、overlap、CUDA Graph
+- **专题深入**：[MoE 负载均衡 aux_loss](./moe_aux_loss/)（MindFormers pynative 与 Megatron-LM 对照）
 
-> ✅ **学完自测**：MoE 的 all-to-all 在传什么？专家负载不均会怎样？负载均衡 aux_loss 里哪一项带梯度、哪一项是 detach 的计数？（→ 读 moe_aux_loss）
+> ✅ **学完自测**：能否从 token 路由一路解释到 Megatron buffer，再根据 profile 判断应优化负载、通信、GEMM 还是 overlap？
 
 ---
 
@@ -185,7 +187,9 @@
 | M3 深入 | 词表并行交叉熵 Loss Parallel | [`loss_parallel/`](./loss_parallel/) | ✅ 已发布 |
 | M4 | 流水线并行 PP | [`04-pp/`](./04-pp/) | ✅ 已发布 |
 | M5 | 上下文并行 CP | [`05-cp/`](./05-cp/) | ✅ 已发布 |
-| M6 | 专家并行 EP | [`06-ep/`](./06-ep/) | ✅ 已发布 |
+| M6-1 | EP 原理篇 | [`06-ep/`](./06-ep/) | ✅ 已发布 |
+| M6-2 | Megatron EP 源码篇 | [`06-ep-source/`](./06-ep-source/) | ✅ 已发布 |
+| M6-3 | EP 性能优化篇 | [`06-ep-performance/`](./06-ep-performance/) | ✅ 已发布 |
 | M6 深入 | MoE 负载均衡 aux_loss（mindformers vs Megatron） | [`moe_aux_loss/`](./moe_aux_loss/) | ✅ 已发布 |
 | M7 | nD 组合并行 + 工程 | [`07-nd/`](./07-nd/) | ✅ 已发布 |
 
