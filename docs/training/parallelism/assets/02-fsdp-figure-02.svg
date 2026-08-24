@@ -24,13 +24,13 @@
   <g text-anchor="middle">
     <rect x="14"  y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="86"  y="60" fill="#cdd5ff" font-size="14">参数：全量常驻</text><text x="86"  y="80" fill="#9aa3b2" font-size="12">2P · 不切</text>
     <rect x="171" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="243" y="60" fill="#d7dbe4" font-size="14">forward</text><text x="243" y="80" fill="#9aa3b2" font-size="12">直接算 · 无通信</text>
-    <rect x="328" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="400" y="60" fill="#d7dbe4" font-size="14">backward</text><text x="400" y="80" fill="#9aa3b2" font-size="12">算全量梯度</text>
-    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(251,191,36,0.14)" stroke="#fbbf24"/><text x="557" y="60" fill="#fde68a" font-size="14">all-reduce / RS</text><text x="557" y="80" fill="#9aa3b2" font-size="12">FP32 梯度 · 常驻 4P</text>
-    <rect x="642" y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="714" y="60" fill="#cdd5ff" font-size="14">step + all-gather</text><text x="714" y="80" fill="#9aa3b2" font-size="12">更新1/N→拼回参数</text>
+    <rect x="328" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="400" y="60" fill="#d7dbe4" font-size="14">backward</text><text x="400" y="80" fill="#9aa3b2" font-size="12">生成全尺寸 grad buffer</text>
+    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(251,191,36,0.14)" stroke="#fbbf24"/><text x="557" y="60" fill="#fde68a" font-size="14">reduce-scatter</text><text x="557" y="80" fill="#9aa3b2" font-size="12">只产出本 rank 的 1/N</text>
+    <rect x="642" y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="714" y="60" fill="#cdd5ff" font-size="14">更新参数 shard</text><text x="714" y="80" fill="#9aa3b2" font-size="12">all-gather 拼回全量</text>
     <line x1="159" y1="64" x2="171" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="316" y1="64" x2="328" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="473" y1="64" x2="485" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
     <line x1="630" y1="64" x2="642" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z1)"/>
   </g>
-  <text x="14" y="118" fill="#fbbf24" font-size="13">参数、梯度都<tspan font-weight="700">全量常驻</tspan>；只有优化器状态降到 1/N。Megatron 用 RS + 参数 AG 实现更新同步。</text>
+  <text x="14" y="118" fill="#fbbf24" font-size="13">有效梯度与 buffer 容量要分开：RS 后只用 1/N，但 ZeRO-1 的全尺寸梯度 buffer（4P）仍在。</text>
 </svg>

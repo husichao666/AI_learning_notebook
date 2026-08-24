@@ -51,14 +51,21 @@ ZeRO 切的是**静态显存**——每 step 都常驻、内容在各卡完全�
 三个阶段每个 step 都是同一套骨架——**forward → backward → 同步梯度 → 更新 → 拼回完整参数**——区别只在**谁被切、何时做 all-gather**。逐个看：
 
 
-### ZeRO-1：参数、梯度全量常驻，只切优化器状态
+### ZeRO-1：参数副本与梯度 buffer 仍是全尺寸，只切优化器状态
 
-参数在每张卡上是**完整**的，所以前向/反向都不需要临时 all-gather，直接算。经典 ZeRO-1 可以用 all-reduce 得到全量平均梯度；Megatron DistributedOptimizer 则用 reduce-scatter 归约每个 rank 负责的区间，但仍保留全尺寸 FP32 梯度 buffer。每张卡**只用自己那 $1/N$** 去更新它负责的参数、master 参数和 Adam 状态，随后 all-gather 更新后的 BF16 参数，供下一个 step 使用。
+这里要分清两个概念：**reduce-scatter 的输出是分片的**，但这不等于**梯度 buffer 的显存分配已经分片**。以 Megatron DistributedOptimizer 为例，一个 step 可以拆成四步：
+
+1. **前向与反向：** 每张卡都有完整 BF16 参数，因此不需要临时 all-gather 参数；反向会为全部参数生成本地梯度，并写入全尺寸 FP32 梯度 buffer。
+2. **梯度同步：** reduce-scatter 把这份逻辑上的完整梯度切成 $N$ 段并完成跨 DP rank 归约；通信结束后，rank $r$ **只得到最终梯度的第 $r$ 段，即 $1/N$ 的有效梯度**。
+3. **局部更新：** rank $r$ 只用这段梯度，更新自己负责的 $1/N$ BF16 参数分片、FP32 master 参数分片以及对应的 Adam 状态；其他参数分片由其他 rank 更新。
+4. **参数同步：** 各 rank 对更新后的 BF16 参数分片执行 all-gather，重新拼成完整参数副本，供下一个 step 的前向使用。
+
+所以你的理解是对的：**reduce-scatter 之后每张卡只用部分梯度、更新部分参数**。它仍叫 ZeRO-1，是因为 ZeRO 阶段按“长期占用多少模型状态显存”分类：Megatron 的实现虽然只使用归约结果中的 $1/N$，但输入 reduce-scatter 的全尺寸梯度 buffer 仍然分配着，梯度显存还是 $4P$；到了 ZeRO-2，才会让非本 rank 的梯度 bucket 及时释放，使梯度存储真正降到 $4P/N$。
 
 
 ![ZeRO-1 一个 step 的流程](assets/02-fsdp-figure-02.svg)
 
-*ZeRO-1：参数、梯度都全量常驻，只有优化器状态降到 1/N。前向/反向无需 all-gather。*
+*ZeRO-1（Megatron 实现）：reduce-scatter 后每个 rank 只使用 $1/N$ 的最终梯度并更新对应参数分片，再 all-gather 拼回完整参数；但梯度 buffer 仍按全尺寸分配。*
 
 
 
