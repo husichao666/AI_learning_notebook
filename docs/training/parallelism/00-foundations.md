@@ -184,7 +184,7 @@ $$
 T_{\mathrm{comm}}\approx S\alpha+\frac{V_{\mathrm{rank}}}{B_{\mathrm{eff}}}+T_{\mathrm{reduce}}
 $$
 
-其中 $S$ 是通信轮数，$\alpha$ 是每轮延迟，$B_{\mathrm{eff}}$ 是有效带宽。于是大张量更在意第二项，小张量更容易被 $S\alpha$ 支配。这正是同一个 collective 需要多种底层算法的原因。
+其中 $S$ 是通信轮数，$\alpha$ 是每轮延迟，$B_{\mathrm{eff}}$ 是有效带宽，$T_{\mathrm{reduce}}$ 是归约类 collective 在本地执行逐元素求和等运算、且未被通信重叠隐藏的时间；非归约类 collective 可将它视为 0。于是大张量更在意第二项，小张量更容易被 $S\alpha$ 支配。这正是同一个 collective 需要多种底层算法的原因。
 
 ### 原语不等于算法：all-reduce 底下不只有 ring
 
