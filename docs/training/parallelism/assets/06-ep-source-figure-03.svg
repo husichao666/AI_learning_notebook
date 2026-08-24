@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 400" role="img" aria-label="All-to-All Dispatcher 主干流程">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+<defs><marker id="disp-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#7c93ff"/></marker></defs>
+<text x="460" y="30" fill="#eaeefb" font-size="19" font-weight="700" text-anchor="middle">Dispatcher：送到专家，再送回来源</text>
+<text x="28" y="69" fill="#aab6ff" font-size="15" font-weight="700">Dispatch</text>
+
+<rect x="28" y="86" width="176" height="76" rx="12" fill="#17213b" stroke="#4967e8"/>
+<text x="116" y="116" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">① 统计收发量</text>
+<text x="116" y="143" fill="#fff" font-size="14" text-anchor="middle">每张卡收发多少 token</text>
+
+<rect x="256" y="86" width="176" height="76" rx="12" fill="#17213b" stroke="#4967e8"/>
+<text x="344" y="116" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">② 按目标专家排序</text>
+<text x="344" y="143" fill="#fff" font-size="14" text-anchor="middle">相同去向放在一起</text>
+
+<rect x="484" y="86" width="176" height="76" rx="12" fill="#24377e" stroke="#7c93ff"/>
+<text x="572" y="116" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">③ EP All-to-All</text>
+<text x="572" y="143" fill="#dbe4ff" font-size="14" text-anchor="middle">跨卡交换 token</text>
+
+<rect x="712" y="86" width="176" height="76" rx="12" fill="#17213b" stroke="#4967e8"/>
+<text x="800" y="116" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">④ 按本地专家收齐</text>
+<text x="800" y="143" fill="#fff" font-size="14" text-anchor="middle">为 Grouped GEMM 排好</text>
+
+<rect x="712" y="196" width="176" height="66" rx="12" fill="#14251d" stroke="#4ade80"/>
+<text x="800" y="224" fill="#86efac" font-size="15" font-weight="700" text-anchor="middle">⑤ Experts 计算</text>
+<text x="800" y="248" fill="#fff" font-size="14" text-anchor="middle">专家 MLP</text>
+
+<text x="28" y="300" fill="#86efac" font-size="15" font-weight="700">Combine</text>
+
+<rect x="712" y="316" width="176" height="66" rx="12" fill="#14251d" stroke="#4ade80"/>
+<text x="800" y="344" fill="#86efac" font-size="15" font-weight="700" text-anchor="middle">⑥ 撤销本地排序</text>
+<text x="800" y="368" fill="#fff" font-size="14" text-anchor="middle">恢复来源分组</text>
+
+<rect x="484" y="316" width="176" height="66" rx="12" fill="#1e6443" stroke="#4ade80"/>
+<text x="572" y="344" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">⑦ EP All-to-All</text>
+<text x="572" y="368" fill="#d8ffe6" font-size="14" text-anchor="middle">结果返回原卡</text>
+
+<rect x="256" y="316" width="176" height="66" rx="12" fill="#14251d" stroke="#4ade80"/>
+<text x="344" y="344" fill="#86efac" font-size="15" font-weight="700" text-anchor="middle">⑧ 合并 top-k</text>
+<text x="344" y="368" fill="#fff" font-size="14" text-anchor="middle">累加同一 token 的结果</text>
+
+<rect x="28" y="316" width="176" height="66" rx="12" fill="#202a4c" stroke="#7c93ff"/>
+<text x="116" y="344" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">输出 tokens</text>
+<text x="116" y="368" fill="#9aa3b2" font-size="14" text-anchor="middle">恢复原顺序</text>
+
+<g stroke="#7c93ff" stroke-width="2.2" marker-end="url(#disp-arrow)">
+<line x1="204" y1="124" x2="253" y2="124"/>
+<line x1="432" y1="124" x2="481" y2="124"/>
+<line x1="660" y1="124" x2="709" y2="124"/>
+<line x1="800" y1="162" x2="800" y2="193"/>
+<line x1="800" y1="262" x2="800" y2="313"/>
+<line x1="712" y1="349" x2="663" y2="349"/>
+<line x1="484" y1="349" x2="435" y2="349"/>
+<line x1="256" y1="349" x2="207" y2="349"/>
+</g>
+</svg>

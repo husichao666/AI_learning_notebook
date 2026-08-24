@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 260" role="img" aria-label="TopKRouter 主干流程">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+<defs><marker id="router-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#f59e66"/></marker></defs>
+<text x="460" y="31" fill="#eaeefb" font-size="19" font-weight="700" text-anchor="middle">Router：决定 token 去哪些专家</text>
+
+<rect x="22" y="78" width="138" height="82" rx="12" fill="#202a4c" stroke="#7c93ff"/>
+<text x="91" y="111" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">输入 tokens</text>
+<text x="91" y="139" fill="#9aa3b2" font-size="14" text-anchor="middle">[S,B,H]</text>
+
+<rect x="190" y="78" width="160" height="82" rx="12" fill="#251e18" stroke="#b9703f"/>
+<text x="270" y="111" fill="#ffcfaa" font-size="15" font-weight="700" text-anchor="middle">① Gating 打分</text>
+<text x="270" y="139" fill="#fff" font-size="14" text-anchor="middle">每个 token 对所有专家</text>
+
+<rect x="380" y="78" width="160" height="82" rx="12" fill="#211c28" stroke="#a56be8"/>
+<text x="460" y="111" fill="#d8b4fe" font-size="15" font-weight="700" text-anchor="middle">② Top-k 选择</text>
+<text x="460" y="139" fill="#fff" font-size="14" text-anchor="middle">选 k 个专家</text>
+
+<rect x="570" y="78" width="160" height="82" rx="12" fill="#251e18" stroke="#b9703f"/>
+<text x="650" y="111" fill="#ffcfaa" font-size="15" font-weight="700" text-anchor="middle">③ 计算权重</text>
+<text x="650" y="139" fill="#fff" font-size="14" text-anchor="middle">决定结果如何混合</text>
+
+<rect x="760" y="78" width="138" height="82" rx="12" fill="#202a4c" stroke="#7c93ff"/>
+<text x="829" y="111" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">输出路由</text>
+<text x="829" y="139" fill="#fff" font-size="14" text-anchor="middle">probs + map</text>
+
+<g stroke="#f59e66" stroke-width="2.2" marker-end="url(#router-arrow)">
+<line x1="160" y1="119" x2="187" y2="119"/>
+<line x1="350" y1="119" x2="377" y2="119"/>
+<line x1="540" y1="119" x2="567" y2="119"/>
+<line x1="730" y1="119" x2="757" y2="119"/>
+</g>
+
+<rect x="286" y="196" width="348" height="42" rx="21" fill="#14251d" stroke="#4ade80"/>
+<text x="460" y="223" fill="#86efac" font-size="14" font-weight="700" text-anchor="middle">训练时可再做容量限制与负载均衡</text>
+</svg>

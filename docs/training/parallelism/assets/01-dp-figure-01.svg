@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 348" role="img" aria-label="数据并行：两张 GPU 各喂一条数据，前向→反向→更新，反向间 all-reduce 同步梯度">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/></marker>
+        <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c93ff"/></marker></defs>
+
+  <!-- 列标题 -->
+  <text x="120" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">数据分片</text>
+  <text x="246" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">前向</text>
+  <text x="372" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">反向</text>
+  <text x="648" y="28" text-anchor="middle" fill="#9aa3b2" font-size="15">更新</text>
+
+  <!-- GPU 0 lane -->
+  <rect x="8" y="46" width="712" height="92" rx="14" fill="#12151d" stroke="#2f3650"/>
+  <text x="22" y="98" fill="#aab6ff" font-size="16" font-weight="700">GPU 0</text>
+  <rect x="72"  y="68" width="96"  height="48" rx="8" fill="#1c2030" stroke="#475569"/><text x="120" y="98" text-anchor="middle" fill="#d7dbe4" font-size="15">数据 x₀</text>
+  <rect x="192" y="68" width="108" height="48" rx="8" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="246" y="98" text-anchor="middle" fill="#cdd5ff" font-size="15">forward</text>
+  <rect x="312" y="68" width="120" height="48" rx="8" fill="rgba(74,222,128,0.14)" stroke="#4ade80"/><text x="372" y="92" text-anchor="middle" fill="#bbf7d0" font-size="15">backward</text><text x="372" y="110" text-anchor="middle" fill="#86efac" font-size="12.5">→ 梯度 g₀</text>
+  <rect x="578" y="68" width="140" height="48" rx="8" fill="rgba(251,191,36,0.12)" stroke="#fbbf24"/><text x="648" y="92" text-anchor="middle" fill="#fde68a" font-size="14.5">optimizer.step</text><text x="648" y="110" text-anchor="middle" fill="#fbbf24" font-size="12.5">用 ḡ 更新</text>
+  <line x1="168" y1="92" x2="190" y2="92" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="300" y1="92" x2="310" y2="92" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- GPU 1 lane -->
+  <rect x="8" y="216" width="712" height="92" rx="14" fill="#12151d" stroke="#2f3650"/>
+  <text x="22" y="268" fill="#aab6ff" font-size="16" font-weight="700">GPU 1</text>
+  <rect x="72"  y="238" width="96"  height="48" rx="8" fill="#1c2030" stroke="#475569"/><text x="120" y="268" text-anchor="middle" fill="#d7dbe4" font-size="15">数据 x₁</text>
+  <rect x="192" y="238" width="108" height="48" rx="8" fill="rgba(124,147,255,0.14)" stroke="#7c93ff"/><text x="246" y="268" text-anchor="middle" fill="#cdd5ff" font-size="15">forward</text>
+  <rect x="312" y="238" width="120" height="48" rx="8" fill="rgba(74,222,128,0.14)" stroke="#4ade80"/><text x="372" y="262" text-anchor="middle" fill="#bbf7d0" font-size="15">backward</text><text x="372" y="280" text-anchor="middle" fill="#86efac" font-size="12.5">→ 梯度 g₁</text>
+  <rect x="578" y="238" width="140" height="48" rx="8" fill="rgba(251,191,36,0.12)" stroke="#fbbf24"/><text x="648" y="262" text-anchor="middle" fill="#fde68a" font-size="14.5">optimizer.step</text><text x="648" y="280" text-anchor="middle" fill="#fbbf24" font-size="12.5">用 ḡ 更新</text>
+  <line x1="168" y1="262" x2="190" y2="262" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="300" y1="262" x2="310" y2="262" stroke="#64748b" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- AllReduce 节点（横跨两条 lane 之间）-->
+  <rect x="450" y="150" width="146" height="64" rx="12" fill="rgba(124,147,255,0.2)" stroke="#7c93ff" stroke-width="1.5"/>
+  <text x="523" y="174" text-anchor="middle" fill="#cdd5ff" font-size="16" font-weight="700">AllReduce</text>
+  <text x="523" y="194" text-anchor="middle" fill="#fff" font-size="14">ḡ = (g₀ + g₁) / 2</text>
+  <text x="523" y="209" text-anchor="middle" fill="#9aa3b2" font-size="12">两卡得到同一份 ḡ</text>
+
+  <!-- 反向 → AllReduce -->
+  <path d="M432 104 C 444 120, 448 148, 450 164" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="432" y="134" fill="#7c93ff" font-size="13">g₀</text>
+  <path d="M432 250 C 444 234, 448 208, 450 200" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="432" y="234" fill="#7c93ff" font-size="13">g₁</text>
+  <!-- AllReduce → 更新 -->
+  <path d="M596 168 C 614 140, 580 108, 578 92" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <path d="M596 196 C 614 224, 580 246, 578 262" fill="none" stroke="#7c93ff" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="612" y="186" text-anchor="middle" fill="#7c93ff" font-size="13">ḡ</text>
+
+  <text x="20" y="338" fill="#fbbf24" font-size="14">两卡各喂一条数据，<tspan font-weight="700">并行</tspan>跑前向/反向；反向产出的 g₀、g₁ 经 AllReduce 求平均成 ḡ，两卡用<tspan font-weight="700"> 同一份 ḡ </tspan>更新 → 模型始终一致。</text>
+</svg>

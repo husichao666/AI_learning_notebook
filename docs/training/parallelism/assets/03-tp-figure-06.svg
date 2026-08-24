@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430" role="img" aria-label="Transformer layer 的 TP 切分与通信位置">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+  <defs><marker id="tarr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="20" y="28" fill="#eaeefb" font-size="16" font-weight="700">一个 dense Transformer layer（前向）</text>
+  <line x1="83" y1="65" x2="83" y2="382" stroke="#475569" stroke-width="2"/>
+  <g text-anchor="middle">
+    <rect x="30" y="50" width="106" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="83" y="75" fill="#fff" font-size="12.5">hidden states</text>
+    <rect x="180" y="50" width="135" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="247" y="75" fill="#d7dbe4" font-size="12.5">RMSNorm</text>
+    <line x1="136" y1="70" x2="176" y2="70" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="350" y="50" width="170" height="40" rx="8" fill="rgba(124,147,255,.14)" stroke="#7c93ff"/><text x="435" y="67" fill="#cdd5ff" font-size="12.5">QKV · Column</text><text x="435" y="82" fill="#9aa3b2" font-size="10.5">按 Q/K/V heads 切</text>
+    <line x1="315" y1="70" x2="346" y2="70" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="555" y="50" width="120" height="40" rx="8" fill="rgba(124,147,255,.08)" stroke="#7c93ff"/><text x="615" y="75" fill="#cdd5ff" font-size="12.5">Local Attention</text>
+    <line x1="520" y1="70" x2="551" y2="70" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="710" y="50" width="150" height="40" rx="8" fill="rgba(255,138,76,.12)" stroke="#ff8a4c"/><text x="785" y="67" fill="#ffd9a8" font-size="12.5">O proj · Row</text><text x="785" y="82" fill="#9aa3b2" font-size="10.5">输出部分和</text>
+    <line x1="675" y1="70" x2="706" y2="70" stroke="#64748b" marker-end="url(#tarr)"/>
+
+    <line x1="785" y1="90" x2="785" y2="122" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="692" y="128" width="186" height="48" rx="9" fill="rgba(251,191,36,.14)" stroke="#fbbf24"/>
+    <text x="785" y="149" fill="#fde68a" font-size="12.5" font-weight="700">通信点 ① · all-reduce</text><text x="785" y="166" fill="#9aa3b2" font-size="10.5">合并 attention 输出</text>
+    <line x1="692" y1="152" x2="130" y2="152" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="30" y="132" width="100" height="40" rx="8" fill="rgba(74,222,128,.09)" stroke="#4ade80"/><text x="80" y="157" fill="#bbf7d0" font-size="12.5">+ residual</text>
+
+    <rect x="180" y="220" width="135" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="247" y="245" fill="#d7dbe4" font-size="12.5">RMSNorm</text>
+    <line x1="83" y1="172" x2="83" y2="240" stroke="#64748b"/><line x1="83" y1="240" x2="176" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="350" y="220" width="170" height="40" rx="8" fill="rgba(124,147,255,.14)" stroke="#7c93ff"/><text x="435" y="237" fill="#cdd5ff" font-size="12.5">FC1 / gate+up · Column</text><text x="435" y="252" fill="#9aa3b2" font-size="10.5">FFN hidden 切分</text>
+    <line x1="315" y1="240" x2="346" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="555" y="220" width="120" height="40" rx="8" fill="rgba(124,147,255,.08)" stroke="#7c93ff"/><text x="615" y="245" fill="#cdd5ff" font-size="12.5">GeLU / SwiGLU</text>
+    <line x1="520" y1="240" x2="551" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="710" y="220" width="150" height="40" rx="8" fill="rgba(255,138,76,.12)" stroke="#ff8a4c"/><text x="785" y="237" fill="#ffd9a8" font-size="12.5">FC2 / down · Row</text><text x="785" y="252" fill="#9aa3b2" font-size="10.5">输出部分和</text>
+    <line x1="675" y1="240" x2="706" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+
+    <line x1="785" y1="260" x2="785" y2="292" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="692" y="298" width="186" height="48" rx="9" fill="rgba(251,191,36,.14)" stroke="#fbbf24"/>
+    <text x="785" y="319" fill="#fde68a" font-size="12.5" font-weight="700">通信点 ② · all-reduce</text><text x="785" y="336" fill="#9aa3b2" font-size="10.5">合并 MLP 输出</text>
+    <line x1="692" y1="322" x2="130" y2="322" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="30" y="302" width="100" height="40" rx="8" fill="rgba(74,222,128,.09)" stroke="#4ade80"/><text x="80" y="327" fill="#bbf7d0" font-size="12.5">+ residual</text>
+    <line x1="80" y1="342" x2="80" y2="370" stroke="#64748b" marker-end="url(#tarr)"/>
+    <rect x="30" y="378" width="100" height="38" rx="8" fill="#1c2030" stroke="#64748b"/><text x="80" y="402" fill="#fff" font-size="12.5">next layer</text>
+  </g>
+  <text x="180" y="385" fill="#9aa3b2" font-size="12.5">蓝色 = Column / 本地；橙色 = Row / 部分和；黄色 = 必须同步后才能进入残差路径。</text>
+  <text x="180" y="408" fill="#fbbf24" font-size="12.5">普通 TP 前向恰好 2 次 all-reduce：Attention 出口 1 次 + MLP 出口 1 次。</text>
+</svg>

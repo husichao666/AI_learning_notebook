@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 600" role="img" aria-label="8 张 GPU 在稠密区按 TP2 DP4 分组，在稀疏专家区按 EP4 expert-DP2 重新分组">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+<defs><marker id="group-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#7c93ff"/></marker></defs>
+<text x="390" y="30" fill="#eaeefb" font-size="17" font-weight="700" text-anchor="middle">同样 8 张 GPU，在 dense 与 sparse 区使用两套分组</text>
+<text x="390" y="54" fill="#9aa3b2" font-size="12.5" text-anchor="middle">dense: TP2 × DP4 = 8　　sparse: EP4 × expert-DP2 = 8</text>
+
+<!-- Dense groups -->
+<text x="32" y="88" fill="#cdd5ff" font-size="15" font-weight="700">稠密 Attention / MLP：4 份 DP 副本，每份由 2 张卡做 TP</text>
+<rect x="28" y="102" width="724" height="158" rx="14" fill="#12151d" stroke="#5b6bb0"/>
+<rect x="46" y="122" width="158" height="112" rx="11" fill="#18203a" stroke="#7c93ff"/>
+<rect x="222" y="122" width="158" height="112" rx="11" fill="#18203a" stroke="#7c93ff"/>
+<rect x="398" y="122" width="158" height="112" rx="11" fill="#18203a" stroke="#7c93ff"/>
+<rect x="574" y="122" width="158" height="112" rx="11" fill="#18203a" stroke="#7c93ff"/>
+<text x="125" y="146" fill="#cdd5ff" font-size="12.5" font-weight="700" text-anchor="middle">DP 副本 0</text>
+<text x="301" y="146" fill="#cdd5ff" font-size="12.5" font-weight="700" text-anchor="middle">DP 副本 1</text>
+<text x="477" y="146" fill="#cdd5ff" font-size="12.5" font-weight="700" text-anchor="middle">DP 副本 2</text>
+<text x="653" y="146" fill="#cdd5ff" font-size="12.5" font-weight="700" text-anchor="middle">DP 副本 3</text>
+<rect x="61" y="162" width="128" height="28" rx="7" fill="#293b91"/><text x="125" y="181" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU0 · TP shard 0</text>
+<rect x="61" y="197" width="128" height="28" rx="7" fill="#293b91"/><text x="125" y="216" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU1 · TP shard 1</text>
+<rect x="237" y="162" width="128" height="28" rx="7" fill="#293b91"/><text x="301" y="181" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU2 · TP shard 0</text>
+<rect x="237" y="197" width="128" height="28" rx="7" fill="#293b91"/><text x="301" y="216" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU3 · TP shard 1</text>
+<rect x="413" y="162" width="128" height="28" rx="7" fill="#293b91"/><text x="477" y="181" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU4 · TP shard 0</text>
+<rect x="413" y="197" width="128" height="28" rx="7" fill="#293b91"/><text x="477" y="216" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU5 · TP shard 1</text>
+<rect x="589" y="162" width="128" height="28" rx="7" fill="#293b91"/><text x="653" y="181" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU6 · TP shard 0</text>
+<rect x="589" y="197" width="128" height="28" rx="7" fill="#293b91"/><text x="653" y="216" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU7 · TP shard 1</text>
+
+<line x1="390" y1="268" x2="390" y2="296" stroke="#7c93ff" stroke-width="2" marker-end="url(#group-arrow)"/>
+<text x="408" y="286" fill="#cdd5ff" font-size="12.5" font-weight="600">进入 MoE 层后重新分组</text>
+
+<!-- Sparse groups -->
+<text x="32" y="324" fill="#86efac" font-size="15" font-weight="700">稀疏 MoE：2 份专家-DP 副本，每份由 4 张卡做 EP</text>
+<rect x="28" y="338" width="724" height="210" rx="14" fill="#12151d" stroke="#1f7a4d"/>
+<rect x="46" y="356" width="688" height="76" rx="11" fill="#14251d" stroke="#4ade80"/>
+<rect x="46" y="454" width="688" height="76" rx="11" fill="#14251d" stroke="#4ade80"/>
+<text x="66" y="380" fill="#86efac" font-size="12.5" font-weight="700">EP group 0</text>
+<text x="66" y="478" fill="#86efac" font-size="12.5" font-weight="700">EP group 1</text>
+<rect x="160" y="370" width="126" height="46" rx="8" fill="#1b3650" stroke="#3a56d4"/><text x="223" y="389" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU0</text><text x="223" y="407" fill="#aab6ff" font-size="11.5" text-anchor="middle">E0 / E1</text>
+<rect x="301" y="370" width="126" height="46" rx="8" fill="#173d31" stroke="#1f7a4d"/><text x="364" y="389" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU1</text><text x="364" y="407" fill="#86efac" font-size="11.5" text-anchor="middle">E2 / E3</text>
+<rect x="442" y="370" width="126" height="46" rx="8" fill="#402d21" stroke="#b9703f"/><text x="505" y="389" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU2</text><text x="505" y="407" fill="#ffcfaa" font-size="11.5" text-anchor="middle">E4 / E5</text>
+<rect x="583" y="370" width="126" height="46" rx="8" fill="#2d2450" stroke="#6f57bd"/><text x="646" y="389" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU3</text><text x="646" y="407" fill="#c4b5fd" font-size="11.5" text-anchor="middle">E6 / E7</text>
+<rect x="160" y="468" width="126" height="46" rx="8" fill="#1b3650" stroke="#3a56d4"/><text x="223" y="487" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU4</text><text x="223" y="505" fill="#aab6ff" font-size="11.5" text-anchor="middle">E0 / E1</text>
+<rect x="301" y="468" width="126" height="46" rx="8" fill="#173d31" stroke="#1f7a4d"/><text x="364" y="487" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU5</text><text x="364" y="505" fill="#86efac" font-size="11.5" text-anchor="middle">E2 / E3</text>
+<rect x="442" y="468" width="126" height="46" rx="8" fill="#402d21" stroke="#b9703f"/><text x="505" y="487" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU6</text><text x="505" y="505" fill="#ffcfaa" font-size="11.5" text-anchor="middle">E4 / E5</text>
+<rect x="583" y="468" width="126" height="46" rx="8" fill="#2d2450" stroke="#6f57bd"/><text x="646" y="487" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">GPU7</text><text x="646" y="505" fill="#c4b5fd" font-size="11.5" text-anchor="middle">E6 / E7</text>
+<line x1="223" y1="416" x2="223" y2="468" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 4"/>
+<line x1="364" y1="416" x2="364" y2="468" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 4"/>
+<line x1="505" y1="416" x2="505" y2="468" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 4"/>
+<line x1="646" y1="416" x2="646" y2="468" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4 4"/>
+<text x="112" y="445" fill="#9aa3b2" font-size="11.5" text-anchor="middle">同专家权重</text>
+<text x="112" y="461" fill="#9aa3b2" font-size="11.5" text-anchor="middle">expert-DP 同步</text>
+
+<text x="390" y="580" fill="#9aa3b2" font-size="12.5" text-anchor="middle">GPU0/1 在 dense 区共同切一份权重；在 sparse 区则分别持有不同专家。</text>
+</svg>

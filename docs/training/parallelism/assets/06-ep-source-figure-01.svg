@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 230" role="img" aria-label="Megatron MoE 前向模块顺序">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+<defs><marker id="ov-arrow" markerWidth="10" markerHeight="10" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#7c93ff"/></marker></defs>
+<text x="460" y="32" fill="#eaeefb" font-size="19" font-weight="700" text-anchor="middle">一次 MoE 前向</text>
+
+<rect x="20" y="82" width="112" height="82" rx="12" fill="#202a4c" stroke="#7c93ff"/>
+<text x="76" y="115" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">输入</text>
+<text x="76" y="143" fill="#cdd5ff" font-size="14" text-anchor="middle">tokens</text>
+
+<rect x="158" y="82" width="154" height="82" rx="12" fill="#251e18" stroke="#b9703f"/>
+<text x="235" y="115" fill="#ffcfaa" font-size="15" font-weight="700" text-anchor="middle">① Router</text>
+<text x="235" y="143" fill="#fff" font-size="14" text-anchor="middle">为 token 选择专家</text>
+
+<rect x="338" y="82" width="164" height="82" rx="12" fill="#17213b" stroke="#4967e8"/>
+<text x="420" y="115" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">② Dispatch</text>
+<text x="420" y="143" fill="#fff" font-size="14" text-anchor="middle">把 token 送到专家</text>
+
+<rect x="528" y="82" width="154" height="82" rx="12" fill="#14251d" stroke="#4ade80"/>
+<text x="605" y="115" fill="#86efac" font-size="15" font-weight="700" text-anchor="middle">③ Experts</text>
+<text x="605" y="143" fill="#fff" font-size="14" text-anchor="middle">执行专家 MLP</text>
+
+<rect x="708" y="82" width="192" height="82" rx="12" fill="#17213b" stroke="#4967e8"/>
+<text x="804" y="115" fill="#aab6ff" font-size="15" font-weight="700" text-anchor="middle">④ Combine</text>
+<text x="804" y="143" fill="#fff" font-size="14" text-anchor="middle">送回并合并结果</text>
+
+<g stroke="#7c93ff" stroke-width="2.2" marker-end="url(#ov-arrow)">
+<line x1="132" y1="123" x2="155" y2="123"/>
+<line x1="312" y1="123" x2="335" y2="123"/>
+<line x1="502" y1="123" x2="525" y2="123"/>
+<line x1="682" y1="123" x2="705" y2="123"/>
+</g>
+<text x="460" y="205" fill="#9aa3b2" font-size="14" text-anchor="middle">选路 → 搬运 → 计算 → 还原</text>
+</svg>

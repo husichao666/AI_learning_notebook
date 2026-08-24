@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="56 8 748 284" role="img" aria-label="通信原语到底层链路的四层关系">
+  <style>
+    [fill="#fff"]{fill:#172033}[fill="#cdd5ff"]{fill:#334a8a}[fill="#bbf7d0"]{fill:#166534}[fill="#fde68a"]{fill:#92400e}[fill="#fca5a5"]{fill:#991b1b}
+  </style>
+  <defs><marker id="stack-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <g font-family="-apple-system, PingFang SC, Microsoft YaHei, sans-serif" text-anchor="middle">
+    <rect x="70" y="18" width="720" height="48" rx="10" fill="rgba(124,147,255,.18)" stroke="#7c93ff"/>
+    <text x="430" y="39" fill="#fff" font-size="14" font-weight="700">① 框架 / 语义层</text><text x="430" y="57" fill="#cdd5ff" font-size="12.5">PyTorch / Megatron：all_reduce(tensor, group)</text>
+    <line x1="430" y1="66" x2="430" y2="86" stroke="#64748b" marker-end="url(#stack-arrow)"/>
+    <rect x="70" y="90" width="720" height="48" rx="10" fill="rgba(74,222,128,.14)" stroke="#4ade80"/>
+    <text x="430" y="111" fill="#fff" font-size="14" font-weight="700">② Collective 算法层</text><text x="430" y="129" fill="#bbf7d0" font-size="12.5">Ring · Tree · Recursive Doubling · Hierarchical · NVLS / CollNet</text>
+    <line x1="430" y1="138" x2="430" y2="158" stroke="#64748b" marker-end="url(#stack-arrow)"/>
+    <rect x="70" y="162" width="720" height="48" rx="10" fill="rgba(251,191,36,.12)" stroke="#fbbf24"/>
+    <text x="430" y="183" fill="#fff" font-size="14" font-weight="700">③ 分块 / 协议 / channel 层</text><text x="430" y="201" fill="#fde68a" font-size="12.5">chunking + pipeline · Simple / LL / LL128 · 单/多 channel</text>
+    <line x1="430" y1="210" x2="430" y2="230" stroke="#64748b" marker-end="url(#stack-arrow)"/>
+    <rect x="70" y="234" width="720" height="48" rx="10" fill="rgba(248,113,113,.12)" stroke="#f87171"/>
+    <text x="430" y="255" fill="#fff" font-size="14" font-weight="700">④ 传输与物理拓扑层</text><text x="430" y="273" fill="#fca5a5" font-size="12.5">NVLink / NVSwitch · PCIe · InfiniBand / RoCE · 多 NIC</text>
+  </g>
+</svg>

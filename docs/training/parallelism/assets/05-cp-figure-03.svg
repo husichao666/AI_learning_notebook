@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 320" role="img" aria-label="4 张卡的 all-to-all：把「按序列切」转置成「按 head 切」">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+  <defs><marker id="u" markerWidth="9" markerHeight="9" refX="7" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="#9aa3b2"/></marker></defs>
+  <!-- headers -->
+  <text x="200" y="26" text-anchor="middle" fill="#eaeefb" font-size="13" font-weight="700">all-to-all 前：每卡 = 一段序列 × 全部 head</text>
+  <text x="640" y="26" text-anchor="middle" fill="#eaeefb" font-size="13" font-weight="700">all-to-all 后：每卡 = 全序列 × 一个 head</text>
+  <!-- LEFT grid: rows = cards, each cell colored by head-group (column) -->
+  <!-- column headers h0..h3 -->
+  <text x="95"  y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head0</text>
+  <text x="158" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head1</text>
+  <text x="221" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head2</text>
+  <text x="284" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">head3</text>
+  <!-- rows -->
+  <!-- row i cells: fill by column color -->
+  <!-- card0 -->
+  <text x="40" y="86" text-anchor="middle" fill="#aab6ff" font-size="11">卡0</text>
+  <rect x="67"  y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h0</text>
+  <rect x="130" y="70" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h1</text>
+  <rect x="193" y="70" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h2</text>
+  <rect x="256" y="70" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h3</text>
+  <!-- card1 -->
+  <text x="40" y="122" text-anchor="middle" fill="#aab6ff" font-size="11">卡1</text>
+  <rect x="67"  y="106" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h0</text>
+  <rect x="130" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h1</text>
+  <rect x="193" y="106" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h2</text>
+  <rect x="256" y="106" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h3</text>
+  <!-- card2 -->
+  <text x="40" y="158" text-anchor="middle" fill="#aab6ff" font-size="11">卡2</text>
+  <rect x="67"  y="142" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h0</text>
+  <rect x="130" y="142" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h1</text>
+  <rect x="193" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h2</text>
+  <rect x="256" y="142" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h3</text>
+  <!-- card3 -->
+  <text x="40" y="194" text-anchor="middle" fill="#aab6ff" font-size="11">卡3</text>
+  <rect x="67"  y="178" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="96"  y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h0</text>
+  <rect x="130" y="178" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)"  stroke="#4ade80"/><text x="159" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h1</text>
+  <rect x="193" y="178" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)"  stroke="#fbbf24"/><text x="222" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h2</text>
+  <rect x="256" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="285" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h3</text>
+  <!-- middle arrow -->
+  <path d="M336,138 L484,138" fill="none" stroke="#9aa3b2" stroke-width="2" marker-end="url(#u)"/>
+  <text x="410" y="128" text-anchor="middle" fill="#d7dbe4" font-size="12" font-weight="700">all-to-all</text>
+  <text x="410" y="156" text-anchor="middle" fill="#9aa3b2" font-size="10">按 head 重新分发</text>
+  <text x="410" y="172" text-anchor="middle" fill="#9aa3b2" font-size="10">（同色块聚到同一张卡）</text>
+  <!-- RIGHT grid: rows = cards, each row single color (its head), columns = seq chunks -->
+  <text x="535" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq0</text>
+  <text x="598" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq1</text>
+  <text x="661" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq2</text>
+  <text x="724" y="58" text-anchor="middle" fill="#9aa3b2" font-size="10.5">seq3</text>
+  <!-- card0 → head0 (blue) -->
+  <text x="480" y="86" text-anchor="middle" fill="#aab6ff" font-size="11">卡0</text>
+  <rect x="507" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="536" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h0</text>
+  <rect x="570" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="599" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h0</text>
+  <rect x="633" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="662" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h0</text>
+  <rect x="696" y="70" width="58" height="30" rx="4" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="725" y="89" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h0</text>
+  <!-- card1 → head1 (green) -->
+  <text x="480" y="122" text-anchor="middle" fill="#aab6ff" font-size="11">卡1</text>
+  <rect x="507" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="536" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h1</text>
+  <rect x="570" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="599" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h1</text>
+  <rect x="633" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="662" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h1</text>
+  <rect x="696" y="106" width="58" height="30" rx="4" fill="rgba(74,222,128,0.20)" stroke="#4ade80"/><text x="725" y="125" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h1</text>
+  <!-- card2 → head2 (amber) -->
+  <text x="480" y="158" text-anchor="middle" fill="#aab6ff" font-size="11">卡2</text>
+  <rect x="507" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="536" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h2</text>
+  <rect x="570" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="599" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h2</text>
+  <rect x="633" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="662" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h2</text>
+  <rect x="696" y="142" width="58" height="30" rx="4" fill="rgba(251,191,36,0.20)" stroke="#fbbf24"/><text x="725" y="161" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h2</text>
+  <!-- card3 → head3 (pink) -->
+  <text x="480" y="194" text-anchor="middle" fill="#aab6ff" font-size="11">卡3</text>
+  <rect x="507" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="536" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S0·h3</text>
+  <rect x="570" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="599" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S1·h3</text>
+  <rect x="633" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="662" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S2·h3</text>
+  <rect x="696" y="178" width="58" height="30" rx="4" fill="rgba(244,114,182,0.20)" stroke="#f472b6"/><text x="725" y="197" text-anchor="middle" fill="#e6ebff" font-size="10">S3·h3</text>
+  <!-- bottom flow note -->
+  <text x="420" y="238" text-anchor="middle" fill="#9aa3b2" font-size="11.5">换轴后每卡握着完整序列的 1 个 head → 直接跑标准注意力 → 再来一次 all-to-all 换回「按序列切」</text>
+  <rect x="150" y="256" width="540" height="44" rx="10" fill="rgba(74,222,128,0.06)" stroke="#4ade80"/>
+  <text x="420" y="283" text-anchor="middle" fill="#bbf7d0" font-size="11.5">同一格记号 S<tspan baseline-shift="sub" font-size="8">i</tspan>·h<tspan baseline-shift="sub" font-size="8">j</tspan> = 第 i 段序列的第 j 个 head 的数据；通信前后数据没变，只是换了「谁持有它」</text>
+</svg>

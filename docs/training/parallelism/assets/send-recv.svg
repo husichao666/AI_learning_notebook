@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="42 6 666 176" role="img" aria-label="send / recv 矩阵示意">
+  <style>
+    [fill="#9aa3b2"]{fill:#5f6b7a}[fill="#cdd5ff"]{fill:#334a8a}[fill="#bbf7d0"]{fill:#166534}[fill="#fde68a"]{fill:#92400e}[fill="#fca5a5"]{fill:#991b1b}[fill="#161922"]{fill:#f8fafc}[stroke="#2a2f3e"]{stroke:#cbd5e1}[fill="#4b5468"]{fill:#94a3b8}
+  </style>
+  <defs><marker id="mg5" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/></marker></defs>
+  <text x="168" y="20" text-anchor="middle" fill="#9aa3b2" font-size="12.5">交换前：r0 持有 m</text>
+  <text x="592" y="20" text-anchor="middle" fill="#9aa3b2" font-size="12.5">交换后：r1 收到 m（其余卡不变）</text>
+  <g font-size="14" text-anchor="middle">
+    <text x="60" y="55" fill="#9aa3b2" text-anchor="end" font-size="12">r0</text>
+    <rect x="70" y="34" width="46" height="32" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="93" y="55" fill="#cdd5ff">m₀</text>
+    <rect x="120" y="34" width="46" height="32" rx="5" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="143" y="55" fill="#bbf7d0">m₁</text>
+    <rect x="170" y="34" width="46" height="32" rx="5" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="193" y="55" fill="#fde68a">m₂</text>
+    <rect x="220" y="34" width="46" height="32" rx="5" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="243" y="55" fill="#fca5a5">m₃</text>
+    <text x="60" y="91" fill="#9aa3b2" text-anchor="end" font-size="12">r1</text>
+    <rect x="70" y="70" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="93" y="91" fill="#4b5468">·</text>
+    <rect x="120" y="70" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="143" y="91" fill="#4b5468">·</text>
+    <rect x="170" y="70" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="193" y="91" fill="#4b5468">·</text>
+    <rect x="220" y="70" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="243" y="91" fill="#4b5468">·</text>
+    <text x="60" y="127" fill="#9aa3b2" text-anchor="end" font-size="12">r2</text>
+    <rect x="70" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="93" y="127" fill="#4b5468">·</text>
+    <rect x="120" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="143" y="127" fill="#4b5468">·</text>
+    <rect x="170" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="193" y="127" fill="#4b5468">·</text>
+    <rect x="220" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="243" y="127" fill="#4b5468">·</text>
+    <text x="60" y="163" fill="#9aa3b2" text-anchor="end" font-size="12">r3</text>
+    <rect x="70" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="93" y="163" fill="#4b5468">·</text>
+    <rect x="120" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="143" y="163" fill="#4b5468">·</text>
+    <rect x="170" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="193" y="163" fill="#4b5468">·</text>
+    <rect x="220" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="243" y="163" fill="#4b5468">·</text>
+    <line x1="300" y1="106" x2="462" y2="106" stroke="#64748b" stroke-width="1.5" marker-end="url(#mg5)"/>
+    <text x="381" y="96" text-anchor="middle" fill="#9aa3b2" font-size="12">send → recv</text>
+    <text x="484" y="55" fill="#9aa3b2" text-anchor="end" font-size="12">r0</text>
+    <rect x="494" y="34" width="46" height="32" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="517" y="55" fill="#cdd5ff">m₀</text>
+    <rect x="544" y="34" width="46" height="32" rx="5" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="567" y="55" fill="#bbf7d0">m₁</text>
+    <rect x="594" y="34" width="46" height="32" rx="5" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="617" y="55" fill="#fde68a">m₂</text>
+    <rect x="644" y="34" width="46" height="32" rx="5" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="667" y="55" fill="#fca5a5">m₃</text>
+    <text x="484" y="91" fill="#9aa3b2" text-anchor="end" font-size="12">r1</text>
+    <rect x="494" y="70" width="46" height="32" rx="5" fill="rgba(124,147,255,0.22)" stroke="#7c93ff"/><text x="517" y="91" fill="#cdd5ff">m₀</text>
+    <rect x="544" y="70" width="46" height="32" rx="5" fill="rgba(74,222,128,0.18)" stroke="#4ade80"/><text x="567" y="91" fill="#bbf7d0">m₁</text>
+    <rect x="594" y="70" width="46" height="32" rx="5" fill="rgba(251,191,36,0.16)" stroke="#fbbf24"/><text x="617" y="91" fill="#fde68a">m₂</text>
+    <rect x="644" y="70" width="46" height="32" rx="5" fill="rgba(248,113,113,0.16)" stroke="#f87171"/><text x="667" y="91" fill="#fca5a5">m₃</text>
+    <text x="484" y="127" fill="#9aa3b2" text-anchor="end" font-size="12">r2</text>
+    <rect x="494" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="517" y="127" fill="#4b5468">·</text>
+    <rect x="544" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="567" y="127" fill="#4b5468">·</text>
+    <rect x="594" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="617" y="127" fill="#4b5468">·</text>
+    <rect x="644" y="106" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="667" y="127" fill="#4b5468">·</text>
+    <text x="484" y="163" fill="#9aa3b2" text-anchor="end" font-size="12">r3</text>
+    <rect x="494" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="517" y="163" fill="#4b5468">·</text>
+    <rect x="544" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="567" y="163" fill="#4b5468">·</text>
+    <rect x="594" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="617" y="163" fill="#4b5468">·</text>
+    <rect x="644" y="142" width="46" height="32" rx="5" fill="#161922" stroke="#2a2f3e"/><text x="667" y="163" fill="#4b5468">·</text>
+  </g>
+</svg>

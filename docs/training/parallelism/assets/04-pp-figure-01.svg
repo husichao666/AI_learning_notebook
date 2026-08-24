@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 150" role="img" aria-label="32 层模型切成 4 个 stage">
+<style>
+  /* The book treats diagrams as daylight-mode figures in every site theme. */
+  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
+  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
+  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
+  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
+  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
+  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
+  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
+  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
+  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
+  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
+  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
+  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
+  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
+  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
+  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
+  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
+  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
+  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
+</style>
+  <defs><marker id="fwd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#7c93ff"/></marker>
+        <marker id="bwd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#4ade80"/></marker></defs>
+  <g font-size="11" text-anchor="middle">
+    <rect x="30"  y="44" width="160" height="46" rx="8" fill="#161922" stroke="#5b6bb0"/><text x="110" y="64" fill="#aab6ff" font-weight="600">GPU 0 · stage 0</text><text x="110" y="80" fill="#9aa3b2">embed + 层 1–8</text>
+    <rect x="230" y="44" width="160" height="46" rx="8" fill="#161922" stroke="#5b6bb0"/><text x="310" y="64" fill="#aab6ff" font-weight="600">GPU 1 · stage 1</text><text x="310" y="80" fill="#9aa3b2">层 9–16</text>
+    <rect x="430" y="44" width="160" height="46" rx="8" fill="#161922" stroke="#5b6bb0"/><text x="510" y="64" fill="#aab6ff" font-weight="600">GPU 2 · stage 2</text><text x="510" y="80" fill="#9aa3b2">层 17–24</text>
+    <rect x="630" y="44" width="160" height="46" rx="8" fill="#161922" stroke="#5b6bb0"/><text x="710" y="64" fill="#aab6ff" font-weight="600">GPU 3 · stage 3</text><text x="710" y="80" fill="#9aa3b2">层 25–32 + 输出</text>
+  </g>
+  <path d="M192,60 L228,60" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#fwd)"/>
+  <path d="M392,60 L428,60" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#fwd)"/>
+  <path d="M592,60 L628,60" stroke="#7c93ff" stroke-width="1.6" marker-end="url(#fwd)"/>
+  <path d="M628,80 L592,80" stroke="#4ade80" stroke-width="1.4" marker-end="url(#bwd)"/>
+  <path d="M428,80 L392,80" stroke="#4ade80" stroke-width="1.4" marker-end="url(#bwd)"/>
+  <path d="M228,80 L192,80" stroke="#4ade80" stroke-width="1.4" marker-end="url(#bwd)"/>
+  <text x="410" y="118" text-anchor="middle" fill="#7c93ff" font-size="12">前向：激活一棒棒往右传 →</text>
+  <text x="410" y="136" text-anchor="middle" fill="#4ade80" font-size="12">← 反向：梯度一棒棒往左传</text>
+</svg>
