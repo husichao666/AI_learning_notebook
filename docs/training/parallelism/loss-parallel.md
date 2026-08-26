@@ -1,10 +1,10 @@
 ---
-title: "专题 · Loss Parallel"
+title: "4.3 · Loss Parallel"
 description: "当词表大到把 logits 全聚合（all-gather）变得不可承受时，如何只用几个标量的通信就算出一模一样的交叉熵？ 本文从数学原理出发，逐行解读 Megatron-LM 的显式 autograd 实现，并介绍与之正交、同样降显存的分块计算（chunked loss）技术。"
 type: deep-dive
 status: stable
 level: advanced
-updated: 2026-08-24
+updated: 2026-08-25
 tags: [distributed-training, loss-parallel, tensor-parallel]
 ---
 
@@ -12,7 +12,7 @@ tags: [distributed-training, loss-parallel, tensor-parallel]
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Distributed Training · Tensor Parallel</span>
+<span class="chapter-kicker">第 4 章 · Tensor Parallel 与 Sequence Parallel</span>
 
 当词表大到把 logits 全聚合（all-gather）变得不可承受时，如何只用几个标量的通信就算出一模一样的交叉熵？
 本文从数学原理出发，逐行解读 Megatron-LM 的显式 autograd 实现，并介绍与之正交、同样降显存的分块计算（chunked loss）技术。

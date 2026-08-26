@@ -1,20 +1,20 @@
 ---
-title: M0 · 基础铺垫
+title: 第 1 章 · 训练状态与集合通信
 description: 显存账本、集合通信原语、通信量与底层算法
 type: series
 status: stable
 level: beginner
-updated: 2026-08-24
+updated: 2026-08-25
 tags:
   - distributed-training
   - collectives
 ---
 
-# 显存花在哪、卡之间怎么传数据
+# 训练状态与集合通信：显存花在哪、卡之间怎么传数据
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Module 0 · 基础铺垫</span>
+<span class="chapter-kicker">第 1 章 · 训练状态与集合通信</span>
 
 在学任何一种并行之前，先建立两块地基：一次训练 step 的**显存账本**，以及卡间通信的**集合通信原语**。后面 DP / FSDP / TP / PP / CP / EP 全是在这两件事上做文章。
 
@@ -27,7 +27,7 @@ tags:
     3. 4 卡 ring all-reduce 一个 1 GiB 张量，每卡究竟发送多少字节？ring 和 all-reduce 是同一层概念吗？
     4. 为什么 TP 一般塞进单机、而 PP / DP 可以跨机？
 
-    答得上来，就可以进 M1；答不上来，回到对应小节再看一遍。后面所有并行都建立在这四件事上。
+    答得上来，就可以进入第 2 章；答不上来，回到对应小节再看一遍。后面所有并行都建立在这四件事上。
 
 ## 01 · 先看清：一个训练 step 长什么样
 
@@ -113,7 +113,7 @@ reduce-scatter 的**逆操作**：每张卡拿出手里的分片，**拼接**成
 
     把上面 ①②③ 串起来看：先 reduce-scatter 把全和切成分片，中间出现「每卡只持有 $1/N$」的省显存窗口，再 all-gather 拼回完整，**语义效果**就等于一次 all-reduce。这不表示底层一定先后调用两个独立 collective，tree 等算法也能直接完成同一语义。
 
-    典型 FSDP 每 step 是「前向参数 all-gather + 反向参数 all-gather + 梯度 reduce-scatter」，DDP 是一次梯度 all-reduce。只有在参数与梯度等宽时，按元素数才是 $3P/2P=1.5\times$；若参数为 BF16、通信梯度为 FP32，两者的网络字节可以相同。M2 会按 dtype 展开这笔账。
+    典型 FSDP 每 step 是「前向参数 all-gather + 反向参数 all-gather + 梯度 reduce-scatter」，DDP 是一次梯度 all-reduce。只有在参数与梯度等宽时，按元素数才是 $3P/2P=1.5\times$；若参数为 BF16、通信梯度为 FP32，两者的网络字节可以相同。第 3 章会按 dtype 展开这笔账。
 
 ### ④ broadcast
 
@@ -143,12 +143,12 @@ reduce-scatter 的**逆操作**：每张卡拿出手里的分片，**拼接**成
 
 | 原语 | 一句话 | 用在哪个模块 |
 | --- | --- | --- |
-| `all-reduce` | 求和，每卡都得到完整全和 | DP 梯度同步（M1） |
-| `reduce-scatter` | 求和后每卡只留 $1/N$ 分片 | FSDP 梯度归约（M2） |
-| `all-gather` | 分片拼成完整，每卡都有 | FSDP 还原参数（M2） |
-| `broadcast` | 一张卡的数据复制到所有卡 | 初始化、PP 传标量（M4） |
-| `send / recv` | 点对点，一张卡发给另一张卡 | PP 跨 stage 传激活/梯度（M4） |
-| `all-to-all` | 每卡按目标切块、互相交换（转置） | MoE 专家并行（M6） |
+| `all-reduce` | 求和，每卡都得到完整全和 | 数据并行梯度同步（第 2 章） |
+| `reduce-scatter` | 求和后每卡只留 $1/N$ 分片 | FSDP 梯度归约（第 3 章） |
+| `all-gather` | 分片拼成完整，每卡都有 | FSDP 还原参数（第 3 章） |
+| `broadcast` | 一张卡的数据复制到所有卡 | 初始化、流水线传标量（第 5 章） |
+| `send / recv` | 点对点，一张卡发给另一张卡 | 流水线跨 stage 传激活/梯度（第 5 章） |
+| `all-to-all` | 每卡按目标切块、互相交换（转置） | MoE 专家并行（第 7 章） |
 
 ### 通信量怎么算：先把口径说死
 
@@ -186,30 +186,6 @@ $$
 
 其中 $S$ 是通信轮数，$\alpha$ 是每轮延迟，$B_{\mathrm{eff}}$ 是有效带宽，$T_{\mathrm{reduce}}$ 是归约类 collective 在本地执行逐元素求和等运算、且未被通信重叠隐藏的时间；非归约类 collective 可将它视为 0。于是大张量更在意第二项，小张量更容易被 $S\alpha$ 支配。这正是同一个 collective 需要多种底层算法的原因。
 
-### 原语不等于算法：all-reduce 底下不只有 ring
-
-`all-reduce` 描述「输入最终变成什么」，ring / tree 描述「数据沿什么路径、分几轮到达」。从训练代码到底层链路，大致分成四层：
-
-![通信原语到底层链路的四层关系](assets/communication-stack.svg)
-
-*上层 collective 语义不变，通信库会按消息大小、机器拓扑和硬件能力选择下层组合。*
-
-| 实现路线 | 轮数 / 特征 | 通常擅长 | 代价或限制 |
-| --- | --- | --- | --- |
-| **Ring** | all-reduce 为 $2(N-1)$ 轮；把张量切块后全环流水 | 大消息，链路负载均匀，容易逼近带宽上限 | rank 越多启动轮数越多，小消息延迟吃亏 |
-| **Tree / Double Binary Tree** | 深度 $O(\log N)$；沿树归约再分发 | 小/中消息或大规模 rank，延迟较低 | 性能依赖树如何映射到真实拓扑；各 rank 流量未必像 ring 一样直观 |
-| **Recursive Doubling / Butterfly** | $O(\log N)$ 轮，peer 距离逐轮翻倍 | 小消息、2 的幂规模，延迟敏感场景 | 朴素版本大消息发送字节更多，非 2 的幂需额外处理 |
-| **Hierarchical** | 先单机内，再跨机，再单机内；可组合 ring/tree | 多机多卡，让跨机数据尽量少并利用多 NIC | 节点不齐、拓扑或 rank 映射不佳时收益下降 |
-| **Fabric / Switch aware** | 利用交换结构或网络侧归约能力，如 NVLS、CollNet | 支持对应硬件的平台，降低 GPU/链路搬运压力 | 依赖硬件、驱动、通信库版本和部署配置 |
-
-!!! warning "两个容易混淆的 ring"
-
-    **NCCL ring** 是实现 all-reduce / all-gather / reduce-scatter 等 collective 的通信算法；**Ring Attention** 则是 CP 中让 K/V 分块沿环传递、边收边算 attention 的上层计算调度。二者都画成环，但解决的问题和所在层次不同。
-
-NCCL 默认会根据拓扑与架构自动选算法，而不是要求训练代码写死 ring；其官方文档列出的候选包括 Ring、Tree、CollNetChain/Direct、NVLS/NVLSTree、PAT，算法集合还会随版本演进。`NCCL_PROTO` 的 Simple / LL / LL128 是协议选择，和 `NCCL_ALGO` 的算法选择也不是同一件事。初学阶段应让自动调优工作，只有 profile 证明选择不佳或排查特定问题时再强制覆盖。
-
-延伸阅读：NVIDIA NCCL 官方的 [Collective Operations](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/collectives.html) 与 [NCCL_ALGO / NCCL_PROTO](https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/env.html#nccl-algo)。这些原语在 PyTorch（`torch.distributed`）和 Megatron-LM 里通常只露出一行 API，实际算法选择由通信后端完成。
-
 ## 05 · 硬件拓扑：带宽决定「谁放哪」
 
 卡间带宽分层级，差距极大，这直接决定每种并行该放在哪一层：
@@ -221,7 +197,7 @@ NCCL 默认会根据拓扑与架构自动选算法，而不是要求训练代码
 
 !!! tip "核心放置直觉"
 
-    通信越频繁、越在关键路径上的并行（TP），越要放进高带宽的 NVLink 域（典型 TP ≤ 8，正好一台机器）；通信稀疏、能和计算重叠的（PP / DP），可以容忍跨机的低带宽。这条原则会在 M7 nD 组合里反复出现。
+    通信越频繁、越在关键路径上的并行（TP），越要放进高带宽的 NVLink 域（典型 TP ≤ 8，正好一台机器）；通信稀疏、能和计算重叠的（PP / DP），可以容忍跨机的低带宽。这条原则会在第 8 章的多维组合并行中反复出现。
 
 ## 06 · 衡量指标：怎么判断快不快
 
@@ -237,11 +213,11 @@ NCCL 默认会根据拓扑与架构自动选算法，而不是要求训练代码
 
 | 模块 | 切账本里的 | 主要通信原语 |
 | --- | --- | --- |
-| M1 DP | 切数据（模型状态不切，冗余） | all-reduce（梯度） |
-| M2 FSDP/ZeRO | 切模型状态（参数 + 梯度 + 优化器状态） | all-gather + reduce-scatter |
-| M3 TP+SP | 切层内参数与计算；SP 切激活 | all-reduce / all-gather + reduce-scatter |
-| M4 PP | 切层（不同层放不同卡） | send / recv |
-| M5 CP | 切序列维的激活 | ring P2P / all-to-all |
-| M6 EP | 切专家（MoE） | all-to-all |
+| 第 2 章 · DP | 切数据（模型状态不切，冗余） | all-reduce（梯度） |
+| 第 3 章 · ZeRO/FSDP | 切模型状态（参数 + 梯度 + 优化器状态） | all-gather + reduce-scatter |
+| 第 4 章 · TP/SP | 切层内参数与计算；SP 切激活 | all-reduce / all-gather + reduce-scatter |
+| 第 5 章 · PP | 切层（不同层放不同卡） | send / recv |
+| 第 6 章 · CP | 切序列维的激活 | ring P2P / all-to-all |
+| 第 7 章 · EP | 切专家（MoE） | all-to-all |
 
-接下来从最简单的 **M1 数据并行** 开始，它是后面一切的起点。
+接下来进入第 2 章，从最简单的**数据并行**开始，它是后续并行策略的起点。

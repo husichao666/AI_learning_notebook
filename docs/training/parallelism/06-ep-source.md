@@ -1,10 +1,10 @@
 ---
-title: "M6-2 · EP 源码"
+title: "7.2 · Megatron 实现"
 description: "沿一次训练前向逐层下钻：先进入 Router 的选路算法，再看 All-to-All Dispatcher 的两次重排与两次通信，最后分析 GroupedMLP 如何按专家分段执行 FC1、SwiGLU 和 FC2。"
 type: source-note
 status: stable
 level: advanced
-updated: 2026-08-24
+updated: 2026-08-25
 tags: [distributed-training, expert-parallel, megatron]
 ---
 
@@ -12,7 +12,7 @@ tags: [distributed-training, expert-parallel, megatron]
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Module 6 · EP 三部曲 2/3 · 源码篇</span>
+<span class="chapter-kicker">第 7 章 · Expert Parallel</span>
 
 沿一次训练前向逐层下钻：先进入 Router 的选路算法，再看 All-to-All Dispatcher 的两次重排与两次通信，最后分析 GroupedMLP 如何按专家分段执行 FC1、SwiGLU 和 FC2。
 

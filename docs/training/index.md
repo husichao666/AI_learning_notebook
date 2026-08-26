@@ -3,7 +3,7 @@ title: 训练系统
 description: 分布式训练、并行策略、通信与大规模训练系统
 type: hub
 status: growing
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # 训练系统
@@ -20,7 +20,7 @@ updated: 2026-08-24
 
 ### [分布式训练并行策略](parallelism/)
 
-从显存账本与集合通信开始，依次学习 DP、FSDP、TP、PP、CP、EP，最后组合成 nD 并行。该专题已经形成完整的 M0–M7 阅读路径。
+从训练状态与集合通信开始，依次学习 DP、ZeRO/FSDP、TP/SP、PP、CP、EP，最后组合成多维并行。全书按 8 章组织，复杂主题在章内继续分节。
 
 ## 与性能工程的边界
 

@@ -1,5 +1,5 @@
 ---
-title: "专题 · MoE aux loss（已迁移）"
+title: "7.4 · MoE 辅助损失（已迁移）"
 description: 页面已迁移到新的知识库结构
 search:
   exclude: true

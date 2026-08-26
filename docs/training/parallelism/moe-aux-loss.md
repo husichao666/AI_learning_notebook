@@ -1,10 +1,10 @@
 ---
-title: "专题 · MoE aux loss"
+title: "7.4 · MoE 辅助损失"
 description: "MoE 路由器天生会「坍缩」——把绝大多数 token 都塞给少数几个专家。负载均衡辅助损失就是把它掰回均匀分配的那只手。 本文先把 Switch 公式拆成「3 行就能写完」的核心，再解释为什么 mindformers 的 router.py 围着这 3 行写了几百行， 最后逐项对照 Megatron-LM，确认两者算的是同一个东西。"
 type: deep-dive
 status: stable
 level: advanced
-updated: 2026-08-24
+updated: 2026-08-25
 tags: [distributed-training, moe, load-balancing]
 ---
 
@@ -12,7 +12,7 @@ tags: [distributed-training, moe, load-balancing]
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Distributed Training · Expert Parallel · MoE</span>
+<span class="chapter-kicker">第 7 章 · Expert Parallel</span>
 
 MoE 路由器天生会「坍缩」——把绝大多数 token 都塞给少数几个专家。负载均衡辅助损失就是把它掰回均匀分配的那只手。
 本文先把 Switch 公式拆成「3 行就能写完」的核心，再解释为什么 mindformers 的 `router.py` 围着这 3 行写了几百行，

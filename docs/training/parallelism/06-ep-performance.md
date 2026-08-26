@@ -1,10 +1,10 @@
 ---
-title: "M6-3 · EP 性能优化"
+title: "7.3 · 性能优化"
 description: "专家并行的性能问题不是单一的“通信慢”：路由偏斜会制造慢 rank，All-to-All 会撞上拓扑墙，细粒度专家会把大矩阵切成小 GEMM，动态路由还会引入重排、同步和显存波动。本章先解释问题为什么发生，再把每类问题映射到 Megatron 的具体算法与实现。"
 type: engineering-note
 status: stable
 level: advanced
-updated: 2026-08-24
+updated: 2026-08-25
 tags: [distributed-training, expert-parallel, performance]
 ---
 
@@ -12,7 +12,7 @@ tags: [distributed-training, expert-parallel, performance]
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Module 6 · EP 三部曲 3/3 · 性能篇</span>
+<span class="chapter-kicker">第 7 章 · Expert Parallel</span>
 
 专家并行的性能问题不是单一的“通信慢”：路由偏斜会制造慢 rank，All-to-All 会撞上拓扑墙，细粒度专家会把大矩阵切成小 GEMM，动态路由还会引入重排、同步和显存波动。本章先解释问题为什么发生，再把每类问题映射到 Megatron 的具体算法与实现。
 

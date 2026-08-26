@@ -24,13 +24,13 @@
   <g text-anchor="middle">
     <rect x="14"  y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="86"  y="60" fill="#cdd5ff" font-size="14">参数：全量常驻</text><text x="86"  y="80" fill="#9aa3b2" font-size="12">2P · 不切</text>
     <rect x="171" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="243" y="60" fill="#d7dbe4" font-size="14">forward</text><text x="243" y="80" fill="#9aa3b2" font-size="12">直接算 · 无通信</text>
-    <rect x="328" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="400" y="60" fill="#d7dbe4" font-size="14">backward</text><text x="400" y="80" fill="#9aa3b2" font-size="12">逐 bucket 算梯度</text>
-    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="557" y="60" fill="#bbf7d0" font-size="14">reduce-scatter</text><text x="557" y="80" fill="#9aa3b2" font-size="12">梯度→每卡留 1/N</text>
-    <rect x="642" y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="714" y="60" fill="#cdd5ff" font-size="14">step + all-gather</text><text x="714" y="80" fill="#9aa3b2" font-size="12">更新1/N→拼回参数</text>
+    <rect x="328" y="32" width="145" height="64" rx="8" fill="#161922" stroke="#475569"/><text x="400" y="60" fill="#d7dbe4" font-size="14">backward</text><text x="400" y="80" fill="#9aa3b2" font-size="12">算完一段梯度</text>
+    <rect x="485" y="32" width="145" height="64" rx="8" fill="rgba(74,222,128,0.16)" stroke="#4ade80"/><text x="557" y="60" fill="#bbf7d0" font-size="14">立即 reduce-scatter</text><text x="557" y="80" fill="#9aa3b2" font-size="12">只保留本 rank 分片</text>
+    <rect x="642" y="32" width="145" height="64" rx="8" fill="rgba(124,147,255,0.16)" stroke="#7c93ff"/><text x="714" y="60" fill="#cdd5ff" font-size="14">更新参数分片</text><text x="714" y="80" fill="#9aa3b2" font-size="12">all-gather 拼回全量</text>
     <line x1="159" y1="64" x2="171" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
     <line x1="316" y1="64" x2="328" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
     <line x1="473" y1="64" x2="485" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
     <line x1="630" y1="64" x2="642" y2="64" stroke="#64748b" stroke-width="1.5" marker-end="url(#z2)"/>
   </g>
-  <text x="14" y="118" fill="#4ade80" font-size="13">相比 ZeRO-1：FP32 梯度也降到 1/N（4P → 4P/N）；BF16 参数仍全量常驻。</text>
+  <text x="14" y="118" fill="#4ade80" font-size="13">反向过程重复“算完一段 → 立即归约”：不累积完整梯度，FP32 梯度存储降到 4P/N。</text>
 </svg>

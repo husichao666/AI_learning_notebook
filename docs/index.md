@@ -52,7 +52,7 @@ hide:
     <span class="kb-status kb-status-stable">完整专题</span>
     <h3>分布式训练</h3>
     <p>显存与通信 → DP → FSDP → TP → PP → CP → EP → nD</p>
-    <a href="training/parallelism/00-foundations/">从 M0 开始 →</a>
+    <a href="training/parallelism/00-foundations/">从第 1 章开始 →</a>
   </div>
   <div class="kb-path-card">
     <span class="kb-status kb-status-growing">持续补充</span>
@@ -71,7 +71,7 @@ hide:
 ## 最近整理
 
 <div class="kb-updates">
-  <div><time>2026-08-24</time><a href="training/parallelism/">并行训练 M0–M7 完成 Markdown 书籍化迁移</a></div>
+  <div><time>2026-08-25</time><a href="training/parallelism/">并行训练按 8 章重组，统一章与节的阅读层级</a></div>
   <div><time>2026-08-24</time><a href="components/attention/dsa/">DeepSeek Sparse Attention：闪电索引与稀疏注意力</a></div>
   <div><time>2026-08-24</time><a href="models/qwen3-5/">Qwen3.5 模型架构与关键模块</a></div>
 </div>

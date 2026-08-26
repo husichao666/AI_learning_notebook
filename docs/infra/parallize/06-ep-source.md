@@ -1,5 +1,5 @@
 ---
-title: "M6-2 · EP 源码（已迁移）"
+title: "7.2 · Megatron 实现（已迁移）"
 description: 页面已迁移到新的知识库结构
 search:
   exclude: true

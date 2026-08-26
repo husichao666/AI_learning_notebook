@@ -1,10 +1,10 @@
 ---
-title: "M2 · FSDP / ZeRO"
-description: "DP 让每张卡冗余存了 N 份模型状态。ZeRO 的洞察是：这些状态在每张卡上各存一份纯属浪费——把优化器状态、梯度、参数依次切到各卡，用时再临时聚合。ZeRO-3 就是 FSDP。"
+title: "3.1 · ZeRO 与 FSDP"
+description: "单纯的DP，让每张卡上都持有所有的模型参数，那为什么不让每张卡各自存其中的一部分呢？"
 type: series
 status: stable
 level: intermediate
-updated: 2026-08-24
+updated: 2026-08-25
 tags: [distributed-training, fsdp, zero]
 ---
 
@@ -12,9 +12,9 @@ tags: [distributed-training, fsdp, zero]
 
 <div class="notebook-hero" markdown>
 
-<span class="chapter-kicker">Module 2 · FSDP / ZeRO</span>
+<span class="chapter-kicker">第 3 章 · 模型状态分片</span>
 
-DP 让每张卡冗余存了 N 份模型状态。ZeRO 的洞察是：这些状态在每张卡上各存一份纯属浪费——把优化器状态、梯度、参数依次切到各卡，用时再临时聚合。ZeRO-3 就是 FSDP。
+单纯的DP，让每张卡上都持有所有的模型参数，这里存在较大的冗余，那为什么不让每张卡各自存其中的一部分呢？
 
 **本章关键词：** 📦 ZeRO 1/2/3 三阶段 · 🔄 all-gather 参数 + reduce-scatter 梯度 · 📉 显存降到 1/N · 🟢 Megatron DistributedOptimizer
 
@@ -53,14 +53,9 @@ ZeRO 切的是**静态显存**——每 step 都常驻、内容在各卡完全�
 
 ### ZeRO-1：参数副本与梯度 buffer 仍是全尺寸，只切优化器状态
 
-这里要分清两个概念：**reduce-scatter 的输出是分片的**，但这不等于**梯度 buffer 的显存分配已经分片**。以 Megatron DistributedOptimizer 为例，一个 step 可以拆成四步：
+每张卡常驻完整 BF16 参数，并为全部参数分配全尺寸 FP32 梯度 buffer。Megatron DistributedOptimizer 用 reduce-scatter 同步梯度：通信后每个 rank 只得到 $1/N$ 的归约梯度，用它更新对应的 $1/N$ 参数、master 参数和 Adam 状态，再通过 all-gather 拼回完整 BF16 参数。
 
-1. **前向与反向：** 每张卡都有完整 BF16 参数，因此不需要临时 all-gather 参数；反向会为全部参数生成本地梯度，并写入全尺寸 FP32 梯度 buffer。
-2. **梯度同步：** reduce-scatter 把这份逻辑上的完整梯度切成 $N$ 段并完成跨 DP rank 归约；通信结束后，rank $r$ **只得到最终梯度的第 $r$ 段，即 $1/N$ 的有效梯度**。
-3. **局部更新：** rank $r$ 只用这段梯度，更新自己负责的 $1/N$ BF16 参数分片、FP32 master 参数分片以及对应的 Adam 状态；其他参数分片由其他 rank 更新。
-4. **参数同步：** 各 rank 对更新后的 BF16 参数分片执行 all-gather，重新拼成完整参数副本，供下一个 step 的前向使用。
-
-所以你的理解是对的：**reduce-scatter 之后每张卡只用部分梯度、更新部分参数**。它仍叫 ZeRO-1，是因为 ZeRO 阶段按“长期占用多少模型状态显存”分类：Megatron 的实现虽然只使用归约结果中的 $1/N$，但输入 reduce-scatter 的全尺寸梯度 buffer 仍然分配着，梯度显存还是 $4P$；到了 ZeRO-2，才会让非本 rank 的梯度 bucket 及时释放，使梯度存储真正降到 $4P/N$。
+这里的“梯度未分片”指**显存分配**而非通信输出：ZeRO-1 虽然只使用 $1/N$ 的梯度，但全尺寸梯度 buffer 仍占 $4P$；ZeRO-2 才会释放非本 rank 的梯度，使梯度存储降到 $4P/N$。
 
 
 ![ZeRO-1 一个 step 的流程](assets/02-fsdp-figure-02.svg)
@@ -71,12 +66,12 @@ ZeRO 切的是**静态显存**——每 step 都常驻、内容在各卡完全�
 
 ### ZeRO-2：backward 边算边 reduce-scatter，梯度也降到 1/N
 
-唯一的变化在梯度存储：反向每算完一个 bucket 的梯度就立即 reduce-scatter，每张卡**只保留自己那 $1/N$ 的梯度、其余立刻释放**。于是 FP32 梯度显存从 $4P$ 降到 $4P/N$。参数依然全量常驻，前向/反向仍不需要为计算临时 all-gather 参数；完成分片更新后仍需同步更新后的参数。
+唯一的变化在梯度存储：反向每算完一段梯度就立即 reduce-scatter，每张卡**只保留自己那 $1/N$ 的归约结果，其余部分随即释放**，然后继续计算下一段。这样不会在每张卡上累积出完整梯度，FP32 梯度显存从 $4P$ 降到 $4P/N$。参数依然全量常驻，前向/反向不需要临时 all-gather 参数；完成分片更新后仍需同步更新后的参数。
 
 
 ![ZeRO-2 一个 step 的流程](assets/02-fsdp-figure-03.svg)
 
-*ZeRO-2：把 all-reduce 换成 reduce-scatter，梯度也切到 1/N。参数依旧全量常驻。*
+*ZeRO-2：反向每算完一段梯度就立即 reduce-scatter，只留下本 rank 的分片；参数依旧全量常驻。*
 
 
 
@@ -97,8 +92,8 @@ FSDP 的核心节奏：**参数平时是切碎的，用到哪层才把那层 all
 
 | 动态显存 | 是什么 | ZeRO 能省吗 | 怎么省 |
 | --- | --- | --- | --- |
-| **激活值 activations** | 前向每层的中间结果，反向要用；$\propto$ batch × seq × 层数 × hidden | **不能**：每卡喂的数据不同、激活各不相同，无法沿 DP 维切 | 激活重计算 checkpointing、序列并行 SP（M3）、上下文并行 CP（M5）、offload |
-| **all-gather 瞬时峰值** （仅 ZeRO-3） | 当前正在算的那个 FSDP unit，all-gather 出的完整参数缓冲 | 是 ZeRO-3 **新增**的开销，不是省 | 大小 ≈ 最大一层的完整参数（非整模型）；prefetch 会让 1~2 个 unit 同时在飞；`reshard_after_forward` 控制留不留 |
+| **激活值 activations** | 前向每层的中间结果，反向要用；$\propto$ batch × seq × 层数 × hidden | **不能**：每卡喂的数据不同、激活各不相同，无法沿 DP 维切 | 激活重计算 checkpointing、序列并行 SP（第 4 章）、上下文并行 CP（第 6 章）、offload |
+| **all-gather 瞬时峰值** （仅 ZeRO-3） | 当前正在算的那个 FSDP unit，all-gather 出的完整参数缓冲 | 是 ZeRO-3 **新增**的开销，不是省 | 大小 ≈ 最大一层的完整参数（非整模型）；prefetch 可能使 1～2 个 unit 在同一时刻持有完整权重；`reshard_after_forward` 控制留不留 |
 | **通信 / 碎片缓冲** | reduce-scatter / all-gather 的临时 buffer、显存碎片 | — | 调 bucket 大小、复用通信桶 |
 
 
@@ -119,72 +114,9 @@ FSDP 的核心节奏：**参数平时是切碎的，用到哪层才把那层 all
 
 
 
-## 05 · Megatron：DistributedOptimizer（ZeRO-1）与 Megatron-FSDP（ZeRO-2/3） { #megatron }
+## 05 · 通信量：1.5× 是等宽 dtype 下的元素口径 { #comm }
 
-Megatron 最经典的省显存路线是 `DistributedOptimizer`：它**不切常驻参数**，只把**优化器状态**按 DP rank 切分（ZeRO-1），梯度用 reduce-scatter 归约。先看它如何把梯度 buffer 平均切给每个 rank：
-
-
-**Megatron-LM · optimizer/distrib_optimizer.py:188（_build_model_gbuf_range）**
-
-
-```python
-gbuf_size = bucket.grad_data.numel()
-max_gbuf_range_size = gbuf_size // data_parallel_world_size   # 平均切成 N 段
-# 第 r 段归 rank r “拥有”：它只 reduce 这段梯度、只为这段建 fp32 master + Adam 状态
-gbuf_world_range = gbuf_world_all_ranges[data_parallel_rank]
-```
-
-每个 rank 只为自己那段建 fp32 master 参数和优化器状态——这就是优化器状态降到 $1/N$ 的地方：
-
-
-**Megatron-LM · optimizer/distrib_optimizer.py:388（只为本 rank 的 shard 建 master）**
-
-
-```python
-shard_model_param = model_param.detach().view(-1)[param_range.start : param_range.end]
-shard_main_param  = shard_model_param.clone().float()   # 只覆盖本 rank 的 shard → 状态 1/N
-```
-
-梯度归约用 reduce-scatter（每 rank 只收到自己 shard 的梯度），更新后再 all-gather 把完整参数拼回供下次前向：
-
-
-**Megatron-LM · distributed/param_and_grad_buffer.py:617 / :420**
-
-
-```python
-# 反向：开启 distributed optimizer → reduce-scatter（否则退化成 DDP 的 all-reduce）
-grad_reduce_handle = dist_reduce_scatter_func(local_data_view, bucket.grad_data, ...)
-# step 后：每 rank 只更新了自己 shard 的参数，再 all-gather 拼回完整 param_data
-dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=async_op)
-```
-
-
-!!! warning "⚠️ 为什么是 ZeRO-1 而不是 ZeRO-2"
-
-    别被 reduce-scatter 迷惑：它只是**通信**手段（总通信量与一次 all-reduce 相同），不代表梯度被持久切分——Megatron 的**梯度 buffer 仍是全尺寸常驻，参数也保留完整副本**，只有优化器状态真正降到 $1/N$。对照官方内存表（bf16 参数 / fp32 梯度）：非分布式 **18** 字节/参数 → 分布式 **6 + 12/d**，其中常驻的 6（参数 2 + 梯度 4）不随 d 下降——这正是 ZeRO-1 的特征，显存降幅小于 FSDP（少降了参数、梯度那两块）。
-
-    来源：Megatron-LM · `docs/user-guide/features/dist_optimizer.md` 内存表。
-
-
-但 Megatron **并不止步于 ZeRO-1**。Megatron-Core 现已自带 **Megatron-FSDP**，用一个开关就能在三档之间切换，语义与 ZeRO-1/2/3 一一对应：
-
-
-**Megatron-LM · docs/user-guide/parallelism-guide.md（Megatron-FSDP 分片策略）**
-
-
-```bash
---use-megatron-fsdp
---data-parallel-sharding-strategy optim               # ZeRO-1：只切优化器状态
---data-parallel-sharding-strategy optim_grads         # ZeRO-2：再切梯度
---data-parallel-sharding-strategy optim_grads_params  # ZeRO-3：再切参数（= FSDP）
-```
-
-所以准确的说法是：**DistributedOptimizer 停在 ZeRO-1，而 Megatron-FSDP 能一路做到 ZeRO-3**——Megatron 生态里 ZeRO 三档都有，只是分属两套实现。
-
-
-## 06 · 通信量：1.5× 是等宽 dtype 下的元素口径 { #comm }
-
-回忆 M0 的恒等式 **all-reduce = reduce-scatter + all-gather**。先假设参数与梯度使用相同 dtype，并忽略环形通信共同的 $(N-1)/N$ 系数，按传输元素数计算：
+回忆第 1 章的恒等式 **all-reduce = reduce-scatter + all-gather**。先假设参数与梯度使用相同 dtype，并忽略环形通信共同的 $(N-1)/N$ 系数，按传输元素数计算：
 
 - **DDP**：每 step 一次梯度 all-reduce ≈ $2P$（reduce-scatter $P$ + all-gather $P$）。
 - **FSDP / ZeRO-3**：前向 all-gather 参数（$P$）+ 反向 all-gather 参数（$P$）+ 反向 reduce-scatter 梯度（$P$）= $3P$。
@@ -192,35 +124,18 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
 在这个简化口径下，$3P / 2P = 1.5$。但 Megatron 默认是 **BF16 参数 + FP32 梯度**，必须换算成字节：DDP 的 FP32 梯度 all-reduce 约为 $2 \times 4P = 8P$ 字节；FSDP 两次 BF16 参数 all-gather 加一次 FP32 梯度 reduce-scatter，约为 $2P + 2P + 4P = 8P$ 字节。因此默认 dtype 下不能宣称网络字节固定增加 50%。实际墙钟差异还取决于 collective 次数与粒度、拓扑、预取以及计算通信重叠程度。
 
 
-## 07 · FSDP ≡ ZeRO-3 { #equiv }
+## 06 · ZeRO-3 在四套实现中的对应关系 { #equiv }
 
-两者算法**完全等价**：参数、梯度、优化器状态全部沿 DP 维切成 $1/N$；用到完整参数时临时 all-gather、用完丢弃；梯度 reduce-scatter 后各管各的 shard。差异只在实现：
+ZeRO-3 描述的是一种分片语义：参数、梯度和优化器状态都沿 DP 维切成 $1/N$；计算前临时 all-gather 当前单元的参数，反向后用 reduce-scatter 留下本 rank 的梯度分片。DeepSpeed、PyTorch、Megatron 和 HyperParallel 都能实现这套语义，只是接口与工程侧重点不同：
 
-|  | DeepSpeed ZeRO-3 | PyTorch FSDP2（`fully_shard`） |
-| --- | --- | --- |
-| 分片粒度 | 参数 flat partition + hook | per-parameter `DTensor`（`Shard(0)`） |
-| 通信单元 | 参数分组 | `fully_shard(module)` 决定 |
-| 混合精度 | ZeRO config | `MixedPrecisionPolicy` |
+| 实现 | ZeRO-3 入口 | 分片与通信边界 | 主要特点 |
+| --- | --- | --- | --- |
+| DeepSpeed ZeRO-3 | 配置 `zero_optimization.stage = 3` | 运行时按参数组管理 | 配置驱动，支持参数与优化器 offload |
+| PyTorch FSDP2 | `fully_shard(module)` | 由传入的 module 决定 | 使用 per-parameter `DTensor`，与 PyTorch 原生接口结合紧密 |
+| Megatron-FSDP | `--use-megatron-fsdp` + `--data-parallel-sharding-strategy optim_grads_params` | FSDP unit，通常是 Transformer 层 | 面向大模型训练，集成 TP、CP、EP、TransformerEngine 与通信重叠 |
+| HyperParallel | `fully_shard(module, mesh=..., comm_fusion=...)` | FSDP unit；通信可选逐参数或按 bucket 融合 | 通过二维 HSDP mesh 映射分片与复制通信域，并优化 RS / AR 跨 unit 流水 |
 
-
-## 08 · 启用 { #compare }
-
-
-#### Megatron DistributedOptimizer（ZeRO-1）
-
-- 只切优化器状态 → $6P + 12P/N$
-- 梯度 reduce-scatter，参数仍完整
-- `--use-distributed-optimizer`
-- `--overlap-grad-reduce` / `--overlap-param-gather`
-- 要 ZeRO-2/3：改用 **Megatron-FSDP**（`--use-megatron-fsdp --data-parallel-sharding-strategy optim_grads[_params]`）
-
-
-#### PyTorch FSDP（ZeRO-3）
-
-- 切参数 + 梯度 + 优化器状态 → $18P/N$
-- per-parameter DTensor 分片（`fully_shard`）
-- 逐层 `fully_shard(block, mesh=dp_mesh)`
-- `reshard_after_forward` 控制前向后是否丢弃完整参数
+需要注意，Megatron 的 `DistributedOptimizer` 与 `Megatron-FSDP` 不是同一条实现路径：前者只切优化器状态，属于 ZeRO-1；后者选择 `optim_grads_params` 时才完整对应 ZeRO-3。
 
 
 !!! tip "✅ 学完自测"
@@ -229,3 +144,5 @@ dist_all_gather_func(bucket.param_data, local_data_view, group=..., async_op=asy
     2. FSDP 前向为什么用完参数要立刻 reshard 丢弃？省的是什么显存？
     3. FSDP/DDP 的 1.5× 通信比值基于什么 dtype 前提？换成 BF16 参数、FP32 梯度后，按字节应如何重算？
     4. Megatron 的 `DistributedOptimizer` 和 FSDP 等价吗？差在哪一块显存？
+
+[→ 继续阅读 3.2 · Megatron 实现方案](02-megatron-fsdp.md)

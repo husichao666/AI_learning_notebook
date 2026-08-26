@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" role="img" aria-labelledby="title desc">
+  <title id="title">一个 TransformerLayer 的参数分组示例</title>
+  <desc id="desc">示例 TransformerLayer 的六个参数按照 FSDP unit、数据类型、dense 或 expert 属性和 requires grad 状态，被分成一个 BF16 参数组和一个 FP32 参数组。</desc>
+
+  <defs>
+    <filter id="shadow" x="-10%" y="-15%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0f172a" flood-opacity="0.09"/>
+    </filter>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="560" fill="#ffffff"/>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="30" y="34" fill="#0f172a" font-size="21" font-weight="700">一个 TransformerLayer 如何拆成参数分组</text>
+    <text x="30" y="59" fill="#64748b" font-size="14">示例配置：FSDP unit = Layer 7；线性层权重为 BF16，LayerNorm 权重保留 FP32，所有参数均参与训练</text>
+
+    <!-- Before grouping -->
+    <text x="30" y="96" fill="#334155" font-size="16" font-weight="700">分组前：Module 中的 Parameter</text>
+    <rect x="30" y="110" width="420" height="397" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+
+    <g filter="url(#shadow)">
+      <rect x="50" y="132" width="380" height="46" rx="8" fill="#e0e7ff" stroke="#818cf8"/>
+    </g>
+    <text x="68" y="153" fill="#312e81" font-size="15" font-weight="700">TransformerLayer</text>
+    <text x="68" y="170" fill="#6366f1" font-size="12">fsdp_unit_id = 7 · dense · requires_grad = true</text>
+
+    <line x1="68" y1="178" x2="68" y2="474" stroke="#cbd5e1" stroke-width="1.5"/>
+
+    <g font-size="12.5">
+      <rect x="63" y="194" width="367" height="39" rx="7" fill="#fffbeb" stroke="#fbbf24"/>
+      <text x="80" y="218" fill="#334155">input_layernorm.weight</text>
+      <rect x="349" y="202" width="64" height="23" rx="11.5" fill="#fef3c7"/>
+      <text x="381" y="218" fill="#92400e" font-weight="700" text-anchor="middle">FP32</text>
+
+      <rect x="63" y="241" width="367" height="39" rx="7" fill="#eff6ff" stroke="#60a5fa"/>
+      <text x="80" y="265" fill="#334155">self_attention.linear_qkv.weight</text>
+      <rect x="349" y="249" width="64" height="23" rx="11.5" fill="#dbeafe"/>
+      <text x="381" y="265" fill="#1e40af" font-weight="700" text-anchor="middle">BF16</text>
+
+      <rect x="63" y="288" width="367" height="39" rx="7" fill="#eff6ff" stroke="#60a5fa"/>
+      <text x="80" y="312" fill="#334155">self_attention.linear_proj.weight</text>
+      <rect x="349" y="296" width="64" height="23" rx="11.5" fill="#dbeafe"/>
+      <text x="381" y="312" fill="#1e40af" font-weight="700" text-anchor="middle">BF16</text>
+
+      <rect x="63" y="335" width="367" height="39" rx="7" fill="#fffbeb" stroke="#fbbf24"/>
+      <text x="80" y="359" fill="#334155">pre_mlp_layernorm.weight</text>
+      <rect x="349" y="343" width="64" height="23" rx="11.5" fill="#fef3c7"/>
+      <text x="381" y="359" fill="#92400e" font-weight="700" text-anchor="middle">FP32</text>
+
+      <rect x="63" y="382" width="367" height="39" rx="7" fill="#eff6ff" stroke="#60a5fa"/>
+      <text x="80" y="406" fill="#334155">mlp.linear_fc1.weight</text>
+      <rect x="349" y="390" width="64" height="23" rx="11.5" fill="#dbeafe"/>
+      <text x="381" y="406" fill="#1e40af" font-weight="700" text-anchor="middle">BF16</text>
+
+      <rect x="63" y="429" width="367" height="39" rx="7" fill="#eff6ff" stroke="#60a5fa"/>
+      <text x="80" y="453" fill="#334155">mlp.linear_fc2.weight</text>
+      <rect x="349" y="437" width="64" height="23" rx="11.5" fill="#dbeafe"/>
+      <text x="381" y="453" fill="#1e40af" font-weight="700" text-anchor="middle">BF16</text>
+    </g>
+
+    <!-- Grouping rule -->
+    <path d="M450 304 L475 304" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <g filter="url(#shadow)">
+      <rect x="480" y="184" width="145" height="230" rx="12" fill="#ffffff" stroke="#94a3b8"/>
+    </g>
+    <text x="552.5" y="212" fill="#0f172a" font-size="15" font-weight="700" text-anchor="middle">按属性 key 分组</text>
+    <line x1="497" y1="226" x2="608" y2="226" stroke="#e2e8f0"/>
+    <g fill="#475569" font-size="13" text-anchor="middle">
+      <text x="552.5" y="257">FSDP unit</text>
+      <text x="552.5" y="289">dtype</text>
+      <text x="552.5" y="321">dense / expert</text>
+      <text x="552.5" y="353">requires_grad</text>
+    </g>
+    <rect x="504" y="374" width="97" height="24" rx="12" fill="#f1f5f9"/>
+    <text x="552.5" y="391" fill="#334155" font-size="12" font-weight="700" text-anchor="middle">只建立引用关系</text>
+
+    <path d="M625 270 C640 270 639 226 653 226" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+    <path d="M625 329 C640 329 639 421 653 421" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arrow)"/>
+
+    <!-- After grouping -->
+    <text x="655" y="96" fill="#334155" font-size="16" font-weight="700">分组后：两个 ParameterGroup</text>
+
+    <g filter="url(#shadow)">
+      <rect x="655" y="110" width="415" height="225" rx="12" fill="#eff6ff" stroke="#60a5fa"/>
+    </g>
+    <text x="678" y="140" fill="#1e3a8a" font-size="15" font-weight="700">Group A · BF16 参数</text>
+    <text x="678" y="162" fill="#1d4ed8" font-size="12.5">unit 7 · BF16 · dense · requires_grad = true</text>
+    <line x1="678" y1="176" x2="1047" y2="176" stroke="#bfdbfe"/>
+    <g fill="#334155" font-size="13">
+      <circle cx="684" cy="202" r="3" fill="#3b82f6"/>
+      <text x="696" y="207">self_attention.linear_qkv.weight</text>
+      <circle cx="684" cy="237" r="3" fill="#3b82f6"/>
+      <text x="696" y="242">self_attention.linear_proj.weight</text>
+      <circle cx="684" cy="272" r="3" fill="#3b82f6"/>
+      <text x="696" y="277">mlp.linear_fc1.weight</text>
+      <circle cx="684" cy="307" r="3" fill="#3b82f6"/>
+      <text x="696" y="312">mlp.linear_fc2.weight</text>
+    </g>
+
+    <g filter="url(#shadow)">
+      <rect x="655" y="355" width="415" height="152" rx="12" fill="#fffbeb" stroke="#fbbf24"/>
+    </g>
+    <text x="678" y="385" fill="#78350f" font-size="15" font-weight="700">Group B · FP32 参数</text>
+    <text x="678" y="407" fill="#b45309" font-size="12.5">unit 7 · FP32 · dense · requires_grad = true</text>
+    <line x1="678" y1="421" x2="1047" y2="421" stroke="#fde68a"/>
+    <g fill="#334155" font-size="13">
+      <circle cx="684" cy="449" r="3" fill="#f59e0b"/>
+      <text x="696" y="454">input_layernorm.weight</text>
+      <circle cx="684" cy="482" r="3" fill="#f59e0b"/>
+      <text x="696" y="487">pre_mlp_layernorm.weight</text>
+    </g>
+
+    <text x="550" y="541" fill="#64748b" font-size="13" text-anchor="middle">分组只整理 Parameter 引用，不复制参数值；实际分组数量由模型配置和参数属性决定。</text>
+  </g>
+</svg>

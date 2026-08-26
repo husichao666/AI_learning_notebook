@@ -1,5 +1,5 @@
 ---
-title: "M0 · 基础铺垫（已迁移）"
+title: "第 1 章 · 训练状态与集合通信（已迁移）"
 description: 页面已迁移到新的知识库结构
 search:
   exclude: true

@@ -1,5 +1,5 @@
 ---
-title: "M6-3 · EP 性能优化（已迁移）"
+title: "7.3 · 性能优化（已迁移）"
 description: 页面已迁移到新的知识库结构
 search:
   exclude: true

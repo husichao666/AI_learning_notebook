@@ -1,16 +1,16 @@
 ---
-title: 分布式训练并行策略
-description: DP、FSDP、TP、PP、CP、EP 与 nD 并行学习路线
+title: 并行训练
+description: 从训练状态与集合通信出发，系统学习 DP、ZeRO、FSDP、TP、SP、PP、CP、EP 与多维组合并行
 type: series-hub
 status: stable
 level: beginner-to-advanced
-updated: 2026-08-24
+updated: 2026-08-26
 tags:
   - distributed-training
   - parallelism
 ---
 
-# 分布式训练并行策略
+# 并行训练：从单卡到多维组合
 
 <div class="notebook-hero" markdown>
 
@@ -18,22 +18,31 @@ tags:
 
 </div>
 
-## 主线章节
+## 全书目录
 
-1. [M0 · 基础铺垫：显存账本与通信原语](00-foundations.md)
-2. [M1 · 数据并行 DP](01-dp.md)
-3. [M2 · FSDP / ZeRO](02-fsdp.md)
-4. [M3 · 张量并行 TP + SP](03-tp.md)
-5. [M4 · 流水线并行 PP](04-pp.md)
-6. [M5 · 上下文并行 CP](05-cp.md)
-7. [M6-1 · EP 原理：路由、分发与负载均衡](06-ep.md)
-8. [M6-2 · Megatron EP 源码执行链路](06-ep-source.md)
-9. [M6-3 · EP 性能优化](06-ep-performance.md)
-10. [M7 · nD 组合并行与工程调优](07-nd.md)
+1. [第 1 章 · 训练状态与集合通信](00-foundations.md)
+   建立显存账本，理解集合通信语义、通信量口径与 ring 等底层算法。
+2. [第 2 章 · Data Parallel](01-dp.md)
+   从模型副本和数据切分出发，理解梯度同步与计算通信重叠。
+3. **第 3 章 · 模型状态分片**
+    - [3.1 · ZeRO 与 FSDP](02-fsdp.md)
+    - [3.2 · Megatron 实现方案](02-megatron-fsdp.md)
+    - [3.3 · PyTorch 原生方案](02-pytorch-fsdp.md)
+    - [3.4 · HyperParallel 性能优化](02-hyper-fsdp.md)
+4. **第 4 章 · Tensor Parallel 与 Sequence Parallel**
+    - [4.1 · Tensor Parallel](03-tp.md)
+    - [4.2 · Sequence Parallel](03-sp.md)
+    - [4.3 · Loss Parallel](loss-parallel.md)
+5. [第 5 章 · Pipeline Parallel](04-pp.md)
+   沿模型深度切分计算，理解气泡、micro-batch 与 1F1B 调度。
+6. [第 6 章 · Context Parallel](05-cp.md)
+   沿序列维切分注意力，比较 Ring Attention、Ulysses 与 all-gather 路线。
+7. **第 7 章 · Expert Parallel**
+    - [7.1 · 原理](06-ep.md)
+    - [7.2 · Megatron 专家并行实现](06-ep-source.md)
+    - [7.3 · 专家并行性能优化](06-ep-performance.md)
+    - [7.4 · MoE 辅助损失](moe-aux-loss.md)
+8. [第 8 章 · 多维组合并行](07-nd.md)
+   把各并行维度放入同一张设备网格，形成完整的选型与调优方法。
 
-## 深入专题
-
-- [Loss Parallel：词表并行交叉熵](loss-parallel.md)
-- [MoE aux loss：负载均衡原理与实现](moe-aux-loss.md)
-
-所有正文现在都以 Markdown 维护；左侧目录负责章节导航，右侧目录定位本章小节，顶部搜索可以跨整本手册检索。
+所有正文都以 Markdown 维护；左侧目录按“章—节”组织，右侧目录定位文章内部主题，顶部搜索可以跨整本书检索。
