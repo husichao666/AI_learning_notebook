@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 580" role="img" aria-labelledby="title desc">
+  <title id="title">两个 CUDA stream 上计算与通信的时间关系</title>
+  <desc id="desc">Host 先后下发计算和异步通信。计算 stream 执行两段计算，通信 stream 同时执行 collective。使用通信结果前建立等待，未被计算覆盖的通信尾部成为暴露等待时间。</desc>
+  <defs><marker id="axis" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#94a3b8"/></marker><marker id="dep" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#ef4444"/></marker></defs>
+  <rect width="1120" height="580" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">异步下发、并发执行、最终等待是三件事</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">时间线向右；方块长度只用于说明关系</text>
+    <line x1="178" y1="106" x2="1070" y2="106" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#axis)"/><text x="1044" y="95" fill="#64748b" font-size="12">时间</text>
+
+    <g fill="#334155" font-size="14" font-weight="700" text-anchor="end">
+      <text x="160" y="165">Host</text><text x="160" y="267">Compute stream</text><text x="160" y="369">Comm stream</text><text x="160" y="471">关键路径</text>
+    </g>
+    <g stroke="#e2e8f0"><line x1="178" y1="160" x2="1070" y2="160"/><line x1="178" y1="262" x2="1070" y2="262"/><line x1="178" y1="364" x2="1070" y2="364"/><line x1="178" y1="466" x2="1070" y2="466"/></g>
+
+    <rect x="205" y="137" width="112" height="46" rx="9" fill="#e2e8f0" stroke="#94a3b8"/><text x="261" y="156" fill="#334155" font-size="12" font-weight="700" text-anchor="middle">launch compute</text><text x="261" y="173" fill="#64748b" font-size="10" text-anchor="middle">很快返回</text>
+    <rect x="331" y="137" width="112" height="46" rx="9" fill="#ede9fe" stroke="#a78bfa"/><text x="387" y="156" fill="#6d28d9" font-size="12" font-weight="700" text-anchor="middle">launch comm</text><text x="387" y="173" fill="#64748b" font-size="10" text-anchor="middle">async</text>
+    <rect x="457" y="137" width="112" height="46" rx="9" fill="#e2e8f0" stroke="#94a3b8"/><text x="513" y="156" fill="#334155" font-size="12" font-weight="700" text-anchor="middle">继续下发</text><text x="513" y="173" fill="#64748b" font-size="10" text-anchor="middle">CPU 不等待</text>
+
+    <rect x="205" y="235" width="310" height="54" rx="10" fill="#dbeafe" stroke="#3b82f6"/><text x="360" y="268" fill="#1e3a8a" font-size="14" font-weight="750" text-anchor="middle">Compute A</text>
+    <rect x="525" y="235" width="285" height="54" rx="10" fill="#dbeafe" stroke="#3b82f6"/><text x="667" y="268" fill="#1e3a8a" font-size="14" font-weight="750" text-anchor="middle">Compute B（覆盖窗口）</text>
+    <rect x="883" y="235" width="155" height="54" rx="10" fill="#dcfce7" stroke="#22c55e"/><text x="960" y="258" fill="#166534" font-size="13" font-weight="750" text-anchor="middle">消费通信结果</text><text x="960" y="276" fill="#64748b" font-size="10" text-anchor="middle">依赖已满足</text>
+
+    <rect x="360" y="337" width="530" height="54" rx="10" fill="#f3e8ff" stroke="#8b5cf6"/><text x="625" y="370" fill="#6d28d9" font-size="14" font-weight="750" text-anchor="middle">Collective：GPU 上真正执行</text>
+    <path d="M890 364C915 364 866 250 878 250" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#dep)"/>
+    <text x="873" y="323" fill="#991b1b" font-size="11" font-weight="700" text-anchor="middle">event / wait</text>
+
+    <rect x="205" y="439" width="605" height="54" rx="10" fill="#dbeafe" stroke="#3b82f6"/><text x="507" y="472" fill="#1e3a8a" font-size="14" font-weight="750" text-anchor="middle">计算覆盖了大部分通信</text>
+    <rect x="810" y="439" width="80" height="54" rx="10" fill="#fee2e2" stroke="#ef4444"/><text x="850" y="460" fill="#991b1b" font-size="11" font-weight="750" text-anchor="middle">暴露</text><text x="850" y="478" fill="#991b1b" font-size="11" font-weight="750" text-anchor="middle">尾巴</text>
+    <rect x="890" y="439" width="148" height="54" rx="10" fill="#dcfce7" stroke="#22c55e"/><text x="964" y="472" fill="#166534" font-size="13" font-weight="750" text-anchor="middle">继续执行</text>
+
+    <rect x="205" y="520" width="833" height="35" rx="17" fill="#f8fafc"/>
+    <text x="621" y="543" fill="#475569" font-size="13" font-weight="700" text-anchor="middle">async 只减少 Host 阻塞；overlap 才减少关键路径上的暴露等待</text>
+  </g>
+</svg>

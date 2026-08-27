@@ -26,9 +26,10 @@ tags:
    从模型副本和数据切分出发，理解梯度同步与计算通信重叠。
 3. **第 3 章 · 模型状态分片**
     - [3.1 · ZeRO 与 FSDP](02-fsdp.md)
-    - [3.2 · Megatron 实现方案](02-megatron-fsdp.md)
-    - [3.3 · PyTorch 原生方案](02-pytorch-fsdp.md)
-    - [3.4 · HyperParallel 性能优化](02-hyper-fsdp.md)
+    - [3.2 · 通信开销基础](02-communication-cost.md)
+    - [3.3 · Megatron 实现方案](02-megatron-fsdp.md)
+    - [3.4 · PyTorch 原生方案](02-pytorch-fsdp.md)
+    - [3.5 · HyperParallel 性能优化](02-hyper-fsdp.md)
 4. **第 4 章 · Tensor Parallel 与 Sequence Parallel**
     - [4.1 · Tensor Parallel](03-tp.md)
     - [4.2 · Sequence Parallel](03-sp.md)

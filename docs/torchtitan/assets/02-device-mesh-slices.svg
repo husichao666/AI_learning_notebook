@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="660" viewBox="0 0 1200 660" role="img" aria-label="二维 dp 乘 tp DeviceMesh 及当前 rank 对应的子 mesh">
+  <rect x="1" y="1" width="1198" height="658" rx="18" fill="#f8fafc" stroke="#d7deea"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="600" y="42" text-anchor="middle" fill="#172033" font-size="28" font-weight="700">二维 DeviceMesh：同一组 rank 的两种通信方向</text>
+    <text x="600" y="75" text-anchor="middle" fill="#5f6b7a" font-size="18">mesh_shape = (2, 4) · mesh_dim_names = ("dp", "tp")</text>
+
+    <text x="600" y="112" text-anchor="middle" fill="#334a8a" font-size="19" font-weight="700">tp axis：沿每一行形成 4-rank 子 mesh</text>
+    <g text-anchor="middle">
+      <text x="235" y="145" fill="#5f6b7a" font-size="16">dp group 0</text>
+      <text x="455" y="145" fill="#5f6b7a" font-size="16">dp group 1</text>
+      <text x="675" y="145" fill="#5f6b7a" font-size="16">dp group 2</text>
+      <text x="895" y="145" fill="#5f6b7a" font-size="16">dp group 3</text>
+
+      <rect x="110" y="166" width="100" height="300" rx="18" fill="#e0e7ff" opacity=".5"/>
+      <rect x="330" y="166" width="100" height="300" rx="18" fill="#dcfce7" opacity=".55"/>
+      <rect x="550" y="166" width="100" height="300" rx="18" fill="#fef3c7" opacity=".55"/>
+      <rect x="770" y="166" width="100" height="300" rx="18" fill="#ffe4e6" opacity=".55"/>
+
+      <rect x="125" y="175" width="170" height="110" rx="14" fill="#ffffff" stroke="#7c93ff" stroke-width="2"/>
+      <rect x="345" y="175" width="170" height="110" rx="14" fill="#eef2ff" stroke="#4f67d8" stroke-width="4"/>
+      <rect x="565" y="175" width="170" height="110" rx="14" fill="#ffffff" stroke="#fbbf24" stroke-width="2"/>
+      <rect x="785" y="175" width="170" height="110" rx="14" fill="#ffffff" stroke="#fb7185" stroke-width="2"/>
+      <text x="210" y="225" fill="#334a8a" font-size="26" font-weight="700">rank 0</text>
+      <text x="430" y="225" fill="#334a8a" font-size="26" font-weight="700">rank 1</text>
+      <text x="650" y="225" fill="#92400e" font-size="26" font-weight="700">rank 2</text>
+      <text x="870" y="225" fill="#9f1239" font-size="26" font-weight="700">rank 3</text>
+      <text x="430" y="260" fill="#4f67d8" font-size="17" font-weight="700">当前 rank</text>
+
+      <rect x="125" y="335" width="170" height="110" rx="14" fill="#ffffff" stroke="#7c93ff" stroke-width="2"/>
+      <rect x="345" y="335" width="170" height="110" rx="14" fill="#ffffff" stroke="#4ade80" stroke-width="2"/>
+      <rect x="565" y="335" width="170" height="110" rx="14" fill="#ffffff" stroke="#fbbf24" stroke-width="2"/>
+      <rect x="785" y="335" width="170" height="110" rx="14" fill="#ffffff" stroke="#fb7185" stroke-width="2"/>
+      <text x="210" y="400" fill="#334a8a" font-size="26" font-weight="700">rank 4</text>
+      <text x="430" y="400" fill="#166534" font-size="26" font-weight="700">rank 5</text>
+      <text x="650" y="400" fill="#92400e" font-size="26" font-weight="700">rank 6</text>
+      <text x="870" y="400" fill="#9f1239" font-size="26" font-weight="700">rank 7</text>
+    </g>
+
+    <path d="M100 155 H980" fill="none" stroke="#7c93ff" stroke-width="3"/>
+    <path d="M100 315 H980" fill="none" stroke="#4ade80" stroke-width="3"/>
+    <text x="1020" y="235" fill="#334a8a" font-size="18" font-weight="700">tp group A</text>
+    <text x="1020" y="261" fill="#5f6b7a" font-size="16">[0, 1, 2, 3]</text>
+    <text x="1020" y="395" fill="#166534" font-size="18" font-weight="700">tp group B</text>
+    <text x="1020" y="421" fill="#5f6b7a" font-size="16">[4, 5, 6, 7]</text>
+
+    <text x="600" y="495" text-anchor="middle" fill="#172033" font-size="19" font-weight="700">在 rank 1 上执行同一段 SPMD 代码时</text>
+    <rect x="105" y="518" width="470" height="92" rx="14" fill="#eef2ff" stroke="#7c93ff"/>
+    <text x="340" y="552" text-anchor="middle" fill="#334a8a" font-size="20" font-weight="700">mesh["tp"].mesh</text>
+    <text x="340" y="585" text-anchor="middle" fill="#172033" font-size="20">tensor([0, 1, 2, 3])</text>
+
+    <rect x="625" y="518" width="470" height="92" rx="14" fill="#ecfdf5" stroke="#4ade80"/>
+    <text x="860" y="552" text-anchor="middle" fill="#166534" font-size="20" font-weight="700">mesh["dp"].mesh</text>
+    <text x="860" y="585" text-anchor="middle" fill="#172033" font-size="20">tensor([1, 5])</text>
+
+    <text x="600" y="642" text-anchor="middle" fill="#5f6b7a" font-size="17">子 mesh 返回“当前 rank 所在的线”，不是所有同类 process group 的列表</text>
+  </g>
+</svg>

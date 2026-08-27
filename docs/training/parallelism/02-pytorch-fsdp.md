@@ -1,10 +1,10 @@
 ---
-title: "3.3 · PyTorch 原生方案"
+title: "3.4 · PyTorch 原生方案"
 description: "沿 PyTorch FSDP2 源码，追踪 fully_shard、FSDPState、FSDPParamGroup、FSDPParam、Hook 与 collective 的完整实现。"
 type: source-note
 status: stable
 level: intermediate
-updated: 2026-08-26
+updated: 2026-08-27
 tags: [distributed-training, fsdp, fsdp2, pytorch, torchtitan]
 ---
 
@@ -571,4 +571,4 @@ FSDPState._pre_forward
     5. `ReduceScatterState` 为什么必须同时持有 input Tensor 和 event？
     6. 普通 AdamW 为什么只更新参数 shard，从不持有计算期 `_unsharded_param`？
 
-[→ 继续阅读 3.4 · HyperParallel 性能优化](02-hyper-fsdp.md)
+[→ 继续阅读 3.5 · HyperParallel 性能优化](02-hyper-fsdp.md)

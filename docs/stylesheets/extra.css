@@ -11,6 +11,11 @@
   --kb-shadow: 0 16px 40px rgba(30, 41, 59, 0.08);
 }
 
+/* Give diagrams and comparison tables enough room beside the two sidebars. */
+.md-grid {
+  max-width: 80rem;
+}
+
 [data-md-color-scheme="slate"] {
   --md-default-bg-color: #0f1117;
   --md-default-fg-color: #d7dbe4;

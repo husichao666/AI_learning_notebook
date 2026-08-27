@@ -47,9 +47,10 @@ nav = [
       { "第 2 章 · Data Parallel" = "training/parallelism/01-dp.md" },
       { "第 3 章 · 模型状态分片" = [
         { "3.1 · ZeRO 与 FSDP" = "training/parallelism/02-fsdp.md" },
-        { "3.2 · Megatron 实现方案" = "training/parallelism/02-megatron-fsdp.md" },
-        { "3.3 · PyTorch 原生方案" = "training/parallelism/02-pytorch-fsdp.md" },
-        { "3.4 · HyperParallel 性能优化" = "training/parallelism/02-hyper-fsdp.md" },
+        { "3.2 · 通信开销基础" = "training/parallelism/02-communication-cost.md" },
+        { "3.3 · Megatron 实现方案" = "training/parallelism/02-megatron-fsdp.md" },
+        { "3.4 · PyTorch 原生方案" = "training/parallelism/02-pytorch-fsdp.md" },
+        { "3.5 · HyperParallel 性能优化" = "training/parallelism/02-hyper-fsdp.md" },
       ] },
       { "第 4 章 · Tensor Parallel 与 Sequence Parallel" = [
         { "4.1 · Tensor Parallel" = "training/parallelism/03-tp.md" },
@@ -67,8 +68,23 @@ nav = [
       { "第 8 章 · 多维组合并行" = "training/parallelism/07-nd.md" },
     ] },
   ] },
+  { "TorchTitan" = [
+    { "专题总览" = "torchtitan/index.md" },
+    { "第 1 章 · DTensor 原理与使用" = "torchtitan/01-dtensor.md" },
+    { "第 2 章 · DeviceMesh 与 Placement" = "torchtitan/02-device-mesh-placement.md" },
+    { "独立源码分析 · GraphTrainer" = "torchtitan/graph-trainer.md" },
+  ] },
   { "性能工程" = [
     { "领域总览" = "engineering/index.md" },
+    { "GPU 性能基础" = [
+      { "专题总览" = "engineering/gpu-basics/index.md" },
+      { "1 · GPU 里面有什么" = "engineering/gpu-basics/01-architecture.md" },
+      { "2 · 一次计算消耗什么" = "engineering/gpu-basics/02-compute.md" },
+      { "3 · 一次拷贝消耗什么" = "engineering/gpu-basics/03-copy.md" },
+      { "4 · 一次通信消耗什么" = "engineering/gpu-basics/04-communication.md" },
+      { "5 · 异步与 overlap" = "engineering/gpu-basics/05-concurrency.md" },
+      { "6 · 怎样观察这些开销" = "engineering/gpu-basics/06-profiling.md" },
+    ] },
     { "训练性能采集与分析" = "engineering/training-performance.md" },
   ] },
 ]

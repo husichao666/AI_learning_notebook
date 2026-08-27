@@ -145,4 +145,4 @@ ZeRO-3 描述的是一种分片语义：参数、梯度和优化器状态都沿 
     3. FSDP/DDP 的 1.5× 通信比值基于什么 dtype 前提？换成 BF16 参数、FP32 梯度后，按字节应如何重算？
     4. Megatron 的 `DistributedOptimizer` 和 FSDP 等价吗？差在哪一块显存？
 
-[→ 继续阅读 3.2 · Megatron 实现方案](02-megatron-fsdp.md)
+[→ 继续阅读 3.2 · 通信开销基础](02-communication-cost.md)

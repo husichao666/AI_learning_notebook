@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 580" role="img" aria-labelledby="title desc">
+  <title id="title">端到端、kernel 与链路三层性能观测</title>
+  <desc id="desc">第一层用 Nsight Systems 或框架 profiler 查看 step 时间线；第二层用 Nsight Compute 分析单个 kernel 的 SM、HBM、缓存和 Roofline；第三层用 nvbandwidth、P2P sample 和 nccl-tests 测量链路与 collective。</desc>
+  <defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker></defs>
+  <rect width="1080" height="580" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">从关键路径向下钻，不从局部指标猜答案</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">每一层回答不同问题</text>
+
+    <rect x="55" y="111" width="970" height="112" rx="20" fill="#eff6ff" stroke="#60a5fa"/>
+    <circle cx="112" cy="167" r="29" fill="#3b82f6"/><text x="112" y="175" fill="#fff" font-size="22" font-weight="800" text-anchor="middle">1</text>
+    <text x="162" y="151" fill="#1e3a8a" font-size="18" font-weight="750">端到端时间线</text>
+    <text x="162" y="180" fill="#334155" font-size="14">计算、memcpy、NCCL 和空洞分别在哪里？哪个等待在关键路径？</text>
+    <rect x="737" y="137" width="250" height="58" rx="12" fill="#fff" stroke="#93c5fd"/><text x="862" y="160" fill="#1e3a8a" font-size="13" font-weight="750" text-anchor="middle">Nsight Systems / 框架 Profiler</text><text x="862" y="181" fill="#64748b" font-size="11" text-anchor="middle">先确定值得下钻的操作</text>
+
+    <path d="M540 223V249" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="55" y="256" width="970" height="112" rx="20" fill="#f0fdf4" stroke="#4ade80"/>
+    <circle cx="112" cy="312" r="29" fill="#22c55e"/><text x="112" y="320" fill="#fff" font-size="22" font-weight="800" text-anchor="middle">2</text>
+    <text x="162" y="296" fill="#166534" font-size="18" font-weight="750">单个 Kernel</text>
+    <text x="162" y="325" fill="#334155" font-size="14">它受计算、HBM、缓存、Occupancy 还是延迟限制？</text>
+    <rect x="737" y="282" width="250" height="58" rx="12" fill="#fff" stroke="#86efac"/><text x="862" y="305" fill="#166534" font-size="13" font-weight="750" text-anchor="middle">Nsight Compute</text><text x="862" y="326" fill="#64748b" font-size="11" text-anchor="middle">Roofline · SM · DRAM · L2</text>
+
+    <path d="M540 368V394" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="55" y="401" width="970" height="112" rx="20" fill="#f5f3ff" stroke="#a78bfa"/>
+    <circle cx="112" cy="457" r="29" fill="#8b5cf6"/><text x="112" y="465" fill="#fff" font-size="22" font-weight="800" text-anchor="middle">3</text>
+    <text x="162" y="441" fill="#6d28d9" font-size="18" font-weight="750">链路与 Collective</text>
+    <text x="162" y="470" fill="#334155" font-size="14">P2P 路径是否正确？小消息延迟和大消息带宽是否符合预期？</text>
+    <rect x="737" y="427" width="250" height="58" rx="12" fill="#fff" stroke="#c4b5fd"/><text x="862" y="450" fill="#6d28d9" font-size="13" font-weight="750" text-anchor="middle">nvbandwidth / nccl-tests</text><text x="862" y="471" fill="#64748b" font-size="11" text-anchor="middle">latency · algbw · busbw</text>
+
+    <text x="540" y="552" fill="#64748b" font-size="13" font-weight="700" text-anchor="middle">局部指标只有放回 step 关键路径，才具有优化意义</text>
+  </g>
+</svg>

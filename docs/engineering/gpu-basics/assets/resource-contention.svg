@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 580" role="img" aria-labelledby="title desc">
+  <title id="title">计算、拷贝和通信发生资源竞争</title>
+  <desc id="desc">GEMM 主要使用 Tensor Core、SM 和 HBM；本地 copy 主要使用 copy engine 或 SM 与 HBM；NCCL 通信使用 SM 或 copy engine、HBM 和外部互联。不同 stream 上的操作仍可能争用共享资源。</desc>
+  <rect width="1080" height="580" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">不同 stream，不等于不同硬件</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">圆点越深，表示该操作越常使用这类资源；实际占用取决于实现</text>
+
+    <g font-size="14" font-weight="750" text-anchor="middle">
+      <rect x="220" y="104" width="138" height="54" rx="12" fill="#eff6ff"/><text x="289" y="136" fill="#1e3a8a">SM / Tensor Core</text>
+      <rect x="374" y="104" width="138" height="54" rx="12" fill="#f0fdf4"/><text x="443" y="136" fill="#166534">HBM / L2</text>
+      <rect x="528" y="104" width="138" height="54" rx="12" fill="#fffbeb"/><text x="597" y="136" fill="#92400e">Copy Engine</text>
+      <rect x="682" y="104" width="138" height="54" rx="12" fill="#f5f3ff"/><text x="751" y="127" fill="#6d28d9">NVLink / PCIe</text><text x="751" y="145" fill="#6d28d9">/ NIC</text>
+      <rect x="836" y="104" width="138" height="54" rx="12" fill="#fff1f2"/><text x="905" y="136" fill="#9f1239">临时 Buffer</text>
+    </g>
+
+    <g fill="#0f172a" font-size="16" font-weight="750" text-anchor="end">
+      <text x="188" y="222">GEMM</text><text x="188" y="306">逐元素 Kernel</text><text x="188" y="390">本地 Copy</text><text x="188" y="474">NCCL Collective</text>
+    </g>
+    <g stroke="#e2e8f0"><line x1="205" y1="180" x2="990" y2="180"/><line x1="205" y1="264" x2="990" y2="264"/><line x1="205" y1="348" x2="990" y2="348"/><line x1="205" y1="432" x2="990" y2="432"/><line x1="205" y1="516" x2="990" y2="516"/></g>
+
+    <g text-anchor="middle" font-size="12" font-weight="700">
+      <circle cx="289" cy="216" r="20" fill="#3b82f6"/><text x="289" y="220" fill="#fff">强</text>
+      <circle cx="443" cy="216" r="15" fill="#86efac"/><text x="443" y="220" fill="#166534">中</text>
+      <circle cx="597" cy="216" r="6" fill="#e2e8f0"/><circle cx="751" cy="216" r="6" fill="#e2e8f0"/><circle cx="905" cy="216" r="6" fill="#e2e8f0"/>
+
+      <circle cx="289" cy="300" r="14" fill="#93c5fd"/><text x="289" y="304" fill="#1e3a8a">中</text>
+      <circle cx="443" cy="300" r="20" fill="#22c55e"/><text x="443" y="304" fill="#fff">强</text>
+      <circle cx="597" cy="300" r="6" fill="#e2e8f0"/><circle cx="751" cy="300" r="6" fill="#e2e8f0"/><circle cx="905" cy="300" r="6" fill="#e2e8f0"/>
+
+      <circle cx="289" cy="384" r="10" fill="#dbeafe"/><text x="289" y="388" fill="#1e3a8a">可</text>
+      <circle cx="443" cy="384" r="20" fill="#22c55e"/><text x="443" y="388" fill="#fff">强</text>
+      <circle cx="597" cy="384" r="20" fill="#f59e0b"/><text x="597" y="388" fill="#fff">强</text>
+      <circle cx="751" cy="384" r="14" fill="#c4b5fd"/><text x="751" y="388" fill="#6d28d9">可</text>
+      <circle cx="905" cy="384" r="15" fill="#fecdd3"/><text x="905" y="388" fill="#9f1239">中</text>
+
+      <circle cx="289" cy="468" r="15" fill="#93c5fd"/><text x="289" y="472" fill="#1e3a8a">中</text>
+      <circle cx="443" cy="468" r="20" fill="#22c55e"/><text x="443" y="472" fill="#fff">强</text>
+      <circle cx="597" cy="468" r="14" fill="#fcd34d"/><text x="597" y="472" fill="#92400e">中</text>
+      <circle cx="751" cy="468" r="20" fill="#8b5cf6"/><text x="751" y="472" fill="#fff">强</text>
+      <circle cx="905" cy="468" r="20" fill="#fb7185"/><text x="905" y="472" fill="#fff">强</text>
+    </g>
+
+    <rect x="205" y="535" width="785" height="30" rx="15" fill="#fff7ed"/>
+    <text x="598" y="555" fill="#92400e" font-size="13" font-weight="750" text-anchor="middle">Overlap 是否有效，取决于并发操作有没有撞上同一个资源上限</text>
+  </g>
+</svg>

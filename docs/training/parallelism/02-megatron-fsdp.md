@@ -1,10 +1,10 @@
 ---
-title: "3.2 · Megatron 实现方案"
+title: "3.3 · Megatron 实现方案"
 description: "从核心类、状态缓冲区和运行时 Hook 入手，读懂 Megatron-FSDP 的 ZeRO-3 实现。"
 type: source-note
 status: stable
 level: intermediate
-updated: 2026-08-26
+updated: 2026-08-27
 tags: [distributed-training, fsdp, zero, megatron]
 ---
 
@@ -518,4 +518,4 @@ Megatron-FSDP 能识别 TP、CP、EP、PP 以及 dense/expert 参数使用的不
 
     实际收益取决于 FSDP unit 的计算量能否覆盖 collective、网络拓扑是否匹配，以及额外缓冲区是否挤压激活显存。评估时应同时观察 step time、未被计算隐藏的 AG/RS 时间、通信 kernel 的 SM 占用和峰值显存，不能只看 NCCL 带宽。
 
-[→ 继续阅读 3.3 · PyTorch 原生方案](02-pytorch-fsdp.md)
+[→ 继续阅读 3.4 · PyTorch 原生方案](02-pytorch-fsdp.md)

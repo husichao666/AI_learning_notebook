@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 590" role="img" aria-labelledby="title desc">
+  <title id="title">Roofline 模型区分带宽受限与计算受限</title>
+  <desc id="desc">横轴是算术强度，即每字节数据对应的计算量；纵轴是性能。斜线区域受内存带宽限制，水平区域受计算峰值限制。逐元素加法位于左侧，矩阵乘法位于右侧。</desc>
+  <rect width="1050" height="590" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">Roofline：每搬一个字节，做了多少计算？</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">算术强度越高，越有机会从 HBM 带宽区进入计算吞吐区</text>
+
+    <line x1="100" y1="480" x2="690" y2="480" stroke="#334155" stroke-width="2"/>
+    <line x1="100" y1="480" x2="100" y2="110" stroke="#334155" stroke-width="2"/>
+    <text x="395" y="530" fill="#334155" font-size="14" font-weight="700" text-anchor="middle">算术强度 FLOP / Byte →</text>
+    <text x="38" y="295" fill="#334155" font-size="14" font-weight="700" text-anchor="middle" transform="rotate(-90 38 295)">实际性能 FLOP/s →</text>
+
+    <polygon points="100,480 410,180 690,180 690,480" fill="#f8fafc"/>
+    <polygon points="100,480 410,180 410,480" fill="#dcfce7" opacity=".75"/>
+    <polygon points="410,180 690,180 690,480 410,480" fill="#dbeafe" opacity=".75"/>
+    <line x1="100" y1="480" x2="410" y2="180" stroke="#22c55e" stroke-width="5"/>
+    <line x1="410" y1="180" x2="690" y2="180" stroke="#3b82f6" stroke-width="5"/>
+    <line x1="410" y1="180" x2="410" y2="480" stroke="#94a3b8" stroke-dasharray="6 5"/>
+    <text x="248" y="312" fill="#166534" font-size="16" font-weight="750" text-anchor="middle" transform="rotate(-44 248 312)">HBM 带宽上限</text>
+    <text x="550" y="164" fill="#1e3a8a" font-size="16" font-weight="750" text-anchor="middle">计算吞吐上限</text>
+    <text x="252" y="454" fill="#166534" font-size="17" font-weight="750" text-anchor="middle">Memory-bound</text>
+    <text x="552" y="454" fill="#1e3a8a" font-size="17" font-weight="750" text-anchor="middle">Compute-bound</text>
+    <text x="410" y="505" fill="#64748b" font-size="11" text-anchor="middle">ridge point</text>
+
+    <circle cx="205" cy="386" r="9" fill="#f59e0b"/><text x="205" y="365" fill="#92400e" font-size="12" font-weight="700" text-anchor="middle">逐元素加法</text>
+    <circle cx="330" cy="275" r="9" fill="#8b5cf6"/><text x="330" y="254" fill="#6d28d9" font-size="12" font-weight="700" text-anchor="middle">Norm / Softmax</text>
+    <circle cx="570" cy="210" r="9" fill="#ef4444"/><text x="570" y="238" fill="#991b1b" font-size="12" font-weight="700" text-anchor="middle">大尺寸 GEMM</text>
+
+    <rect x="740" y="110" width="272" height="370" rx="18" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="876" y="146" fill="#0f172a" font-size="18" font-weight="750" text-anchor="middle">怎么提高性能</text>
+    <rect x="765" y="172" width="222" height="94" rx="12" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="784" y="198" fill="#166534" font-size="14" font-weight="750">带宽受限时</text>
+    <text x="784" y="224" fill="#475569" font-size="13">• 少读写一次 HBM</text><text x="784" y="246" fill="#475569" font-size="13">• 融合中间操作</text>
+    <rect x="765" y="284" width="222" height="94" rx="12" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="784" y="310" fill="#1e3a8a" font-size="14" font-weight="750">计算受限时</text>
+    <text x="784" y="336" fill="#475569" font-size="13">• 使用合适精度 / Tensor Core</text><text x="784" y="358" fill="#475569" font-size="13">• 改善 tile 与形状</text>
+    <rect x="765" y="396" width="222" height="58" rx="12" fill="#fff7ed" stroke="#fdba74"/>
+    <text x="876" y="420" fill="#92400e" font-size="13" font-weight="750" text-anchor="middle">实际位置要测量</text>
+    <text x="876" y="440" fill="#64748b" font-size="12" text-anchor="middle">峰值规格不是实测性能</text>
+  </g>
+</svg>

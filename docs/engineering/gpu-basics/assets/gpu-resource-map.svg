@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 650" role="img" aria-labelledby="title desc">
+  <title id="title">GPU 的计算、存储与互联资源地图</title>
+  <desc id="desc">GPU 内包含多个 SM、共享 L2、HBM 和 copy engine。SM 内有寄存器、Shared Memory、L1、CUDA Core 和 Tensor Core。GPU 通过 PCIe 连接 CPU，通过 NVLink 或 PCIe 连接其他 GPU。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity=".08"/></filter>
+  </defs>
+  <rect width="1120" height="650" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="36" y="40" fill="#0f172a" font-size="24" font-weight="750">GPU 资源地图：算力只是其中一层</text>
+    <text x="36" y="66" fill="#64748b" font-size="14">蓝色是计算，绿色是存储，黄色是搬运，紫色是对外互联</text>
+
+    <g filter="url(#shadow)">
+      <rect x="36" y="106" width="170" height="150" rx="16" fill="#f8fafc" stroke="#cbd5e1"/>
+      <rect x="238" y="86" width="690" height="500" rx="22" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+      <rect x="960" y="106" width="124" height="150" rx="16" fill="#f5f3ff" stroke="#c4b5fd"/>
+    </g>
+    <text x="121" y="140" fill="#0f172a" font-size="18" font-weight="750" text-anchor="middle">CPU / Host</text>
+    <rect x="64" y="163" width="114" height="52" rx="10" fill="#e2e8f0" stroke="#94a3b8"/><text x="121" y="185" fill="#334155" font-size="14" font-weight="700" text-anchor="middle">Host DRAM</text><text x="121" y="203" fill="#64748b" font-size="11" text-anchor="middle">系统内存</text>
+    <text x="583" y="120" fill="#0f172a" font-size="20" font-weight="750" text-anchor="middle">GPU</text>
+    <text x="1022" y="140" fill="#6d28d9" font-size="18" font-weight="750" text-anchor="middle">其他 GPU</text>
+    <rect x="981" y="163" width="82" height="52" rx="10" fill="#ede9fe" stroke="#a78bfa"/><text x="1022" y="185" fill="#6d28d9" font-size="14" font-weight="700" text-anchor="middle">HBM</text><text x="1022" y="203" fill="#7c3aed" font-size="11" text-anchor="middle">Peer</text>
+
+    <path d="M206 181H238" stroke="#8b5cf6" stroke-width="5" marker-end="url(#arrow)"/><text x="222" y="165" fill="#6d28d9" font-size="12" text-anchor="middle">PCIe</text>
+    <path d="M928 181H960" stroke="#8b5cf6" stroke-width="5" marker-end="url(#arrow)"/><text x="944" y="159" fill="#6d28d9" font-size="11" text-anchor="middle">NVLink</text><text x="944" y="174" fill="#6d28d9" font-size="11" text-anchor="middle">/ PCIe</text>
+
+    <g>
+      <rect x="270" y="146" width="290" height="170" rx="15" fill="#eff6ff" stroke="#60a5fa"/>
+      <rect x="606" y="146" width="290" height="170" rx="15" fill="#eff6ff" stroke="#60a5fa"/>
+      <text x="415" y="174" fill="#1e3a8a" font-size="17" font-weight="750" text-anchor="middle">SM 0</text>
+      <text x="751" y="174" fill="#1e3a8a" font-size="17" font-weight="750" text-anchor="middle">SM 1 … SM N</text>
+      <g font-size="12" font-weight="650" text-anchor="middle">
+        <rect x="290" y="194" width="112" height="42" rx="8" fill="#fff" stroke="#93c5fd"/><text x="346" y="220" fill="#334155">Register</text>
+        <rect x="420" y="194" width="120" height="42" rx="8" fill="#fff" stroke="#93c5fd"/><text x="480" y="220" fill="#334155">Shared / L1</text>
+        <rect x="290" y="252" width="112" height="42" rx="8" fill="#dbeafe" stroke="#3b82f6"/><text x="346" y="278" fill="#1e3a8a">CUDA Core</text>
+        <rect x="420" y="252" width="120" height="42" rx="8" fill="#dbeafe" stroke="#3b82f6"/><text x="480" y="278" fill="#1e3a8a">Tensor Core</text>
+        <rect x="626" y="194" width="112" height="42" rx="8" fill="#fff" stroke="#93c5fd"/><text x="682" y="220" fill="#334155">Register</text>
+        <rect x="756" y="194" width="120" height="42" rx="8" fill="#fff" stroke="#93c5fd"/><text x="816" y="220" fill="#334155">Shared / L1</text>
+        <rect x="626" y="252" width="112" height="42" rx="8" fill="#dbeafe" stroke="#3b82f6"/><text x="682" y="278" fill="#1e3a8a">CUDA Core</text>
+        <rect x="756" y="252" width="120" height="42" rx="8" fill="#dbeafe" stroke="#3b82f6"/><text x="816" y="278" fill="#1e3a8a">Tensor Core</text>
+      </g>
+    </g>
+
+    <rect x="270" y="350" width="626" height="74" rx="14" fill="#ecfdf5" stroke="#4ade80"/>
+    <text x="583" y="382" fill="#166534" font-size="17" font-weight="750" text-anchor="middle">共享 L2 Cache</text>
+    <text x="583" y="405" fill="#475569" font-size="12" text-anchor="middle">所有 SM 共享 · 缓存 HBM 数据 · 连接内存与部分互联路径</text>
+
+    <rect x="270" y="458" width="470" height="94" rx="14" fill="#f0fdf4" stroke="#22c55e"/>
+    <text x="505" y="492" fill="#166534" font-size="19" font-weight="750" text-anchor="middle">HBM / Device Memory</text>
+    <text x="505" y="518" fill="#475569" font-size="13" text-anchor="middle">参数 · 激活 · 梯度 · 通信 buffer</text>
+    <text x="505" y="539" fill="#64748b" font-size="12" text-anchor="middle">容量大；比片上存储慢；带宽仍有限</text>
+    <rect x="770" y="458" width="126" height="94" rx="14" fill="#fffbeb" stroke="#fbbf24"/>
+    <text x="833" y="490" fill="#92400e" font-size="16" font-weight="750" text-anchor="middle">Copy Engine</text>
+    <text x="833" y="515" fill="#64748b" font-size="12" text-anchor="middle">DMA 搬运</text>
+    <text x="833" y="535" fill="#64748b" font-size="12" text-anchor="middle">可独立调度</text>
+
+    <path d="M415 316V345" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/><path d="M751 316V345" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M505 424V453" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M833 424V453" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+
+    <rect x="36" y="602" width="1048" height="32" rx="16" fill="#eef2ff"/>
+    <text x="560" y="623" fill="#3730a3" font-size="13" font-weight="700" text-anchor="middle">性能问题 = 数据路径上的某一种资源先达到上限，而不是所有硬件同时达到峰值</text>
+  </g>
+</svg>

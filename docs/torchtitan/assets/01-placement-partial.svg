@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="540" viewBox="0 0 1100 540" role="img" aria-label="Partial Placement：各 rank 保存最终张量的局部贡献，归约后才得到完整结果">
+  <defs>
+    <marker id="partial-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1098" height="538" rx="18" fill="#f8fafc" stroke="#d7deea"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="550" y="42" text-anchor="middle" fill="#172033" font-size="28" font-weight="700">Partial(sum)：每个 rank 保存最终结果的一部分贡献</text>
+    <text x="550" y="73" text-anchor="middle" fill="#5f6b7a" font-size="18">每份 local tensor 与最终结果形状相同，但数值尚未完成跨 rank 求和</text>
+
+    <g text-anchor="middle">
+      <rect x="45" y="112" width="225" height="145" rx="14" fill="#ffffff" stroke="#7c93ff" stroke-width="1.5"/>
+      <text x="157" y="144" fill="#334a8a" font-size="20" font-weight="700">rank 0</text>
+      <text x="157" y="181" fill="#172033" font-size="24" font-weight="700">Y₀ = X₀W₀ᵀ</text>
+      <text x="157" y="217" fill="#5f6b7a" font-size="17">贡献 shape = [B, N]</text>
+      <text x="157" y="242" fill="#334a8a" font-size="16">不是 Y 的第 0 块</text>
+
+      <rect x="305" y="112" width="225" height="145" rx="14" fill="#ffffff" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="417" y="144" fill="#166534" font-size="20" font-weight="700">rank 1</text>
+      <text x="417" y="181" fill="#172033" font-size="24" font-weight="700">Y₁ = X₁W₁ᵀ</text>
+      <text x="417" y="217" fill="#5f6b7a" font-size="17">贡献 shape = [B, N]</text>
+      <text x="417" y="242" fill="#166534" font-size="16">不是 Y 的第 1 块</text>
+
+      <rect x="565" y="112" width="225" height="145" rx="14" fill="#ffffff" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="677" y="144" fill="#92400e" font-size="20" font-weight="700">rank 2</text>
+      <text x="677" y="181" fill="#172033" font-size="24" font-weight="700">Y₂ = X₂W₂ᵀ</text>
+      <text x="677" y="217" fill="#5f6b7a" font-size="17">贡献 shape = [B, N]</text>
+      <text x="677" y="242" fill="#92400e" font-size="16">不是 Y 的第 2 块</text>
+
+      <rect x="825" y="112" width="225" height="145" rx="14" fill="#ffffff" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="937" y="144" fill="#9f1239" font-size="20" font-weight="700">rank 3</text>
+      <text x="937" y="181" fill="#172033" font-size="24" font-weight="700">Y₃ = X₃W₃ᵀ</text>
+      <text x="937" y="217" fill="#5f6b7a" font-size="17">贡献 shape = [B, N]</text>
+      <text x="937" y="242" fill="#9f1239" font-size="16">不是 Y 的第 3 块</text>
+    </g>
+
+    <g fill="none" stroke="#64748b" stroke-width="1.7" marker-end="url(#partial-arrow)">
+      <path d="M157 257 C157 307 350 310 510 331"/>
+      <path d="M417 257 C417 291 475 304 520 326"/>
+      <path d="M677 257 C677 291 625 304 580 326"/>
+      <path d="M937 257 C937 307 750 310 590 331"/>
+    </g>
+
+    <circle cx="550" cy="342" r="43" fill="#eef2ff" stroke="#7c93ff" stroke-width="2"/>
+    <text x="550" y="351" text-anchor="middle" fill="#334a8a" font-size="34" font-weight="700">Σ</text>
+    <text x="550" y="406" text-anchor="middle" fill="#5f6b7a" font-size="18">all-reduce：Partial → Replicate</text>
+    <path d="M550 385 L550 426" fill="none" stroke="#64748b" stroke-width="1.7" marker-end="url(#partial-arrow)"/>
+
+    <rect x="280" y="434" width="540" height="70" rx="15" fill="#dcfce7" stroke="#4ade80" stroke-width="1.5"/>
+    <text x="550" y="463" text-anchor="middle" fill="#166534" font-size="22" font-weight="700">完整结果 Y = Y₀ + Y₁ + Y₂ + Y₃</text>
+    <text x="550" y="491" text-anchor="middle" fill="#5f6b7a" font-size="17">归约完成后，每个 rank 才得到数值完整的 [B, N]</text>
+
+    <text x="550" y="526" text-anchor="middle" fill="#9f1239" font-size="17" font-weight="700">Partial 表示“待归约的贡献”，不是沿某一维切出的 shard</text>
+  </g>
+</svg>

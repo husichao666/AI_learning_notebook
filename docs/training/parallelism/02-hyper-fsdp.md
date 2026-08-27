@@ -1,10 +1,10 @@
 ---
-title: "3.4 · HyperParallel 性能优化"
+title: "3.5 · HyperParallel 性能优化"
 description: "沿 HyperParallel fully_shard 源码，从原因、目标、做法和收益四个角度理解逐参数通信、融合 All-Reduce 与反向流水。"
 type: source-note
 status: stable
 level: advanced
-updated: 2026-08-26
+updated: 2026-08-27
 tags: [distributed-training, fsdp, hsdp, hyperparallel, performance]
 ---
 
@@ -295,7 +295,7 @@ Torch 后端在 `comm_fusion=True` 且未显式设置 `comm_fusion_zero_copy` �
 
 ## 06 · 与 PyTorch FSDP2 的直接对照 { #comparison }
 
-第 3.3 节已经沿 PyTorch 源码展开 FSDP2。只比较本节关心的数据搬运与反向时序，两者的默认选择如下：
+第 3.4 节已经沿 PyTorch 源码展开 FSDP2。只比较本节关心的数据搬运与反向时序，两者的默认选择如下：
 
 | 维度 | PyTorch FSDP2 | HyperParallel 默认路径 |
 | --- | --- | --- |

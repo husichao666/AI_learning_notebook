@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="500" viewBox="0 0 1100 500" role="img" aria-label="Replicate Placement：每个 rank 都保存逻辑张量的完整副本">
+  <defs>
+    <marker id="replicate-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1098" height="498" rx="18" fill="#f8fafc" stroke="#d7deea"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="550" y="42" text-anchor="middle" fill="#172033" font-size="28" font-weight="700">Replicate：每个 rank 都持有完整副本</text>
+    <text x="550" y="73" text-anchor="middle" fill="#5f6b7a" font-size="18">逻辑 shape = [4, D] · local shape = [4, D] · placements = [Replicate()]</text>
+
+    <text x="195" y="116" text-anchor="middle" fill="#172033" font-size="20" font-weight="700">逻辑全局张量 X</text>
+    <rect x="70" y="135" width="250" height="220" rx="14" fill="#ffffff" stroke="#7c93ff" stroke-width="2"/>
+    <g text-anchor="middle" font-size="22" font-weight="700">
+      <rect x="90" y="155" width="100" height="80" rx="8" fill="#e0e7ff" stroke="#7c93ff"/>
+      <rect x="200" y="155" width="100" height="80" rx="8" fill="#dcfce7" stroke="#4ade80"/>
+      <rect x="90" y="245" width="100" height="80" rx="8" fill="#fef3c7" stroke="#fbbf24"/>
+      <rect x="200" y="245" width="100" height="80" rx="8" fill="#ffe4e6" stroke="#fb7185"/>
+      <text x="140" y="205" fill="#334a8a">A</text>
+      <text x="250" y="205" fill="#166534">B</text>
+      <text x="140" y="295" fill="#92400e">C</text>
+      <text x="250" y="295" fill="#9f1239">D</text>
+    </g>
+    <text x="195" y="386" text-anchor="middle" fill="#5f6b7a" font-size="17">一份完整逻辑内容</text>
+
+    <g text-anchor="middle">
+      <rect x="500" y="112" width="230" height="140" rx="14" fill="#ffffff" stroke="#7c93ff" stroke-width="1.5"/>
+      <text x="615" y="142" fill="#334a8a" font-size="20" font-weight="700">rank 0 · local</text>
+      <text x="615" y="176" fill="#172033" font-size="21" font-weight="700">A　B</text>
+      <text x="615" y="207" fill="#172033" font-size="21" font-weight="700">C　D</text>
+      <text x="615" y="234" fill="#5f6b7a" font-size="16">完整 [4, D]</text>
+
+      <rect x="790" y="112" width="230" height="140" rx="14" fill="#ffffff" stroke="#4ade80" stroke-width="1.5"/>
+      <text x="905" y="142" fill="#166534" font-size="20" font-weight="700">rank 1 · local</text>
+      <text x="905" y="176" fill="#172033" font-size="21" font-weight="700">A　B</text>
+      <text x="905" y="207" fill="#172033" font-size="21" font-weight="700">C　D</text>
+      <text x="905" y="234" fill="#5f6b7a" font-size="16">完整 [4, D]</text>
+
+      <rect x="500" y="292" width="230" height="140" rx="14" fill="#ffffff" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="615" y="322" fill="#92400e" font-size="20" font-weight="700">rank 2 · local</text>
+      <text x="615" y="356" fill="#172033" font-size="21" font-weight="700">A　B</text>
+      <text x="615" y="387" fill="#172033" font-size="21" font-weight="700">C　D</text>
+      <text x="615" y="414" fill="#5f6b7a" font-size="16">完整 [4, D]</text>
+
+      <rect x="790" y="292" width="230" height="140" rx="14" fill="#ffffff" stroke="#fb7185" stroke-width="1.5"/>
+      <text x="905" y="322" fill="#9f1239" font-size="20" font-weight="700">rank 3 · local</text>
+      <text x="905" y="356" fill="#172033" font-size="21" font-weight="700">A　B</text>
+      <text x="905" y="387" fill="#172033" font-size="21" font-weight="700">C　D</text>
+      <text x="905" y="414" fill="#5f6b7a" font-size="16">完整 [4, D]</text>
+    </g>
+
+    <g fill="none" stroke="#64748b" stroke-width="1.7" marker-end="url(#replicate-arrow)">
+      <path d="M320 225 C400 225 415 182 492 182"/>
+      <path d="M320 225 C520 225 600 182 782 182"/>
+      <path d="M320 265 C400 265 415 362 492 362"/>
+      <path d="M320 265 C520 265 600 362 782 362"/>
+    </g>
+
+    <rect x="285" y="453" width="530" height="31" rx="15" fill="#eef2ff"/>
+    <text x="550" y="475" text-anchor="middle" fill="#334a8a" font-size="17" font-weight="700">存储代价随 rank 数增加；本地计算读取完整数据时无需先拼接 shard</text>
+  </g>
+</svg>

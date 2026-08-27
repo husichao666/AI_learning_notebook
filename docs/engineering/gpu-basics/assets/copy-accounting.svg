@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 510" role="img" aria-labelledby="title desc">
+  <title id="title">100 MB GPU 内拷贝产生 200 MB HBM 流量</title>
+  <desc id="desc">源区域读取 100 MB，目标区域写入 100 MB，所以一次逻辑大小为 100 MB 的 GPU 内复制至少产生约 200 MB HBM 流量。通信前 copy-in 和通信后 copy-out 共两次复制时约为 400 MB。</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#f59e0b"/></marker></defs>
+  <rect width="1050" height="510" fill="#fff"/>
+  <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
+    <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">“复制 100 MB”的 HBM 账本</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">逻辑数据量只描述结果大小；硬件需要同时完成读取和写入</text>
+
+    <rect x="55" y="132" width="250" height="144" rx="18" fill="#f0fdf4" stroke="#22c55e"/>
+    <text x="180" y="170" fill="#166534" font-size="18" font-weight="750" text-anchor="middle">源区域</text>
+    <text x="180" y="216" fill="#0f172a" font-size="35" font-weight="800" text-anchor="middle">100 MB</text>
+    <text x="180" y="248" fill="#64748b" font-size="13" text-anchor="middle">HBM 读取</text>
+
+    <rect x="400" y="156" width="250" height="96" rx="48" fill="#fffbeb" stroke="#f59e0b"/>
+    <text x="525" y="192" fill="#92400e" font-size="17" font-weight="750" text-anchor="middle">Copy Engine / Kernel</text>
+    <text x="525" y="222" fill="#64748b" font-size="13" text-anchor="middle">搬运，不改变逻辑数据量</text>
+
+    <rect x="745" y="132" width="250" height="144" rx="18" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="870" y="170" fill="#1e3a8a" font-size="18" font-weight="750" text-anchor="middle">目标区域</text>
+    <text x="870" y="216" fill="#0f172a" font-size="35" font-weight="800" text-anchor="middle">100 MB</text>
+    <text x="870" y="248" fill="#64748b" font-size="13" text-anchor="middle">HBM 写入</text>
+
+    <path d="M305 204H394" stroke="#f59e0b" stroke-width="5" marker-end="url(#arrow)"/>
+    <path d="M650 204H739" stroke="#f59e0b" stroke-width="5" marker-end="url(#arrow)"/>
+
+    <rect x="55" y="326" width="940" height="118" rx="18" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="525" y="360" fill="#0f172a" font-size="18" font-weight="750" text-anchor="middle">一次 D2D copy 的理想流量下界</text>
+    <text x="525" y="405" fill="#334155" font-size="27" font-weight="800" text-anchor="middle">100 MB 读 + 100 MB 写 = 约 200 MB HBM 流量</text>
+    <text x="525" y="430" fill="#64748b" font-size="12" text-anchor="middle">copy-in + copy-out 各做一次时，约为 400 MB；尚未计算 kernel 启动和竞争</text>
+  </g>
+</svg>
