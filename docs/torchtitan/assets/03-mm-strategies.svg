@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-label="一维 DeviceMesh 上矩阵乘的四类基础分片策略">
+  <defs>
+    <pattern id="partial-hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" fill="#fff7ed"/>
+      <line x1="0" y1="0" x2="0" y2="10" stroke="#fb923c" stroke-width="4"/>
+    </pattern>
+    <marker id="mm-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1198" height="898" rx="18" fill="#f8fafc" stroke="#d7deea"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="600" y="43" text-anchor="middle" fill="#172033" font-size="28" font-weight="700">一维 mesh 上的矩阵乘：四类基础布局</text>
+    <text x="600" y="75" text-anchor="middle" fill="#5f6b7a" font-size="18">A[M,K] × B[K,N] = C[M,N]；蓝色表示当前 rank 保存或计算的局部区域</text>
+
+    <rect x="35" y="105" width="550" height="350" rx="17" fill="#ffffff" stroke="#d7deea" stroke-width="1.5"/>
+    <circle cx="70" cy="141" r="20" fill="#eef2ff" stroke="#7c93ff"/>
+    <text x="70" y="148" text-anchor="middle" fill="#334a8a" font-size="18" font-weight="700">1</text>
+    <text x="103" y="148" fill="#172033" font-size="21" font-weight="700">完整复制</text>
+    <text x="310" y="180" text-anchor="middle" fill="#334a8a" font-size="18" font-weight="700">R × R → R</text>
+    <rect x="85" y="214" width="130" height="115" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="150" y="270" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">A</text>
+    <text x="150" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">[M,K] 完整</text>
+    <text x="246" y="280" text-anchor="middle" fill="#64748b" font-size="28">×</text>
+    <rect x="280" y="214" width="130" height="115" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="345" y="270" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">B</text>
+    <text x="345" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">[K,N] 完整</text>
+    <path d="M427 272 L461 272" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#mm-arrow)"/>
+    <rect x="474" y="214" width="78" height="115" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="513" y="270" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">C</text>
+    <text x="513" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">完整</text>
+    <text x="310" y="417" text-anchor="middle" fill="#166534" font-size="17">本地 GEMM 直接得到完整输出，不需要通信</text>
+
+    <rect x="615" y="105" width="550" height="350" rx="17" fill="#ffffff" stroke="#d7deea" stroke-width="1.5"/>
+    <circle cx="650" cy="141" r="20" fill="#ecfdf5" stroke="#4ade80"/>
+    <text x="650" y="148" text-anchor="middle" fill="#166534" font-size="18" font-weight="700">2</text>
+    <text x="683" y="148" fill="#172033" font-size="21" font-weight="700">切分 A 的自由维 M</text>
+    <text x="890" y="180" text-anchor="middle" fill="#166534" font-size="18" font-weight="700">S(0) × R → S(0)</text>
+    <rect x="665" y="214" width="130" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="665" y="214" width="130" height="38" rx="6" fill="#bbf7d0" stroke="#22c55e" stroke-width="2"/>
+    <line x1="665" y1="252" x2="795" y2="252" stroke="#94a3b8"/>
+    <line x1="665" y1="290" x2="795" y2="290" stroke="#94a3b8"/>
+    <text x="730" y="239" text-anchor="middle" fill="#14532d" font-size="18" font-weight="700">Aᵣ</text>
+    <text x="730" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">按行保存</text>
+    <text x="826" y="280" text-anchor="middle" fill="#64748b" font-size="28">×</text>
+    <rect x="860" y="214" width="130" height="115" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="925" y="270" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">B</text>
+    <text x="925" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">完整</text>
+    <path d="M1007 272 L1041 272" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#mm-arrow)"/>
+    <rect x="1054" y="214" width="78" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="1054" y="214" width="78" height="38" rx="6" fill="#bbf7d0" stroke="#22c55e" stroke-width="2"/>
+    <text x="1093" y="239" text-anchor="middle" fill="#14532d" font-size="18" font-weight="700">Cᵣ</text>
+    <text x="1093" y="352" text-anchor="middle" fill="#5f6b7a" font-size="16">按行</text>
+    <text x="890" y="417" text-anchor="middle" fill="#166534" font-size="17">每个 rank 独立计算一组输出行</text>
+
+    <rect x="35" y="485" width="550" height="370" rx="17" fill="#ffffff" stroke="#d7deea" stroke-width="1.5"/>
+    <circle cx="70" cy="521" r="20" fill="#eef2ff" stroke="#7c93ff"/>
+    <text x="70" y="528" text-anchor="middle" fill="#334a8a" font-size="18" font-weight="700">3</text>
+    <text x="103" y="528" fill="#172033" font-size="21" font-weight="700">切分 B 的自由维 N</text>
+    <text x="310" y="560" text-anchor="middle" fill="#334a8a" font-size="18" font-weight="700">R × S(1) → S(1)</text>
+    <rect x="85" y="594" width="130" height="115" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="150" y="650" text-anchor="middle" fill="#1e3a8a" font-size="21" font-weight="700">A</text>
+    <text x="150" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">完整</text>
+    <text x="246" y="660" text-anchor="middle" fill="#64748b" font-size="28">×</text>
+    <rect x="280" y="594" width="130" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="280" y="594" width="43" height="115" rx="6" fill="#bfdbfe" stroke="#3b82f6" stroke-width="2"/>
+    <line x1="323" y1="594" x2="323" y2="709" stroke="#94a3b8"/>
+    <line x1="366" y1="594" x2="366" y2="709" stroke="#94a3b8"/>
+    <text x="301" y="650" text-anchor="middle" fill="#1e3a8a" font-size="18" font-weight="700">Bᵣ</text>
+    <text x="345" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">按列保存</text>
+    <path d="M427 652 L461 652" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#mm-arrow)"/>
+    <rect x="474" y="594" width="78" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="474" y="594" width="26" height="115" rx="6" fill="#bfdbfe" stroke="#3b82f6" stroke-width="2"/>
+    <text x="487" y="650" text-anchor="middle" fill="#1e3a8a" font-size="16" font-weight="700">Cᵣ</text>
+    <text x="513" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">按列</text>
+    <text x="310" y="802" text-anchor="middle" fill="#334a8a" font-size="17">每个 rank 独立计算一组输出列</text>
+
+    <rect x="615" y="485" width="550" height="370" rx="17" fill="#ffffff" stroke="#d7deea" stroke-width="1.5"/>
+    <circle cx="650" cy="521" r="20" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="650" y="528" text-anchor="middle" fill="#9a3412" font-size="18" font-weight="700">4</text>
+    <text x="683" y="528" fill="#172033" font-size="21" font-weight="700">切分收缩维 K</text>
+    <text x="890" y="560" text-anchor="middle" fill="#9a3412" font-size="18" font-weight="700">S(1) × S(0) → P(sum)</text>
+    <rect x="665" y="594" width="130" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="665" y="594" width="43" height="115" rx="6" fill="#fed7aa" stroke="#fb923c" stroke-width="2"/>
+    <line x1="708" y1="594" x2="708" y2="709" stroke="#94a3b8"/>
+    <line x1="751" y1="594" x2="751" y2="709" stroke="#94a3b8"/>
+    <text x="686" y="650" text-anchor="middle" fill="#9a3412" font-size="18" font-weight="700">Aᵣ</text>
+    <text x="730" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">按列切 K</text>
+    <text x="826" y="660" text-anchor="middle" fill="#64748b" font-size="28">×</text>
+    <rect x="860" y="594" width="130" height="115" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <rect x="860" y="594" width="130" height="38" rx="6" fill="#fed7aa" stroke="#fb923c" stroke-width="2"/>
+    <line x1="860" y1="632" x2="990" y2="632" stroke="#94a3b8"/>
+    <line x1="860" y1="670" x2="990" y2="670" stroke="#94a3b8"/>
+    <text x="925" y="619" text-anchor="middle" fill="#9a3412" font-size="18" font-weight="700">Bᵣ</text>
+    <text x="925" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">按行切 K</text>
+    <path d="M1007 652 L1041 652" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#mm-arrow)"/>
+    <rect x="1054" y="594" width="78" height="115" rx="6" fill="url(#partial-hatch)" stroke="#fb923c" stroke-width="2"/>
+    <text x="1093" y="650" text-anchor="middle" fill="#9a3412" font-size="19" font-weight="700">Cᵣ</text>
+    <text x="1093" y="732" text-anchor="middle" fill="#5f6b7a" font-size="16">部分和</text>
+    <text x="890" y="785" text-anchor="middle" fill="#9a3412" font-size="17">各 rank 只完成 K 的一段贡献</text>
+    <text x="890" y="814" text-anchor="middle" fill="#5f6b7a" font-size="16">后续 all-reduce 或 reduce-scatter 才得到已归约结果</text>
+  </g>
+</svg>

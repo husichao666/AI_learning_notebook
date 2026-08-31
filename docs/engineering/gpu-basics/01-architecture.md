@@ -42,9 +42,43 @@ GPU 不是一块只有“算力”的黑盒。它同时包含计算单元、存�
 - **Kernel**：在 GPU 上执行的函数。
 - **Grid**：一次 kernel 启动产生的全部线程。
 - **Thread block**：被整体分配给某个 SM 的线程组。
+- **Thread**：kernel 的一个执行实例，通常负责一个或几个数据元素。
 - **Warp**：SM 实际调度的一组 32 个线程。
 
-block 太少时，一部分 SM 没有工作；单个 block 占用太多寄存器或 Shared Memory 时，同一 SM 能并发容纳的 block 又会减少。这里先建立关系，具体调优留到编写算子时再深入。
+例如，对 256 个元素执行 `c = a + b`，kernel 可以选择每个 block 启动 128 个线程，于是整个 grid 包含 2 个 block，每个 block 又被硬件分成 4 个 warp：
+
+```text
+Block 0：thread   0～127 → 4 个 Warp
+Block 1：thread 128～255 → 4 个 Warp
+```
+
+### 软件与硬件的边界
+
+```text
+CPU 启动 Kernel                                      ← 软件
+     │
+     │ 指定：Grid 大小、Block 大小、参数、Stream
+     ▼
+────────────── 软件给出约束，硬件接管调度 ──────────────
+     ▼
+GPU 收到整个 Grid                                    ← 硬件
+     │
+     │ 选择哪些 Block 可以开始运行
+     ▼
+Block 被分配到某个 SM
+     │
+     │ Block 按每 32 个线程组成多个 Warp
+     ▼
+SM 的 Warp Scheduler 选择已经就绪的 Warp
+     │
+     ├─ 读取 / 写回 ──→ Load/Store Unit
+     ├─ 普通 FP32 计算 → CUDA Core
+     └─ 矩阵乘加 ─────→ Tensor Core
+```
+
+一个 block 开始执行后通常留在同一个 SM，直到完成并释放资源。软件不能假设 block 的执行顺序、精确落点或线程与 CUDA Core 的固定绑定。
+
+每个 block 的线程数由 kernel 实现指定；使用 PyTorch、cuBLAS 等库时，这个选择通常隐藏在算子内部。它一般取 32 的整数倍，常见起点是 128 或 256，同时受 GPU 的单 block 线程上限、寄存器、Shared Memory 和数据形状限制。block 太小可能无法提供足够并行工作，太大又可能占用过多资源，使一个 SM 能同时容纳的 block 变少。
 
 !!! tip "先形成这个直觉"
 

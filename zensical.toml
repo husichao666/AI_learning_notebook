@@ -70,8 +70,17 @@ nav = [
   ] },
   { "TorchTitan" = [
     { "专题总览" = "torchtitan/index.md" },
-    { "第 1 章 · DTensor 原理与使用" = "torchtitan/01-dtensor.md" },
-    { "第 2 章 · DeviceMesh 与 Placement" = "torchtitan/02-device-mesh-placement.md" },
+    { "共用基础" = [
+      { "第 1 章 · DTensor 原理与使用" = "torchtitan/01-dtensor.md" },
+      { "第 2 章 · DeviceMesh 与 Placement" = "torchtitan/02-device-mesh-placement.md" },
+    ] },
+    { "partial_dtensor 路线" = [
+      { "第 3 章 · 分布式算子与分片传播" = "torchtitan/03-distributed-operators.md" },
+      { "第 4 章 · 使用 ColwiseParallel 切分模型" = "torchtitan/04-colwise-parallel.md" },
+    ] },
+    { "spmd_types 路线" = [
+      { "第 5 章 · ShardingConfig 与 spmd_types" = "torchtitan/05-sharding-config-spmd-types.md" },
+    ] },
     { "独立源码分析 · GraphTrainer" = "torchtitan/graph-trainer.md" },
   ] },
   { "性能工程" = [

@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 520" role="img" aria-labelledby="title desc">
   <title id="title">CUDA grid、block、warp、thread 与 SM 的映射关系</title>
-  <desc id="desc">Host 启动一个 kernel，产生一个 grid。Grid 包含多个 thread block，block 被分配到 SM。每个 block 内的线程按 32 个组成 warp，由 SM 调度。</desc>
+  <desc id="desc">软件启动 kernel 并定义 grid、block、代码和依赖。硬件把 block 分配到有空闲资源的 SM，再从 block 的多个 warp 中选择已经就绪的 warp 执行。</desc>
   <defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0L9 4.5L0 9Z" fill="#64748b"/></marker></defs>
   <rect width="1100" height="520" fill="#fff"/>
   <g font-family="'WenQuanYi Zen Hei','Noto Sans SC','Microsoft YaHei','Segoe UI',Inter,ui-sans-serif,system-ui,sans-serif">
     <text x="38" y="42" fill="#0f172a" font-size="24" font-weight="750">软件层级怎样落到 GPU</text>
-    <text x="38" y="68" fill="#64748b" font-size="14">Grid 和 block 是程序员看到的组织；SM 和 warp 是硬件执行的关键层级</text>
+    <text x="38" y="68" fill="#64748b" font-size="14">软件定义任务怎样切分；硬件决定 Block 放到哪个 SM，以及下一次执行哪个 Warp</text>
 
     <rect x="38" y="118" width="155" height="112" rx="16" fill="#f8fafc" stroke="#94a3b8"/>
     <text x="115" y="153" fill="#0f172a" font-size="17" font-weight="750" text-anchor="middle">CPU / Host</text>
@@ -22,13 +22,13 @@
       <text x="316" y="185">Block 0</text><text x="402" y="185">Block 1</text><text x="488" y="185">Block 2</text>
       <text x="316" y="255">Block 3</text><text x="402" y="255">Block 4</text><text x="488" y="255">…</text>
     </g>
-    <path d="M562 207H620" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/><text x="591" y="194" fill="#64748b" font-size="11" text-anchor="middle">调度</text>
+    <path d="M562 207H620" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/><text x="591" y="194" fill="#64748b" font-size="11" text-anchor="middle">分配 Block</text>
 
     <rect x="628" y="94" width="206" height="226" rx="18" fill="#f0fdf4" stroke="#4ade80"/>
     <text x="731" y="126" fill="#166534" font-size="18" font-weight="750" text-anchor="middle">SM</text>
     <rect x="654" y="150" width="154" height="54" rx="10" fill="#fff" stroke="#4ade80"/><text x="731" y="173" fill="#166534" font-size="13" font-weight="700" text-anchor="middle">驻留 Block 0</text><text x="731" y="191" fill="#64748b" font-size="11" text-anchor="middle">寄存器 + Shared Memory</text>
     <rect x="654" y="222" width="154" height="54" rx="10" fill="#fff" stroke="#4ade80"/><text x="731" y="245" fill="#166534" font-size="13" font-weight="700" text-anchor="middle">驻留 Block 3</text><text x="731" y="263" fill="#64748b" font-size="11" text-anchor="middle">资源允许时并发</text>
-    <path d="M834 207H885" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+    <path d="M834 207H885" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/><text x="860" y="194" fill="#64748b" font-size="11" text-anchor="middle">选 Warp</text>
 
     <rect x="893" y="94" width="169" height="226" rx="18" fill="#f5f3ff" stroke="#a78bfa"/>
     <text x="977" y="126" fill="#6d28d9" font-size="18" font-weight="750" text-anchor="middle">Warp</text>
@@ -40,13 +40,17 @@
     <text x="977" y="267" fill="#6d28d9" font-size="13" font-weight="700" text-anchor="middle">同一条指令</text>
     <text x="977" y="286" fill="#64748b" font-size="11" text-anchor="middle">处理不同数据</text>
 
+    <line x1="595" y1="82" x2="595" y2="330" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 6"/>
+    <text x="582" y="340" fill="#1e3a8a" font-size="11" font-weight="700" text-anchor="end">软件给出约束</text>
+    <text x="608" y="340" fill="#166534" font-size="11" font-weight="700">硬件在约束内调度</text>
+
     <rect x="38" y="356" width="1024" height="116" rx="16" fill="#f8fafc" stroke="#cbd5e1"/>
     <g text-anchor="middle">
-      <text x="210" y="390" fill="#0f172a" font-size="15" font-weight="750">Block 太少</text><text x="210" y="417" fill="#64748b" font-size="13">部分 SM 没有工作</text><text x="210" y="442" fill="#ef4444" font-size="13" font-weight="700">并行度不足</text>
+      <text x="210" y="390" fill="#1e3a8a" font-size="15" font-weight="750">软件定义</text><text x="210" y="417" fill="#64748b" font-size="13">Grid / Block 大小、代码、Stream</text><text x="210" y="442" fill="#3b82f6" font-size="13" font-weight="700">任务是什么、依赖是什么</text>
       <line x1="380" y1="378" x2="380" y2="448" stroke="#e2e8f0"/>
-      <text x="550" y="390" fill="#0f172a" font-size="15" font-weight="750">单 Block 用太多资源</text><text x="550" y="417" fill="#64748b" font-size="13">同一 SM 能驻留的 Block 变少</text><text x="550" y="442" fill="#f59e0b" font-size="13" font-weight="700">Occupancy 受限</text>
+      <text x="550" y="390" fill="#166534" font-size="15" font-weight="750">硬件调度</text><text x="550" y="417" fill="#64748b" font-size="13">Block → SM、选择就绪 Warp</text><text x="550" y="442" fill="#22c55e" font-size="13" font-weight="700">什么时候执行、在哪里执行</text>
       <line x1="720" y1="378" x2="720" y2="448" stroke="#e2e8f0"/>
-      <text x="890" y="390" fill="#0f172a" font-size="15" font-weight="750">线程访问不连续</text><text x="890" y="417" fill="#64748b" font-size="13">一次请求产生更多内存事务</text><text x="890" y="442" fill="#8b5cf6" font-size="13" font-weight="700">带宽利用率下降</text>
+      <text x="890" y="390" fill="#6d28d9" font-size="15" font-weight="750">软件不能假设</text><text x="890" y="417" fill="#64748b" font-size="13">Block 顺序、精确落点、固定 Core</text><text x="890" y="442" fill="#8b5cf6" font-size="13" font-weight="700">只通过约束影响调度</text>
     </g>
   </g>
 </svg>

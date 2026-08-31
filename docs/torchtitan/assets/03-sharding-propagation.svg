@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="850" viewBox="0 0 1200 850" role="img" aria-label="DTensor 分布式算子从 OpSchema 到本地计算与输出布局的完整流程">
+  <defs>
+    <marker id="prop-arrow" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1198" height="848" rx="18" fill="#f8fafc" stroke="#d7deea"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="600" y="43" text-anchor="middle" fill="#172033" font-size="28" font-weight="700">DTensor 分布式算子：先传播布局，再执行本地算子</text>
+    <text x="600" y="74" text-anchor="middle" fill="#5f6b7a" font-size="18">布局推导决定“怎样算”；collective 只在所选布局需要重排布或归约时发生</text>
+
+    <rect x="42" y="112" width="260" height="128" rx="15" fill="#ffffff" stroke="#7c93ff" stroke-width="1.7"/>
+    <text x="172" y="144" text-anchor="middle" fill="#334a8a" font-size="21" font-weight="700">OpSchema</text>
+    <text x="172" y="177" text-anchor="middle" fill="#172033" font-size="17">算子 + 参数结构</text>
+    <text x="172" y="205" text-anchor="middle" fill="#5f6b7a" font-size="16">输入 DTensorSpec 与元数据</text>
+    <text x="172" y="229" text-anchor="middle" fill="#5f6b7a" font-size="16">当前 placements</text>
+
+    <path d="M302 176 L360 176" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+
+    <rect x="370" y="96" width="788" height="188" rx="17" fill="#eef2ff" stroke="#7c93ff" stroke-width="1.5"/>
+    <text x="764" y="126" text-anchor="middle" fill="#334a8a" font-size="21" font-weight="700">ShardingPropagator 的三类注册入口</text>
+
+    <rect x="394" y="145" width="225" height="111" rx="12" fill="#ffffff" stroke="#4ade80"/>
+    <text x="506" y="176" text-anchor="middle" fill="#166534" font-size="19" font-weight="700">Propagation Rule</text>
+    <text x="506" y="205" text-anchor="middle" fill="#172033" font-size="16">直接推导输出布局</text>
+    <text x="506" y="231" text-anchor="middle" fill="#5f6b7a" font-size="15">必要时建议输入重排布</text>
+
+    <rect x="651" y="145" width="225" height="111" rx="12" fill="#ffffff" stroke="#fbbf24"/>
+    <text x="763" y="176" text-anchor="middle" fill="#92400e" font-size="19" font-weight="700">Single-dim Strategy</text>
+    <text x="763" y="205" text-anchor="middle" fill="#172033" font-size="16">每个 mesh axis 枚举</text>
+    <text x="763" y="231" text-anchor="middle" fill="#5f6b7a" font-size="15">再做多轴组合</text>
+
+    <rect x="908" y="145" width="225" height="111" rx="12" fill="#ffffff" stroke="#fb923c"/>
+    <text x="1020" y="176" text-anchor="middle" fill="#9a3412" font-size="19" font-weight="700">Op Strategy</text>
+    <text x="1020" y="205" text-anchor="middle" fill="#172033" font-size="16">针对整个算子枚举</text>
+    <text x="1020" y="231" text-anchor="middle" fill="#5f6b7a" font-size="15">输入/输出布局候选</text>
+
+    <path d="M506 256 L506 331 L278 331 L278 366" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+    <path d="M763 256 L763 315 L591 315 L591 366" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+    <path d="M1020 256 L1020 331 L820 331 L820 366" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+
+    <rect x="75" y="374" width="406" height="126" rx="15" fill="#ecfdf5" stroke="#4ade80" stroke-width="1.5"/>
+    <text x="278" y="407" text-anchor="middle" fill="#166534" font-size="21" font-weight="700">规则结果 · OutputSharding</text>
+    <text x="278" y="440" text-anchor="middle" fill="#172033" font-size="17">输出 DTensorSpec</text>
+    <text x="278" y="469" text-anchor="middle" fill="#5f6b7a" font-size="16">或建议的输入 OpSchema / 不支持原因</text>
+
+    <rect x="511" y="374" width="386" height="126" rx="15" fill="#fff7ed" stroke="#fbbf24" stroke-width="1.5"/>
+    <text x="704" y="407" text-anchor="middle" fill="#92400e" font-size="21" font-weight="700">候选 PlacementStrategy</text>
+    <text x="704" y="440" text-anchor="middle" fill="#172033" font-size="17">所需输入布局 + 输出布局</text>
+    <text x="704" y="469" text-anchor="middle" fill="#5f6b7a" font-size="16">每个候选都必须能完成正确的本地计算</text>
+
+    <rect x="927" y="374" width="231" height="126" rx="15" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="1042" y="407" text-anchor="middle" fill="#9a3412" font-size="21" font-weight="700">成本选择</text>
+    <text x="1042" y="440" text-anchor="middle" fill="#172033" font-size="17">估算输入重排布</text>
+    <text x="1042" y="469" text-anchor="middle" fill="#5f6b7a" font-size="16">选择总代价最低者</text>
+
+    <path d="M897 437 L919 437" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+    <path d="M278 500 L278 544 L600 544 L600 573" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+    <path d="M1042 500 L1042 544 L600 544" fill="none" stroke="#64748b" stroke-width="1.8"/>
+
+    <rect x="380" y="581" width="440" height="82" rx="15" fill="#eef2ff" stroke="#7c93ff" stroke-width="1.7"/>
+    <text x="600" y="615" text-anchor="middle" fill="#334a8a" font-size="21" font-weight="700">确定目标输入 spec 与输出 spec</text>
+    <text x="600" y="645" text-anchor="middle" fill="#5f6b7a" font-size="16">此时只是分布语义，尚不等于已经发生通信</text>
+
+    <path d="M600 663 L600 699" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+
+    <rect x="47" y="709" width="311" height="95" rx="14" fill="#ffffff" stroke="#7c93ff"/>
+    <text x="202" y="743" text-anchor="middle" fill="#334a8a" font-size="19" font-weight="700">① 输入重排布（按需）</text>
+    <text x="202" y="774" text-anchor="middle" fill="#5f6b7a" font-size="16">all-gather / all-to-all / reduce...</text>
+
+    <rect x="445" y="709" width="310" height="95" rx="14" fill="#ffffff" stroke="#4ade80"/>
+    <text x="600" y="743" text-anchor="middle" fill="#166534" font-size="19" font-weight="700">② 执行本地 ATen 算子</text>
+    <text x="600" y="774" text-anchor="middle" fill="#5f6b7a" font-size="16">每个 rank 只处理自己的 local tensor</text>
+
+    <rect x="842" y="709" width="311" height="95" rx="14" fill="#ffffff" stroke="#fb923c"/>
+    <text x="997" y="743" text-anchor="middle" fill="#9a3412" font-size="19" font-weight="700">③ 包装输出 DTensor</text>
+    <text x="997" y="774" text-anchor="middle" fill="#5f6b7a" font-size="16">local result + output DTensorSpec</text>
+
+    <path d="M358 756 L437 756" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+    <path d="M755 756 L834 756" fill="none" stroke="#64748b" stroke-width="1.8" marker-end="url(#prop-arrow)"/>
+  </g>
+</svg>

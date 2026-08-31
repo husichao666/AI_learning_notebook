@@ -311,30 +311,7 @@ DTensor.__torch_dispatch__
 
 因此，DTensor 不是当前 TorchTitan 所有分布式行为的唯一外观，但仍是理解 FSDP2 与 `partial_dtensor` 路径的基础。阅读具体实现时，应先确认当前代码使用的是哪一种 SPMD 后端，再判断激活、参数和通信是否由 DTensor 直接表达。
 
-## 8. 调试 DTensor 时看什么
-
-遇到形状或布局问题时，可以先打印四类信息：
-
-```python
-print("global shape:", tuple(x.shape))
-print("local shape :", tuple(x.to_local().shape))
-print("placements  :", x.placements)
-print("mesh        :", x.device_mesh)
-```
-
-然后依次检查：
-
-1. `placements` 的数量是否与 mesh 维数一致；
-2. `Shard(dim)` 中的 `dim` 是否指向预期的张量维度；
-3. 传入 API 的到底是逻辑完整张量，还是已切好的本地 shard；
-4. 是否错误假设每个 rank 的 shard 等长；
-5. 两个输入布局不一致时是否发生了隐式重分片；
-6. `full_tensor()` 是否意外进入高频训练路径；
-7. 普通 Tensor 与 DTensor 混用时，语义是否明确。
-
-调试的核心原则是：始终同时观察**逻辑全局视图**和**当前 rank 的实际 buffer**。只看其中一个，很容易把形状正确误判为存储正确，或把本地形状不同误判为逻辑计算错误。
-
-## 9. 小结
+## 8. 小结
 
 DTensor 用 DeviceMesh 描述设备拓扑，用 Placement 描述张量在各 mesh 轴上的布局，再以 DTensorSpec 把这些信息与逻辑全局元数据绑定。算子执行时，布局规则决定本地运算能否直接进行，以及何时需要 `all_gather`、`all_reduce`、`reduce_scatter` 或 `all_to_all`。
 

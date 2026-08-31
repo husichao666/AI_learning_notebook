@@ -474,43 +474,7 @@ else:
 
 在 `partial_dtensor` 路径中，这些布局会解析为 DTensor Placement；在默认 `spmd_types` 路径中，相同的 axis 级声明用于分发状态、建立本地 SPMD 类型并验证边界。模型配置表达的是“张量在哪些 axis 上如何分布”，具体运行时表示由 backend 决定。
 
-## 8. 调试 DeviceMesh 与 Placement
-
-### 8.1 先检查 mesh
-
-```python
-print("mesh          :", mesh.mesh)
-print("shape         :", mesh.shape)
-print("axis names    :", mesh.mesh_dim_names)
-print("local rank    :", mesh.get_local_rank())
-```
-
-重点确认：
-
-1. 所有 rank 是否用相同的 mesh 定义进入 SPMD 初始化；
-2. rank 排列是否符合预期的机内、机间通信方向；
-3. 子 mesh 返回的是否是当前 rank 所在的那条线；
-4. 多 axis 子 mesh 的顺序是否与 Placement 顺序一致。
-
-### 8.2 再检查张量
-
-```python
-print("global shape :", tuple(x.shape))
-print("local shape  :", tuple(x.to_local().shape))
-print("placements   :", x.placements)
-print("device mesh  :", x.device_mesh)
-```
-
-重点确认：
-
-1. Placement 数量是否等于 `mesh.ndim`；
-2. `Shard(dim)` 的 dim 是否指向正确的张量维度；
-3. Partial 是否被误当作张量切片；
-4. 不等长 shard 是否被上层组件支持；
-5. 模块边界是否发生了意外的 `Shard → Replicate`；
-6. 当前查看的是参数存储 mesh、模型计算 mesh，还是数据加载 mesh。
-
-## 9. 小结
+## 8. 小结
 
 DeviceMesh 把 rank 组织成具有名字和顺序的通信 axis，Placement 则逐轴描述张量是复制、切分还是等待归约。多维布局必须同时说明 mesh axis 与 tensor dimension，不能只说“这个张量是 Shard”。
 
@@ -518,4 +482,4 @@ DeviceMesh 把 rank 组织成具有名字和顺序的通信 axis，Placement 则
 
 ---
 
-上一章：[DTensor 原理与使用](01-dtensor.md)
+上一章：[DTensor 原理与使用](01-dtensor.md) · 下一章（进入 `partial_dtensor` 路线）：[分布式算子与分片传播](03-distributed-operators.md)
