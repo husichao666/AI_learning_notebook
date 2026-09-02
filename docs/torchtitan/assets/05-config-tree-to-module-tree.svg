@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="720" viewBox="0 0 1500 720" role="img" aria-label="Config 通过 build 构造并配置 Module">
+  <defs>
+    <marker id="config-arrow" markerWidth="11" markerHeight="11" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1498" height="718" rx="24" fill="#f8fafc" stroke="#d7deea"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="750" y="54" text-anchor="middle" fill="#172033" font-size="31" font-weight="700">Config → build() → Module</text>
+    <text x="750" y="91" text-anchor="middle" fill="#5f6b7a" font-size="19">Config 保存构造参数与 ShardingConfig，build() 负责创建对应实例</text>
+
+    <rect x="65" y="140" width="480" height="390" rx="20" fill="#ffffff" stroke="#8b93df" stroke-width="1.8"/>
+    <text x="305" y="184" text-anchor="middle" fill="#4338a8" font-size="25" font-weight="700">Linear.Config</text>
+    <rect x="100" y="215" width="410" height="112" rx="14" fill="#eef2ff" stroke="#818cf8"/>
+    <text x="125" y="250" fill="#312e81" font-size="20" font-weight="700">模块构造参数</text>
+    <text x="125" y="282" fill="#565f78" font-size="18">in_features · out_features · bias</text>
+    <text x="125" y="312" fill="#565f78" font-size="18">传给 Linear.__init__(config)</text>
+    <rect x="100" y="350" width="410" height="112" rx="14" fill="#f5f3ff" stroke="#a78bfa"/>
+    <text x="125" y="385" fill="#5b21b6" font-size="20" font-weight="700">Module 共用配置</text>
+    <text x="125" y="417" fill="#6d28d9" font-size="18">param_init · sharding_config</text>
+    <text x="125" y="447" fill="#6d28d9" font-size="18">构造后挂到 Module 实例</text>
+    <text x="305" y="500" text-anchor="middle" fill="#475569" font-size="18">_owner = Linear</text>
+
+    <path d="M545 335 L665 335" fill="none" stroke="#64748b" stroke-width="2.4" marker-end="url(#config-arrow)"/>
+    <rect x="665" y="265" width="170" height="140" rx="18" fill="#fff7ed" stroke="#fb923c" stroke-width="1.8"/>
+    <text x="750" y="316" text-anchor="middle" fill="#9a3412" font-size="23" font-weight="700">config</text>
+    <text x="750" y="346" text-anchor="middle" fill="#9a3412" font-size="23" font-weight="700">.build()</text>
+    <text x="750" y="378" text-anchor="middle" fill="#7c5b43" font-size="16">读取 _owner</text>
+    <path d="M835 335 L955 335" fill="none" stroke="#64748b" stroke-width="2.4" marker-end="url(#config-arrow)"/>
+
+    <rect x="955" y="140" width="480" height="390" rx="20" fill="#ffffff" stroke="#55a7d9" stroke-width="1.8"/>
+    <text x="1195" y="184" text-anchor="middle" fill="#075985" font-size="25" font-weight="700">Linear 实例</text>
+    <rect x="990" y="215" width="410" height="112" rx="14" fill="#eaf6ff" stroke="#38a3d1"/>
+    <text x="1015" y="250" fill="#075985" font-size="20" font-weight="700">完成模块构造</text>
+    <text x="1015" y="282" fill="#365f73" font-size="18">weight · bias</text>
+    <text x="1015" y="312" fill="#365f73" font-size="18">保留原来的 nn.Linear.forward</text>
+    <rect x="990" y="350" width="410" height="112" rx="14" fill="#f0f9ff" stroke="#38bdf8"/>
+    <text x="1015" y="385" fill="#075985" font-size="20" font-weight="700">保存通用配置</text>
+    <text x="1015" y="417" fill="#0369a1" font-size="18">._param_init</text>
+    <text x="1015" y="447" fill="#0369a1" font-size="18">._sharding_config</text>
+    <text x="1195" y="500" text-anchor="middle" fill="#475569" font-size="18">实例本身没有 build() 接口</text>
+
+    <rect x="235" y="580" width="1030" height="86" rx="18" fill="#ecfdf5" stroke="#4ade80" stroke-width="1.6"/>
+    <text x="750" y="617" text-anchor="middle" fill="#166534" font-size="21" font-weight="700">组合模块只是重复这套机制</text>
+    <text x="750" y="648" text-anchor="middle" fill="#3f6f54" font-size="18">FeedForward.Config 保存 w1 / w2 / w3 的 Config，再分别调用 child_config.build()</text>
+  </g>
+</svg>

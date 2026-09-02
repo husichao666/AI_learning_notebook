@@ -1,14 +1,14 @@
 ---
 title: "7.3 · 性能优化"
-description: "专家并行的性能问题不是单一的“通信慢”：路由偏斜会制造慢 rank，All-to-All 会撞上拓扑墙，细粒度专家会把大矩阵切成小 GEMM，动态路由还会引入重排、同步和显存波动。本章先解释问题为什么发生，再把每类问题映射到 Megatron 的具体算法与实现。"
+description: "从负载偏斜、All-to-All 拓扑、小 GEMM 与动态路由四类证据出发，建立 Megatron 专家并行的性能分析与优化顺序。"
 type: engineering-note
 status: stable
 level: advanced
-updated: 2026-08-25
+updated: 2026-09-02
 tags: [distributed-training, expert-parallel, performance]
 ---
 
-# EP 优化：常见问题、根因与 Megatron 解法
+# Expert Parallel 性能：瓶颈、证据与 Megatron 优化
 
 <div class="notebook-hero" markdown>
 
@@ -21,11 +21,18 @@ tags: [distributed-training, expert-parallel, performance]
 </div>
 
 
-## 01 · EP 到底慢在哪里：四类常见问题 { #overview }
+!!! note "实现基线"
+
+    本文关于 DeepEP、HybridEP、overlap 开关及其组合限制的源码结论，对应 Megatron-LM 集成提交 `88894e3ee`。性能分析中的数据依赖和测量方法可迁移到其他版本，但具体 backend 名称、支持矩阵与命令行参数必须以目标版本为准。
+
+
+## 01 · 四类性能瓶颈 { #overview }
 
 先把一层 MoE 的前向主链路写出来：
 
 **Router → Permute → Dispatch A2A → Expert GEMM → Combine A2A → Unpermute**
+
+后文使用 ETP 表示 expert Tensor Parallel，即继续切分单个专家内部的矩阵；D2H 表示 device-to-host，把 GPU 上的计数或 shape 信息取回 CPU。两者分别影响专家 GEMM 粒度和动态调度开销。
 
 反向还会再走一遍相反方向的数据依赖。于是总时间可以粗略拆为：
 
@@ -47,7 +54,7 @@ tags: [distributed-training, expert-parallel, performance]
 
 
 
-## 02 · 问题一：负载不均，为什么所有 rank 都会被一个热点拖慢？ { #balance }
+## 02 · 负载不均与慢 rank { #balance }
 
 
 ### 问题与成因
@@ -75,7 +82,7 @@ Switch/GShard 风格的辅助损失同时约束“专家被选中的频率”和
 
 ```python
 --moe-router-load-balancing-type aux_loss
---moe-aux-loss-coeff 1e-2
+--moe-aux-loss-coeff COEFF  # 按主任务损失、负载偏斜与训练稳定性实验确定
 
 # 也可按模型需要选择 seq_aux_loss / global_aux_loss
 ```
@@ -128,7 +135,7 @@ Capacity factor 给每个专家设上限。超限 assignment 可以按概率或�
 
 
 
-## 03 · 问题二：两次 All-to-All 为什么会成为通信墙？ { #communication }
+## 03 · All-to-All 数据路径与拓扑瓶颈 { #communication }
 
 
 ### 问题与成因
@@ -217,7 +224,7 @@ hidden, _ = fused_combine(hidden, group, handle, ...)
 
 #### 3. HybridEP：把两侧重排也并入层次化通信
 
-HybridEP 面向大 NVLink 域和多节点拓扑，把 scale-up 与 scale-out 放进同一条 token 搬运流水：NVLink/MNNVL 侧使用 TMA 等机制降低搬运所需 SM，跨节点侧使用 IBGDA/RDMA 直接访问通信 buffer，并允许分别控制 preprocess、permute、dispatch/combine 占用的 SM / block 数。
+HybridEP 面向大 NVLink 域和多节点拓扑，把节点内扩展（scale-up）与跨节点扩展（scale-out）放进同一条 token 搬运流水。NVLink / Multi-Node NVLink（MNNVL）侧可使用 Tensor Memory Accelerator（TMA）等机制降低搬运占用的 Streaming Multiprocessor（SM）资源；跨节点侧使用 InfiniBand GPU Direct Async（IBGDA）/ RDMA 直接访问通信 buffer，并允许分别控制 preprocess、permute、dispatch/combine 占用的 SM 或 thread block 数。
 
 它与上面 DeepEP 路径最关键的区别，是**融合边界更大**：
 
@@ -229,7 +236,7 @@ HybridEP 面向大 NVLink 域和多节点拓扑，把 scale-up 与 scale-out 放
 ![HybridEP 扩大融合边界并减少 HBM 中间落地](assets/06-ep-performance-figure-03.svg)
 
 
-**为什么要扩大融合边界？** DeepEP 已经缓解跨节点网络瓶颈后，独立的 local-expert permute/unpermute 会暴露出来：每次都要把整块 token 激活写回 HBM、重新读取、启动索引 kernel，而且这些 CUDA kernel 会占用本可留给专家 GEMM 的 SM。HybridEP 用 TMA 承担大 NVLink 域的数据搬运、用 IBGDA/RDMA 完成 scale-out，并让 token 在通信过程中直接落到 expert-contiguous 位置；它优化的不只是“网络带宽”，而是**网络 + HBM + SM + launch**组成的整条 dispatch/combine 路径。
+DeepEP 缓解跨节点网络瓶颈后，独立的 local-expert permute/unpermute 可能成为新的暴露开销：每次都要把整块 token 激活写回 HBM、重新读取并启动索引 kernel，这些 CUDA kernel 还会占用本可留给专家 GEMM 的 SM。HybridEP 扩大融合边界，让 token 在通信过程中直接落到 expert-contiguous 位置，优化对象从网络传输扩展到 HBM 搬运、SM 占用和 kernel launch。
 
 因此 HybridEP 输出已经是 Grouped GEMM 可直接消费的 expert-contiguous layout；Megatron 的 `get_permuted_hidden_states_by_experts()` 和恢复函数在这条路径上直接返回输入，不再单独发起第二套 permute/unpermute kernel。
 
@@ -336,7 +343,9 @@ Megatron 的实现不是简单地把整个 shared MLP 丢到另一个 stream：
 这就是 `combined_1f1b` 的核心：相邻 micro-batch 没有激活依赖，可以把一边的 A2A 放在通信 stream，把另一边的 attention/MLP 放在计算 stream。PP>1 时还要多 warmup 一个 micro-batch，确保进入稳态后配对的 forward 与 backward 真正独立。
 
 
-#### 3. 为什么还要 delay wgrad？
+前后向跨 micro-batch 重叠仍可能缺少足够的独立计算窗口。权重梯度（weight gradient, wgrad）只需在 optimizer step 前完成，因此可以从输入梯度计算中拆出并延后，用来覆盖 A2A。
+
+#### 3. 延后 wgrad 的调度作用
 
 线性层反向包含两类 GEMM：
 
@@ -383,7 +392,7 @@ new_order = [..., -3, -3.5, -2, -2.5, -1, -1.5, ...]
 
 
 
-## 04 · 问题三：专家计算量不少，为什么 GPU 仍吃不满？ { #compute }
+## 04 · 专家 GEMM 的小矩阵效率 { #compute }
 
 
 ### 问题与成因
@@ -434,7 +443,7 @@ class TEGroupedMLP(MegatronModule):
 ```
 
 
-## 05 · 问题四：router 不重，为什么重排、动态 shape 和显存仍很贵？ { #dynamic }
+## 05 · 动态路由的重排、shape 与显存开销 { #dynamic }
 
 
 ### 问题与成因
@@ -493,7 +502,7 @@ MoE 激活会被 top-k 扩张，还要保留 permutation mapping 和通信 buffe
 ```
 
 
-## 06 · 把问题映射到方案：一条可执行的优化顺序 { #workflow }
+## 06 · 从 profile 证据到优化顺序 { #workflow }
 
 | Profile 证据 | 先验证什么 | 第一候选方案 | 不要先做什么 |
 | --- | --- | --- | --- |

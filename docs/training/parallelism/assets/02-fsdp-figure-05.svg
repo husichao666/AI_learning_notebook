@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 198" role="img" aria-label="静态显存随卡数缩小、激活值不变，大 N 下激活主导峰值">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 198" role="img" aria-label="配置不变时，模型状态随分片组增大而缩小，激活更可能主导峰值">
 <style>
   /* The book treats diagrams as daylight-mode figures in every site theme. */
   [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
@@ -20,9 +20,9 @@
   stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
   [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
 </style>
-  <text x="20" y="24" fill="#eaeefb" font-size="15" font-weight="700">卡越多，激活越主导峰值</text>
-  <rect x="360" y="13" width="15" height="14" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="381" y="25" fill="#9aa3b2" font-size="12.5">静态(模型状态)</text>
-  <rect x="500" y="13" width="15" height="14" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="521" y="25" fill="#9aa3b2" font-size="12.5">激活(动态)</text>
+  <text x="20" y="24" fill="#eaeefb" font-size="15" font-weight="700">其他配置不变时，激活更可能主导峰值</text>
+  <rect x="360" y="13" width="15" height="14" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="381" y="25" fill="#9aa3b2" font-size="12.5">模型状态</text>
+  <rect x="500" y="13" width="15" height="14" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="521" y="25" fill="#9aa3b2" font-size="12.5">激活</text>
   <rect x="612" y="13" width="15" height="14" fill="rgba(148,163,184,0.12)" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="633" y="25" fill="#9aa3b2" font-size="12.5">all-gather 峰值</text>
   <g font-size="14">
     <text x="20" y="90" fill="#d7dbe4">N=1</text>
@@ -30,8 +30,8 @@
     <rect x="550" y="66" width="200" height="34" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="650" y="88" text-anchor="middle" fill="#c4b5fd" font-size="12.5">激活</text>
     <text x="20" y="150" fill="#d7dbe4">N=8</text>
     <rect x="150" y="126" width="50"  height="34" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/><text x="175" y="148" text-anchor="middle" fill="#ffd0ad" font-size="11">2.25P</text>
-    <rect x="200" y="126" width="200" height="34" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="300" y="148" text-anchor="middle" fill="#c4b5fd" font-size="12.5">激活（不变）</text>
+    <rect x="200" y="126" width="200" height="34" fill="rgba(168,139,250,0.24)" stroke="#a78bfa"/><text x="300" y="148" text-anchor="middle" fill="#c4b5fd" font-size="12.5">激活（配置不变时）</text>
     <rect x="400" y="126" width="50"  height="34" fill="rgba(148,163,184,0.12)" stroke="#94a3b8" stroke-dasharray="3 2"/><text x="425" y="148" text-anchor="middle" fill="#94a3b8" font-size="10">峰值</text>
   </g>
-  <text x="20" y="188" fill="#9aa3b2" font-size="13.5">静态显存随卡数线性缩小（橙 18P→2.25P），激活值几乎不变（紫）——<tspan fill="#c4b5fd" font-weight="700">大 N 下峰值由激活主导</tspan>。（激活宽度为示意）</text>
+  <text x="20" y="188" fill="#9aa3b2" font-size="13.5">模型状态理想项随 N 缩小（橙 18P→2.25P）；local batch、SP/CP 与重计算不变时，激活项不自动缩小（紫）。</text>
 </svg>

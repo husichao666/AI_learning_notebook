@@ -4,7 +4,7 @@ description: "从核心类、状态缓冲区和运行时 Hook 入手，读懂 Me
 type: source-note
 status: stable
 level: intermediate
-updated: 2026-08-27
+updated: 2026-09-02
 tags: [distributed-training, fsdp, zero, megatron]
 ---
 
@@ -20,7 +20,7 @@ Megatron-FSDP 把 ZeRO-3 拆成两部分实现：`ParamAndGradBuffer` 管理参�
 
 !!! note "实现范围"
 
-    以下讨论 `--use-megatron-fsdp` 与 `optim_grads_params` 组成的 ZeRO-3 路径。经典 Megatron `DistributedOptimizer` 只切优化器状态；`--use-torch-fsdp2` 则走另一套 PyTorch FSDP2 包装器。
+    以下讨论 Megatron-LM 提交 `88894e3ee` 中，由 `--use-megatron-fsdp` 与 `optim_grads_params` 组成的 ZeRO-3 路径。经典 Megatron `DistributedOptimizer` 只切优化器状态；`--use-torch-fsdp2` 则走另一套 PyTorch FSDP2 包装器。内部类名与开关应以目标版本为准。
 
 ## 从 ZeRO-3 流程进入 Megatron 实现
 
@@ -32,7 +32,7 @@ Megatron-FSDP 把 ZeRO-3 拆成两部分实现：`ParamAndGradBuffer` 管理参�
 
 Megatron-FSDP 没有改变这套算法，真正增加的是一套具体的运行时机制：用 `ParamAndGradBuffer` 保存分片状态，用 `AllGatherPipeline` 和 `GradReducePipeline` 调度通信，再用 Hook 把参数恢复、释放和梯度归约插入模型执行过程。理解其源码，就是把上图中的每个箭头对应到具体的类、缓冲区和 Hook。
 
-## 01 · 初始化：三层包装分别做什么 { #init }
+## 01 · 初始化调用链与三层包装 { #init }
 
 入口在 `megatron/training/models/dist_utils.py::_ddp_wrap()`。开启 Megatron-FSDP 后，主调用链是：
 
@@ -166,7 +166,7 @@ Adam 的一阶矩和二阶矩不由该类保存，而是由 `DistributedOptimize
 
 ### 生成 offset 和 buffer
 
-#### buffer 是什么
+#### buffer 的物理含义
 
 本文所说的 buffer，是一个实际保存数据的一维 CUDA Tensor；它的底层 Storage 是单张 GPU 上的一段连续显存。源码中的 `DataParallelBuffer` 则是管理对象，除了 `.data` 这个 CUDA Tensor，还保存参数 offset、完整范围、本 rank 分片范围、dtype 和通信组等元数据。
 
@@ -180,7 +180,7 @@ DataParallelBuffer
 
 同一个 buffer 只能保存一种 dtype，所以参数分组阶段已经将 BF16、FP32 等不同 dtype 的参数分开。
 
-#### 参数分组怎样变成 buffer
+#### 从参数分组到连续 buffer
 
 把参数拼接到一起，然后按照rank切分：
 
@@ -209,7 +209,7 @@ Wk.shape   → offset [6, 12)
 
 运行时不需要把 Wq、bias 和 Wk 再复制拼接。All-Gather 直接读取各 rank 的本地连续 buffer，并将结果写入临时完整 buffer；Parameter 随后通过 offset 和 view 找到自己的数据。
 
-#### 哪些 buffer 常驻
+#### 常驻 buffer 与临时 buffer
 
 基础 ZeRO-3 对每个参数分组最多管理三类**常驻分片 buffer**，计算时还会使用临时完整 buffer：
 
@@ -223,7 +223,7 @@ Wk.shape   → offset [6, 12)
 
 因此，“ZeRO-3 的 buffer 是否常驻”不能统一回答：参数、主权重和归约后梯度的**本地分片 Storage 常驻**；All-Gather 得到的完整参数和 Reduce-Scatter 前的完整梯度只是临时数据。启用双缓冲时，后两者的两组 Storage 也会常驻，但其中的数据仍会被不同 FSDP unit 轮换覆盖。
 
-### 这些 buffer 何时使用
+### buffer 的运行时数据生命周期
 
 当前 FSDP unit 即将计算时，每个 rank 准备一个临时完整参数 buffer，并通过 All-Gather 把各 rank 的常驻分片拼成完整输出：
 
@@ -244,7 +244,7 @@ Parameter 对象仍然保留，只是其 `.data` 指向临时完整 buffer 中�
 
 `MegatronFSDP.__init__()` 只在初始化时调用一次 `_register_fsdp_hooks(root_module)`。这个函数遍历 `root_module.named_modules()`，找到 `TransformerLayer` 等 FSDP unit，并把回调函数挂到 Module、前向输出 Tensor 和 Parameter 上。训练循环仍然调用普通的 `forward()` 与 `backward()`，参数 All-Gather、释放和梯度 Reduce-Scatter 则由这些触发点自动执行。
 
-### Hook 是怎么插入的
+### Hook 的注册位置与触发点
 
 核心注册关系可以压缩为：
 
@@ -359,7 +359,7 @@ sequenceDiagram
 
 反向结束后，`finish_grad_sync()` 等待异步 Reduce-Scatter，随后把梯度分片挂到 `optimizer_named_parameters`，并将模块参数切换为分片 DTensor。`DistributedOptimizer` 因此只看到本 rank 的参数、梯度和 Adam 状态分片。更新完成后，下一次 `start_param_sync()` 再进入新的循环。
 
-## 04 · Megatron-FSDP 做了哪些工程优化 { #performance }
+## 04 · 工程优化：重叠、缓冲区与通信路径 { #performance }
 
 ZeRO-3 决定了基本通信量：每个 step 至少需要两轮参数 All-Gather 和一轮梯度 Reduce-Scatter。Megatron-FSDP 并没有消除这些 collective，而是尽量做到三件事：**让通信与计算重叠、减少通信前后的数据搬运、降低通信对 GPU 计算资源的占用**。
 
@@ -388,7 +388,7 @@ ZeRO-3 决定了基本通信量：每个 step 至少需要两轮参数 All-Gathe
 
 固定 offset 不会改变 ZeRO-3 必须传输的有效参数和梯度字节数，padding 甚至会带来少量额外字节。它优化的是“小通信太多、通信前后还要搬数据”的软件开销。代价是通信和释放粒度变成整个分组：组越大，collective 越高效，但临时完整参数和梯度也可能保留更久，峰值显存更高。
 
-### 3. 临时缓冲区如何分配与复用
+### 3. 临时缓冲区的分配与复用
 
 理解这部分之前，需要先区分 PyTorch 中的 `Tensor` 和 `Storage`：
 
@@ -468,7 +468,7 @@ Megatron-FSDP 分别管理计算权重、主权重、主梯度和梯度通信 dt
 
 这里降低的是**实际网络字节数**，不同于通信重叠只是隐藏等待时间。
 
-### 5. 固定缓冲区如何被 NCCL 与网络硬件利用
+### 5. NCCL 与网络硬件对固定缓冲区的利用
 
 上面的第 3 项解决的是缓冲区的**分配与生命周期**：完整参数和临时梯度放在哪里、何时可以复用，以及地址是否稳定。本节讨论下一层问题：地址稳定之后，通信库和网络硬件能利用它做什么。
 

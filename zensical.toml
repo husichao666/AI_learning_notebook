@@ -80,8 +80,12 @@ nav = [
     ] },
     { "spmd_types 路线" = [
       { "第 5 章 · ShardingConfig 与 spmd_types" = "torchtitan/05-sharding-config-spmd-types.md" },
+      { "第 6 章 · torch.compile 与显式通信" = "torchtitan/06-torch-compile-explicit-collectives.md" },
     ] },
-    { "独立源码分析 · GraphTrainer" = "torchtitan/graph-trainer.md" },
+    { "GraphTrainer 路线" = [
+      { "第 7 章 · GraphTrainer 的整步训练图" = "torchtitan/07-graph-trainer-step-graph.md" },
+      { "第 8 章 · GraphTrainer 的图变换流水线" = "torchtitan/08-graph-trainer-passes.md" },
+    ] },
   ] },
   { "性能工程" = [
     { "领域总览" = "engineering/index.md" },

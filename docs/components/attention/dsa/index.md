@@ -1,10 +1,10 @@
 ---
 title: DeepSeek Sparse Attention
-description: DSA 闪电索引器、Token-wise 稀疏注意力与源码实现
+description: DSA 闪电索引器、Token-wise 稀疏注意力、IndexShare 与 IndexPool
 type: component
 status: stable
 level: advanced
-updated: 2026-08-24
+updated: 2026-09-02
 tags:
   - attention
   - sparse-attention
@@ -14,11 +14,15 @@ tags:
 # DeepSeek Sparse Attention (DSA)：闪电索引与稀疏注意力
 
 > **💡 核心总结 (TL;DR):**
-> DSA（DeepSeek Sparse Attention）是 DeepSeek 自研的稀疏注意力机制，首次在 DeepSeek-V3.2-Exp 中引入。它通过 **闪电索引器（Lightning Indexer）** 以极低开销完成"海选"，再用 **细粒度 Token 选择（Fine-grained Token Selection）** 仅对 Top-k 个关键 KV 条目执行注意力计算，将复杂度从 O(L²) 降至 O(L×k)。
+> DSA（DeepSeek Sparse Attention）是 DeepSeek 自研的稀疏注意力机制，首次在 DeepSeek-V3.2-Exp 中引入。它通过 **闪电索引器（Lightning Indexer）** 完成“海选”，再用 **细粒度 Token 选择（Fine-grained Token Selection）** 仅对 Top-k 个关键 KV 条目执行主注意力计算，使昂贵的 Sparse MLA 从 O(L²) 降至 O(L×k)。不过，原始索引器仍需扫描全部历史位置：prefill 阶段是 O(L²)，单步 decode 是 O(L)。当上下文扩展到 1M token 时，这部分会成为新的瓶颈，后续的 IndexShare 与 IndexPool 分别从层维度和序列维度压缩索引器开销。
 
 参考资料：
 - [DeepSeek-V3.2 技术报告](./DeepSeek_V3_2.pdf)
 - [NSA: Native Sparse Attention (ACL 2025 最佳论文)](https://arxiv.org/abs/2502.11089)
+- [IndexCache: Accelerating Sparse Attention via Cross-Layer Index Reuse](https://arxiv.org/abs/2603.12201)
+- [GLM-5.2：IndexShare 模型说明](https://huggingface.co/zai-org/GLM-5.2)
+- [GLM-5.3-Flash：IndexPool 官方说明](https://z.ai/blog/glm-5.3-flash)
+- [NVIDIA NeMo AutoModel：K-Pool Indexer 接口说明](https://docs.nvidia.com/nemo/automodel/v0.4/nemo-automodel/nemo_automodel/components/models/glm5_next/layers)
 
 ---
 
@@ -73,7 +77,7 @@ DSA 的解决思路是构建一个 **两级注意力架构**：
 
 2. **① 闪电索引器打分（中·橙，"海选"）**：索引器用**低维、低精度**的一套独立 Q/K，把**整张**下三角矩阵快速打一遍分 `I[t,s]`（颜色越深分越高）。注意它算的是**便宜的估分**，不是真注意力——目的只是判断"哪些列值得看"。打完分后**逐行**取分数最高的 `k` 个格子（打 ✓ 的粗框格），其余丢弃。图里能看出选中的规律：**第 0 列（注意力汇聚点 sink）几乎每行都留、对角线附近（最近的 token）也留**，再加零星几个中距离的"语义命中"。
 
-3. **② 细粒度稀疏注意力（右·蓝，"精算"）**：**只在上一步选中的格子上**执行完整精度的真注意力，其余位置直接置 `−∞`（图中灰格），经 softmax 后权重≈0、等于没看。于是真正参与昂贵计算的格子从满下三角的 36 个降到 21 个；当序列拉长到 128K 时，每行被 `k`=2048 死死钉住，复杂度从 O(L²) 变成 **O(L·k)**。
+3. **② 细粒度稀疏注意力（右·蓝，"精算"）**：**只在上一步选中的格子上**执行完整精度的真注意力，其余位置直接置 `−∞`（图中灰格），经 softmax 后权重≈0、等于没看。于是真正参与昂贵计算的格子从满下三角的 36 个降到 21 个；当序列拉长到 128K 时，每行被 `k`=2048 死死钉住，主注意力的复杂度从 O(L²) 变成 **O(L·k)**。
 
 一句话串起来：**索引器把"该看谁"这个决定，从昂贵的主注意力里剥离出来，用一张廉价的打分矩阵替代**；主注意力只需照着 Top-k 的稀疏图案去算。后面第二部分的 `index_mask`、`topk_indices` 等张量，就是这张图里"粗框 → −∞ 灰格"这一步在代码里的形态。
 
@@ -93,7 +97,7 @@ DSA 的解决思路是构建一个 **两级注意力架构**：
 4. **③ DSA mask 后（蓝/−∞）**：把上一步**没选中**的位置直接置 `−∞`。对比第 2 列可以看到：标准注意力这里是**满下三角**，DSA 则每行最多只留 `k` 个真格子。**主分数的算法一个字没改，改的只是"哪些格子活下来"。**
 5. **④ 输出 `o_t`（黄绿）**：用活下来的分数对 `v` 加权求和。前两行历史太短（≤k）、和 dense 完全一样；**第 3、4 行因为丢了低分列，输出 `≠dense`**——但被丢掉的都是分数很小的格子，softmax 后本就接近 0，所以真实模型里这点差异极小，这正是"稀疏几乎不掉点"的直觉来源。
 
-把这张具体数字图和上面的热力图合起来看：**热力图告诉你"省了多少"（O(L²)→O(L·k)），数字图告诉你"具体省在哪一格、代价是什么"。** 二者对应的就是第二部分代码里 `index_mask`（非 Top-k 置 `-inf`）加到注意力分数上这一行。
+把这张具体数字图和上面的热力图合起来看：**热力图告诉你主注意力“省了多少”（O(L²)→O(L·k)），数字图告诉你“具体省在哪一格、代价是什么”。** 二者对应的就是第二部分代码里 `index_mask`（非 Top-k 置 `-inf`）加到注意力分数上这一行。索引器自身为什么仍可能成为瓶颈，将在第三部分继续讨论。
 
 ---
 
@@ -233,7 +237,7 @@ MLA 的核心技巧是**低秩压缩**：先把高维向量压小再算，省显
 - **单 Key 共享**：在下面 2.2 的索引分数公式里，$q_{t,j}^I$ 带头下标 $j$、而 $k_s^I$ **不带**——每个历史 token 只有**一个** Key 向量，被全部 64 个索引头共享，进一步省掉了多头 Key 的投影与缓存
 - **FP8/FP4 精度**：索引器的所有计算均可使用低精度实现，在保证索引分数准确性的前提下大幅降低计算和存储开销
 
-> **一句话抓住索引器**：它的 Q/K 计算和 MLA 几乎一样，就是个**"微缩版 MLA"**——头数 64（vs MLA 的 128）、每头维度 128（vs MLA 的 576），算量大约只有 MLA 对应部分的 **1/9**。所以"海选"这一步虽然仍是 O(L²)，但常数极小，几乎不占成本。
+> **一句话抓住索引器**：它的 Q/K 计算和 MLA 几乎一样，就是个**“微缩版 MLA”**——头数 64（vs MLA 的 128）、每头维度 128（vs MLA 的 576），算量大约只有 MLA 对应部分的 **1/9**。在 V3.2 的 128K 上下文中，这个较小的常数让索引开销可以接受；但它没有消除对全部历史位置的扫描，prefill 仍是 O(L²)。当上下文继续增长到 1M token，主注意力被 `k` 限制住，而索引器的扫描量仍随 `L` 增长，于是瓶颈会逐渐转移到“海选”阶段。
 
 #### 2.2 索引分数计算
 
@@ -520,7 +524,84 @@ $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{index
 
 ---
 
-## 第三部分：DSA 的后续演进——从 V3.2 到 V4
+## 第三部分：Lightning Indexer 的后续优化
+
+原始 DSA 已经把主注意力限制在 Top-k 个历史 token 上，但索引器仍要回答“这 `k` 个位置是谁”。设模型有 `N` 个 DSA 层、历史长度为 `L`、索引头数为 $H^I$、每头维度为 $d^I$，单步 decode 的索引打分量大致与 $N H^I d^I L$ 成正比。到了百万 token 上下文，继续优化 DSA 的重点便从 Sparse MLA 转向 Lightning Indexer 本身。
+
+后续工作形成了两个相互独立的方向：**IndexShare** 减少需要运行索引器的层数，**IndexPool** 减少一次索引器需要扫描的 Key 数量。前者沿模型的“层”维度复用结果，后者沿上下文的“序列”维度压缩输入。
+
+### 1. IndexShare：跨层复用 Top-k 位置
+
+IndexShare 来自 IndexCache 工作，并在 GLM-5.2 中落地。它的出发点是：虽然不同 Transformer 层拥有各自的 Query、Key 和 Value，但相邻 DSA 层选出的 Top-k **位置集合**通常高度重合。IndexCache 在实验中观察到，相邻层 Top-k 位置的重合率约为 70%～100%。如果后续层还从头运行一次索引器，很多计算只是在重新发现相同的位置。
+
+IndexShare 因此把 DSA 层分成两类：
+
+- **Full 层**：正常运行 Lightning Indexer，得到当前 query 的 Top-k 位置集合 $S_t^{(\ell)}$。
+- **Shared 层**：跳过自己的索引器，直接继承最近一个 Full 层留下的位置集合。
+
+用公式表示，Full 层 $\ell$ 先计算：
+
+$$S_t^{(\ell)} = \operatorname{TopK}\left(I_{t,:}^{(\ell)}, k\right)$$
+
+它后面的 Shared 层 $\ell+r$ 则直接使用：
+
+$$S_t^{(\ell+r)} \leftarrow S_t^{(\ell)}$$
+
+这里共享的只是“去哪些历史位置取数”的整数索引。Shared 层仍会使用自己的 Query 和自己的 MLA 参数，在这些位置上重新计算注意力分数、softmax 和 Value 聚合；它**没有共享 KV Cache、注意力分数或层输出**。因此，一组层的数据生命周期是：Full 层生成并暂存 Top-k indices，Shared 层读取同一份 indices，各层分别完成自己的 Sparse MLA，进入下一组时再由新的 Full 层刷新 indices。
+
+GLM-5.2 的主体配置采用一组四层共享一次索引结果的模式，可从模型配置中的 `index_topk_freq: 4` 以及 `indexer_types` 的 `full/shared` 序列直接看到。官方报告称，这一设计在 1M 上下文下将 per-token FLOPs 降低 2.9 倍；IndexCache 论文在 30B DSA 模型上移除 75% 的索引器计算后，最高取得 1.82 倍 prefill 加速和 1.48 倍 decode 加速。
+
+跨层 Top-k 重合并不意味着任意模型都能无损地套用固定的 `F → S → S → S` 模式。IndexCache 区分了两种适用方式：已有 DSA 模型可以在校准集上搜索应保留哪些 Full 层；从训练阶段引入共享时，则可以让一个 Full 层的索引器同时蒸馏多个目标层的注意力分布。层模式与训练方式都属于具体模型实现，不能写成 DSA 算法本身的固定定义。
+
+### 2. IndexPool：池化索引 Key 后再检索
+
+IndexShare 减少了索引器的运行次数，但每个保留下来的 Full 层仍需扫描长度为 `L` 的索引 Key 缓存。GLM-5.3-Flash 引入的 IndexPool（配置和推理实现中也称 K-Pool）继续沿序列维度压缩这次扫描：它把相邻 `p` 个索引 Key 合并为一个池化 Key，再让 Lightning Indexer 在池化后的序列上检索。
+
+以 GLM-5.3-Flash 的 `p=4` 为例，原来四个 token 分别对应：
+
+$$k_{4b}^I,\;k_{4b+1}^I,\;k_{4b+2}^I,\;k_{4b+3}^I$$
+
+IndexPool 使用可学习的加权池化得到一个代表向量：
+
+$$\bar{k}_b^I = \operatorname{Pool}_{\theta}\left(k_{4b}^I,k_{4b+1}^I,k_{4b+2}^I,k_{4b+3}^I\right)$$
+
+其中，`b` 是池编号，$\theta$ 表示池化模块的可学习参数。官方公开说明只把它定义为 **weighted pooling**，因此不能把这里的 `Pool` 简化成固定的平均池化。
+
+整个过程按数据生命周期可以分成四步：
+
+1. 每个新 token 仍先通过 `wk + k_norm` 产生原始索引 Key。
+2. 相邻四个索引 Key 被压成一个池化 Key，索引缓存保留池化后的表示。
+3. Query 只与约 $\lceil L/4 \rceil$ 个池化 Key 打分并选择候选池，而不是逐一扫描 `L` 个 token。
+4. **一个完整池一旦被选中，池内四个 token 会全部进入候选集合。** Sparse MLA 随后从主 MLA KV Cache 中分别读取这四个 token 的原始条目，独立计算注意力分数；最新、尚未组成完整池的 tail 位置则直接保留，避免池化延迟损伤局部信息。
+
+下面用池 10 对应 `token 40～43` 的例子把两条数据路径拆开。橙色的 $\bar{k}_{10}^I$ 只是索引器用来决定“要不要看池 10”的代表向量；一旦池 10 入选，索引结果会展开为 `[40, 41, 42, 43]`。蓝色的四份 MLA KV 从未被合并，因此主注意力仍会分别得到四个分数和四个 softmax 权重，而不是把四个 token 当成一个 token。
+
+<div align="center">
+<img src="indexpool_pool_expansion.svg" alt="IndexPool 选择池 10 后，将池内 token 40、41、42、43 全部展开并分别送入 Sparse MLA；池化只发生在索引 Key 路径" width="1100"/>
+</div>
+
+因此，IndexPool 可以概括成 **块级粗筛、token 级精算**。它没有在入选的池内再挑一个“最重要 token”：池内某个 token 只要把整个池的代表分数推入 Top-k，同池的其余 token 也会一起参加主注意力。代价是可能多取几个不相关 token，收益是索引器只需为四个 token 计算和缓存一个代表 Key。
+
+GLM-5.3-Flash 的官方配置明确给出了这一口径：
+
+```json
+"index_kpool": 4,
+"index_kpool_compress": true,
+"index_kpool_always_select_tail": true,
+"index_topk": 2048
+```
+
+需要特别区分两份缓存：IndexPool 压缩的是 Lightning Indexer 使用的 **索引 Key Cache**，不是主注意力的 MLA latent KV Cache；`index_topk=2048` 表示候选池展开后进入 Sparse MLA 的主体 token 预算。由于尚未组成完整池的 tail 会额外保留，推理接口通常为最多 `index_topk + p - 1` 个位置预留空间。若池化因子为 `p`，索引器的 prefill 计算从约 O(L²) 降为 O(L²/p)，单步 decode 从 O(L) 降为 O(L/p)，索引 Key Cache 也从 O(L) 降为 O(L/p)。它降低的是常数，并没有把索引器的渐近复杂度改成次线性。
+
+GLM-5.3-Flash 同时采用 34 层线性注意力和 11 层 DSA，因此官方给出的“注意力计算降低约 3.0 倍、KV Cache 降低约 4.4 倍”是**整个混合架构相对 GLM-5.3 的结果**，不能当作 IndexPool 单项消融。配置中的 `index_share_for_mtp_iteration: true` 也只表示在 MTP 推测解码迭代间复用索引，不等同于 GLM-5.2 在普通 Transformer 层之间采用的 IndexShare。
+
+把两个方向放在一起看，如果每 `g` 层运行一次索引器、每 `p` 个索引 Key 池化成一个，那么单步 decode 的索引打分量可从约 $N H^I d^I L$ 降到 $\frac{N}{g}H^I d^I\frac{L}{p}$。这只是解释两条优化轴如何组合的理论口径；具体模型能否采用同样的 `g`、`p`，仍取决于训练方式、检索质量和推理 kernel 的支持。
+
+---
+
+## 第四部分：DSA 的后续演进——从 V3.2 到 V4
+
+IndexShare 与 IndexPool 保留了 DSA 的 Sparse MLA，只压缩 Lightning Indexer 的工作量。DeepSeek-V4 则沿另一条路线继续修改注意力与 KV 表示本身。
 
 在 DeepSeek-V4 中，DSA 进一步演化为 **CSA + HCA 混合压缩注意力架构（DSA2）**，核心思路是在 DSA 的 Lightning Indexer 之前增加 **KV 压缩**，并将不同层配置为不同的压缩策略交替互补：
 
@@ -536,7 +617,7 @@ $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{index
 
 ---
 
-## 第四部分：实验结果与效果分析
+## 第五部分：实验结果与效果分析
 
 ### 1. V3.2-Exp：DSA 的首次验证
 
@@ -560,7 +641,7 @@ $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{index
 
 ---
 
-## 第五部分：从 NSA 到 DSA 到 DSA2 的技术谱系
+## 第六部分：从 NSA 到 DSA 到 DSA2 的技术谱系
 
 ```mermaid
 %%{init: {'theme':'default'}}%%
@@ -585,6 +666,6 @@ graph LR
 
 ## 📝 总结
 
-DSA 的核心思想是 **用轻量筛选换计算效率**。通过 Lightning Indexer 做"海选"、细粒度 Top-k 选择做"精算"，DSA 将注意力复杂度从 O(L²) 降至 O(L×k)，同时通过两阶段训练策略确保了从密集注意力到稀疏注意力的平滑过渡。
+DSA 的核心思想是 **用轻量筛选换计算效率**。通过 Lightning Indexer 做“海选”、细粒度 Top-k 选择做“精算”，DSA 将主 Sparse MLA 的复杂度从 O(L²) 降至 O(L×k)，同时通过两阶段训练策略确保了从密集注意力到稀疏注意力的平滑过渡。原始索引器仍需扫描完整历史，因此并没有消除所有二次项；IndexShare 通过跨层复用 Top-k 位置减少索引器调用次数，IndexPool 通过池化索引 Key 缩短每次扫描的序列，两者分别从层维度和序列维度缓解这一瓶颈。
 
 在 V3.2-Exp 上的实验验证了这一思路的可行性：在 H800 集群上，无论 prefilling 还是 decoding，单位 token 成本都大幅下降，**在 128K 长上下文下单位 token 成本最高降低达 60%~70%**，且几乎不影响模型性能，部分任务上甚至带来提升。在 V4 中，DSA 进一步与 KV 压缩机制结合，演化为 CSA + HCA 混合架构，使百万 Token 上下文成为现实。

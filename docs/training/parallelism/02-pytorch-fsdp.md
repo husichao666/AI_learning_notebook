@@ -4,7 +4,7 @@ description: "沿 PyTorch FSDP2 源码，追踪 fully_shard、FSDPState、FSDPPa
 type: source-note
 status: stable
 level: intermediate
-updated: 2026-08-27
+updated: 2026-09-02
 tags: [distributed-training, fsdp, fsdp2, pytorch, torchtitan]
 ---
 
@@ -22,7 +22,7 @@ PyTorch FSDP2 的公开入口只有一个 `fully_shard()`，真正的实现却�
 
     以下讨论 `torch.distributed.fsdp.fully_shard`，也就是通常所说的 FSDP2，不是旧版包装器 `FullyShardedDataParallel`（FSDP1）。源码结构以 2026 年 8 月的 PyTorch `main` 分支为准；以下划线开头的文件、类和字段都是内部实现，不构成兼容性承诺。TorchTitan 只在第 2 节作为真实调用入口出现。
 
-## 01 · 先建立源码对象地图 { #source-map }
+## 01 · 源码对象地图 { #source-map }
 
 阅读 FSDP2 时，最容易被 `state`、`param_group` 和多个参数副本绕晕。先把五层对象的职责固定下来：
 
@@ -87,7 +87,7 @@ classDiagram
 
 这里的“参数组”不是优化器的 `optimizer.param_groups`，而是**一次 all-gather 和一次 reduce-scatter 一起处理的通信组**。
 
-## 02 · `fully_shard()` 初始化时到底做了什么 { #init }
+## 02 · `fully_shard()` 初始化流程 { #init }
 
 公开函数 `fully_shard()` 被 `@contract(state_cls=FSDPState)` 装饰。这个 composable contract（可组合 API 契约）为调用创建 `FSDPState`，后续可通过 `fully_shard.state(module)` 取回；普通单模块路径是一模块一 state，`fully_shard([a, b])` 则让列表中的模块共享同一 state。删去校验和少数分支后，源码主线可以压缩成：
 
@@ -213,7 +213,7 @@ fully_shard(model, **fsdp_config)
 
 HSDP 参数每卡约为 $1/S$，不是 $1/(R\times S)$；`replicate` 轴保留的是 shard 副本。
 
-## 03 · `FSDPParam` 如何保存并切换参数 { #param-state }
+## 03 · `FSDPParam` 的参数表示与状态切换 { #param-state }
 
 FSDP2 不使用 FSDP1 的 `FlatParameter`，但它也不是只保存一个 DTensor。默认 Tensor 路径中，一个 `FSDPParam` 至少要区分以下对象：
 
@@ -255,7 +255,7 @@ def to_sharded(self):
 
 `ParamModuleInfo` 还保存了所有 tied/shared parameter 的模块与属性名，所以一次切换会同步更新全部别名。这也是共享权重必须由同一 FSDP group 管理的原因：两个 group 不能同时决定同一个 `module.weight` 当前应该指向哪个对象。
 
-### 为什么释放 storage，而不是删除完整 Parameter
+### 完整 Parameter 的对象身份与 storage 释放
 
 autograd 可能把 `_unsharded_param` 或它的 view 保存到反向图中。如果每轮都销毁 Parameter 再新建，旧 view 的别名关系会失效。源码因此只创建一次完整 Parameter 对象，随后用：
 
@@ -270,7 +270,7 @@ tensor.untyped_storage().resize_(size)  # alloc_storage
 
     优化器在 `fully_shard()` 之后创建，持有的是 `sharded_param`，不是计算期临时注册到模块上的 `_unsharded_param`。反向结束后，reduce-scatter 结果会写入 `sharded_param.grad`；因此 `optimizer.step()` 始终更新本地 DTensor shard。
 
-## 04 · Hook 如何卡住前向和反向边界 { #hooks }
+## 04 · 前向与反向边界的 Hook 组合 { #hooks }
 
 FSDP2 运行时并不是简单的“前向两个 Hook、反向两个 Hook”。源码组合了 module Hook、Tensor Hook、自定义 autograd Function 和 autograd engine callback：
 
@@ -408,7 +408,7 @@ Adam states = 与 sharded_param 相同的本地布局
 
 因此 FSDP2 不需要在 optimizer step 前再运行一次参数或梯度切分。若关闭梯度同步，`post_backward()` 会保留或累积完整梯度而不调用 `foreach_reduce()`；恢复同步后再执行归约，这就是 FSDP2 的 no-sync 语义。
 
-## 07 · 通信 buffer 为何更可控 { #memory-management }
+## 07 · 通信 buffer 的生命周期控制 { #memory-management }
 
 FSDP2 的工程优化不只是在别的 stream 上调用 NCCL。`FSDPCommContext` 由整棵 FSDP 树共享，并在 lazy init 时建立：
 
@@ -463,7 +463,7 @@ reduce-scatter input 同样由 `ReduceScatterState(input, event)` 保持引用�
     2. `wait_for_unshard()` 在 copy-out 后记录 event，并让通信 stream 等待该 event 后才释放 all-gather result。
     3. `post_backward()` 把 `reduce_scatter_input` 与完成 event 放进 `ReduceScatterState`，并按 `reduce_scatter_max_input_buffers` 回收最旧状态。
 
-## 08 · 源码中还有哪些性能优化 { #optimizations }
+## 08 · 其他性能优化 { #optimizations }
 
 FSDP2 的主要优化可以落到具体函数，而不是笼统归结为“异步通信”：
 
@@ -507,7 +507,7 @@ $$
 
 这不包含当前与预取 unit 的完整计算参数、激活、AG/RS flat buffer 和 allocator 碎片。
 
-## 09 · optimizer 与 checkpoint 为什么仍然是原生接口 { #optimizer }
+## 09 · optimizer 与 checkpoint 的原生接口 { #optimizer }
 
 TorchTitan 在分片与物化后创建优化器：
 
@@ -520,7 +520,7 @@ optimizer = torch.optim.AdamW(params, fused=True, ...)
 
 `model.state_dict()` 同样保留原参数 FQN，并以 DTensor 描述全局形状和本地 placement。PyTorch Distributed Checkpoint 根据这些元数据让各 rank 并行保存自己的 local shard，不需要先把完整模型聚合到 rank 0。
 
-## 10 · 按什么顺序读源码与打断点 { #debug }
+## 10 · 源码阅读与断点顺序 { #debug }
 
 建议沿数据生命周期阅读，而不是从 `fully_shard.py` 顺序翻到文件结尾：
 

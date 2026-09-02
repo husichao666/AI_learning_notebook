@@ -84,7 +84,7 @@
 <rect x="447" y="568" width="72" height="28" rx="7" fill="#1f7a4d"/><text x="483" y="587" fill="#fff" font-size="12" font-weight="700" text-anchor="middle">b0 → E1</text>
 
 <!-- ③ dispatch 后按专家收齐 -->
-<text x="450" y="639" fill="#eaeefb" font-size="15.5" font-weight="700" text-anchor="middle">③ Dispatch 后：每张卡按本地专家收齐 token</text>
+<text x="450" y="639" fill="#eaeefb" font-size="15.5" font-weight="700" text-anchor="middle">③ Dispatch 后：收齐 token，并按本地专家重排</text>
 <rect x="50" y="655" width="360" height="148" rx="12" fill="#161922" stroke="#2f3855"/>
 <rect x="490" y="655" width="360" height="148" rx="12" fill="#161922" stroke="#2f3855"/>
 <rect x="70" y="676" width="320" height="50" rx="10" fill="#12151d" stroke="#3a56d4"/>
@@ -167,5 +167,5 @@
 <rect x="596" y="1405" width="62" height="30" rx="8" fill="#12351f" stroke="#4ade80"/><text x="627" y="1425" fill="#86efac" font-size="12.5" font-weight="700" text-anchor="middle">b1*</text>
 <rect x="668" y="1405" width="62" height="30" rx="8" fill="#12351f" stroke="#4ade80"/><text x="699" y="1425" fill="#86efac" font-size="12.5" font-weight="700" text-anchor="middle">b2*</text>
 
-<text x="450" y="1485" fill="#86efac" font-size="13" text-anchor="middle">dispatch 按目标专家发送；combine 按 token 来源返回；unpermute 只负责恢复本地原序。</text>
+<text x="450" y="1485" fill="#86efac" font-size="13" text-anchor="middle">概念图把接收端 expert regroup 合并在③；标准源码路径会显式执行第二次 permute。</text>
 </svg>

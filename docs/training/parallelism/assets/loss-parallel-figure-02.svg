@@ -61,5 +61,5 @@
   <!-- Result -->
   <rect x="210" y="290" width="440" height="58" rx="10" fill="rgba(74,222,128,0.10)" stroke="#4ade80"/>
   <text x="430" y="314" text-anchor="middle" fill="#bbf7d0" font-size="14" font-weight="600">loss = log(Σexp) − z_t</text>
-  <text x="430" y="334" text-anchor="middle" fill="#86efac" font-size="12.5">逐 token 标量 · 反向传播零通信</text>
+  <text x="430" y="334" text-anchor="middle" fill="#86efac" font-size="12.5">逐 token 统计量 · 交叉熵算子反向无词表维通信</text>
 </svg>

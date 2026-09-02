@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-label="TorchTitan 从并行化到编译执行的时间线">
+  <defs>
+    <marker id="compile-arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#64748b"/>
+    </marker>
+    <marker id="compile-arrow-green" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#15803d"/>
+    </marker>
+  </defs>
+  <rect x="1" y="1" width="1598" height="1038" rx="24" fill="#f8fafc" stroke="#d7deea"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, PingFang SC, Microsoft YaHei, sans-serif">
+    <text x="800" y="54" text-anchor="middle" fill="#172033" font-size="32" font-weight="700">从显式并行程序到可复用编译结果</text>
+    <text x="800" y="92" text-anchor="middle" fill="#5f6b7a" font-size="20">安装编译入口不等于已经编译；第一次真实前反向才完成捕获与代码生成</text>
+
+    <rect x="54" y="126" width="1492" height="258" rx="20" fill="#ffffff" stroke="#8ba3d9" stroke-width="2"/>
+    <text x="82" y="165" fill="#334a8a" font-size="23" font-weight="700">初始化阶段 · 每个模型只执行一次</text>
+
+    <rect x="82" y="207" width="220" height="112" rx="14" fill="#eef2ff" stroke="#7c93ff"/>
+    <text x="192" y="243" text-anchor="middle" fill="#334a8a" font-size="20" font-weight="700">Config.build()</text>
+    <text x="192" y="274" text-anchor="middle" fill="#5f6b7a" font-size="17">meta 模型</text>
+    <text x="192" y="301" text-anchor="middle" fill="#5f6b7a" font-size="17">带 ShardingConfig</text>
+
+    <path d="M302 263 L346 263" fill="none" stroke="#64748b" stroke-width="2.2" marker-end="url(#compile-arrow)"/>
+
+    <rect x="356" y="207" width="244" height="112" rx="14" fill="#ffedd5" stroke="#fb923c"/>
+    <text x="478" y="243" text-anchor="middle" fill="#9a3412" font-size="20" font-weight="700">parallelize()</text>
+    <text x="478" y="274" text-anchor="middle" fill="#5f6b7a" font-size="17">切分状态</text>
+    <text x="478" y="301" text-anchor="middle" fill="#5f6b7a" font-size="17">显式 collective 进入 forward</text>
+
+    <path d="M600 263 L644 263" fill="none" stroke="#64748b" stroke-width="2.2" marker-end="url(#compile-arrow)"/>
+
+    <rect x="654" y="207" width="244" height="112" rx="14" fill="#f3e8ff" stroke="#a855f7"/>
+    <text x="776" y="243" text-anchor="middle" fill="#6b21a8" font-size="20" font-weight="700">Activation Checkpoint</text>
+    <text x="776" y="274" text-anchor="middle" fill="#5f6b7a" font-size="17">包装 layer</text>
+    <text x="776" y="301" text-anchor="middle" fill="#5f6b7a" font-size="17">声明保存与重计算边界</text>
+
+    <path d="M898 263 L942 263" fill="none" stroke="#64748b" stroke-width="2.2" marker-end="url(#compile-arrow)"/>
+
+    <rect x="952" y="207" width="244" height="112" rx="14" fill="#dcfce7" stroke="#22c55e"/>
+    <text x="1074" y="243" text-anchor="middle" fill="#166534" font-size="20" font-weight="700">Module.compile()</text>
+    <text x="1074" y="274" text-anchor="middle" fill="#5f6b7a" font-size="17">安装懒编译入口</text>
+    <text x="1074" y="301" text-anchor="middle" fill="#5f6b7a" font-size="17">此时还没有生成 kernel</text>
+
+    <path d="M1196 263 L1240 263" fill="none" stroke="#64748b" stroke-width="2.2" marker-end="url(#compile-arrow)"/>
+
+    <rect x="1250" y="207" width="244" height="112" rx="14" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="1372" y="243" text-anchor="middle" fill="#1e3a8a" font-size="20" font-weight="700">fully_shard()</text>
+    <text x="1372" y="274" text-anchor="middle" fill="#5f6b7a" font-size="17">FSDP 参数分片与 hook</text>
+    <text x="1372" y="301" text-anchor="middle" fill="#5f6b7a" font-size="17">随后初始化真实参数</text>
+
+    <path d="M1372 319 L1372 423 L800 423 L800 454" fill="none" stroke="#64748b" stroke-width="2.4" marker-end="url(#compile-arrow)"/>
+
+    <rect x="54" y="466" width="1492" height="332" rx="20" fill="#ffffff" stroke="#66b88a" stroke-width="2"/>
+    <text x="82" y="505" fill="#166534" font-size="23" font-weight="700">第一次真实前向与反向 · 捕获、生成并缓存</text>
+
+    <rect x="82" y="552" width="260" height="170" rx="14" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="212" y="588" text-anchor="middle" fill="#9a3412" font-size="20" font-weight="700">Block 调用链</text>
+    <text x="212" y="622" text-anchor="middle" fill="#334155" font-size="17">输入 collective</text>
+    <text x="212" y="651" text-anchor="middle" fill="#334155" font-size="17">本地 ATen / fused kernel</text>
+    <text x="212" y="680" text-anchor="middle" fill="#334155" font-size="17">输出 collective</text>
+    <text x="212" y="707" text-anchor="middle" fill="#5f6b7a" font-size="16">通信已经是程序操作</text>
+
+    <path d="M342 637 L406 637" fill="none" stroke="#15803d" stroke-width="2.4" marker-end="url(#compile-arrow-green)"/>
+
+    <rect x="416" y="552" width="242" height="170" rx="14" fill="#ecfdf5" stroke="#22c55e"/>
+    <text x="537" y="590" text-anchor="middle" fill="#166534" font-size="21" font-weight="700">TorchDynamo</text>
+    <text x="537" y="628" text-anchor="middle" fill="#334155" font-size="17">捕获 Python 调用</text>
+    <text x="537" y="657" text-anchor="middle" fill="#334155" font-size="17">生成 FX 图</text>
+    <text x="537" y="686" text-anchor="middle" fill="#5f6b7a" font-size="16">建立输入 guard</text>
+
+    <path d="M658 637 L722 637" fill="none" stroke="#15803d" stroke-width="2.4" marker-end="url(#compile-arrow-green)"/>
+
+    <rect x="732" y="552" width="242" height="170" rx="14" fill="#ecfdf5" stroke="#22c55e"/>
+    <text x="853" y="590" text-anchor="middle" fill="#166534" font-size="21" font-weight="700">AOTAutograd</text>
+    <text x="853" y="628" text-anchor="middle" fill="#334155" font-size="17">生成前向与反向图</text>
+    <text x="853" y="657" text-anchor="middle" fill="#334155" font-size="17">划分保存的激活</text>
+    <text x="853" y="686" text-anchor="middle" fill="#5f6b7a" font-size="16">保留 collective 的反向规则</text>
+
+    <path d="M974 637 L1038 637" fill="none" stroke="#15803d" stroke-width="2.4" marker-end="url(#compile-arrow-green)"/>
+
+    <rect x="1048" y="552" width="242" height="170" rx="14" fill="#ecfdf5" stroke="#22c55e"/>
+    <text x="1169" y="590" text-anchor="middle" fill="#166534" font-size="21" font-weight="700">Inductor</text>
+    <text x="1169" y="628" text-anchor="middle" fill="#334155" font-size="17">融合与代码生成</text>
+    <text x="1169" y="657" text-anchor="middle" fill="#334155" font-size="17">调度受支持的通信模式</text>
+    <text x="1169" y="686" text-anchor="middle" fill="#5f6b7a" font-size="16">生成可执行代码</text>
+
+    <path d="M1290 637 L1354 637" fill="none" stroke="#15803d" stroke-width="2.4" marker-end="url(#compile-arrow-green)"/>
+
+    <rect x="1364" y="552" width="130" height="170" rx="14" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+    <text x="1429" y="600" text-anchor="middle" fill="#166534" font-size="20" font-weight="700">缓存</text>
+    <text x="1429" y="638" text-anchor="middle" fill="#334155" font-size="17">forward</text>
+    <text x="1429" y="668" text-anchor="middle" fill="#334155" font-size="17">backward</text>
+    <text x="1429" y="698" text-anchor="middle" fill="#5f6b7a" font-size="16">+ guards</text>
+
+    <path d="M1429 722 L1429 840" fill="none" stroke="#64748b" stroke-width="2.4" marker-end="url(#compile-arrow)"/>
+
+    <rect x="54" y="850" width="1492" height="132" rx="20" fill="#ffffff" stroke="#94a3b8" stroke-width="2"/>
+    <text x="82" y="889" fill="#334155" font-size="23" font-weight="700">后续稳态执行</text>
+    <rect x="260" y="880" width="1080" height="70" rx="14" fill="#f1f5f9" stroke="#94a3b8"/>
+    <text x="800" y="910" text-anchor="middle" fill="#334155" font-size="19">guard 匹配 → 复用编译后 forward / backward → 可选 CUDA Graph replay</text>
+    <text x="800" y="937" text-anchor="middle" fill="#5f6b7a" font-size="16">梯度裁剪、optimizer.step()、学习率更新、日志和 checkpoint 仍在外层训练循环</text>
+
+    <text x="800" y="1012" text-anchor="middle" fill="#5f6b7a" font-size="17">SpmdType 负责检查布局；图中真正执行的是本地算子、collective 及其反向</text>
+  </g>
+</svg>

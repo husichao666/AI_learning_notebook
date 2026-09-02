@@ -4,11 +4,11 @@ description: "从启动延迟、有效带宽、本地数据搬运和计算通信
 type: series
 status: stable
 level: intermediate
-updated: 2026-08-27
+updated: 2026-09-02
 tags: [distributed-training, communication, collective, performance]
 ---
 
-# 一次集合通信到底花在哪里
+# 集合通信的时间成本
 
 <div class="notebook-hero" markdown>
 
@@ -26,7 +26,7 @@ tags: [distributed-training, communication, collective, performance]
 
     可以先阅读 [GPU 性能基础专题](../../engineering/gpu-basics/index.md)，用图建立 SM、HBM、copy engine、NVLink 和 CUDA stream 的基本认识，再回到本节分析通信成本。
 
-## 01 · 一次 collective 不只是链路传输 { #cost-components }
+## 01 · collective 的端到端成本 { #cost-components }
 
 集合通信（collective communication）是一个通信组内所有 rank 共同参与的操作。一次 `all_gather` 或 `reduce_scatter` 从输入就绪到结果可用，通常会依次经历：
 
@@ -97,7 +97,7 @@ T_{\text{AR}}
 
 All-Reduce（AR）可以看成 Reduce-Scatter 加 All-Gather，因此 ring AR 的轮数和链路字节大约都是单独 AG/RS 的两倍。公式用于建立数量级直觉，不是 profiler 预测器：真实通信库可能选择 tree、分层算法或不同协议，多机网络还会经过节点内与节点间两个带宽不同的阶段。
 
-## 03 · 开销和 GPU 有关，但不只由 GPU 决定 { #hardware }
+## 03 · 硬件与软件共同决定通信性能 { #hardware }
 
 同一组张量的通信时间由整条数据路径共同决定：
 
@@ -111,7 +111,7 @@ All-Reduce（AR）可以看成 Reduce-Scatter 加 All-Gather，因此 ring AR �
 
 因此，不能只用“GPU 型号”推断通信性能。即使 GPU 相同，NIC 配比、交换网络、进程绑定和通信组映射不同，也可能让结果相差数倍。RoCE 也不等于天然低效；这里真正关心的是，相比节点内高速互联，跨节点通信通常具有更高延迟、更低的单卡有效带宽，也更容易受到拥塞影响。
 
-## 04 · 高速链路上，本地 copy 也可能很贵 { #local-copy }
+## 04 · 高速链路中的本地 copy 成本 { #local-copy }
 
 假设一次通信前要把 100 MB 参数装入融合 buffer。一次 copy 至少包含 100 MB 读取和 100 MB 写入。若有效 HBM 带宽为 1 TB/s，只看数据搬运的理想下界也约为：
 
@@ -133,7 +133,7 @@ T_{\text{copy}}
 
 这也解释了后文为什么反复区分三种数据布局：每轮临时拼接、初始化时建立固定连续 buffer，以及让 collective 直接读写参数自己的 buffer。它们的理论网络字节可以相同，本地 HBM 流量和临时显存却不同。
 
-## 05 · 逐参数还是融合，要看消息与拓扑 { #fusion }
+## 05 · 通信粒度：逐参数与融合 { #fusion }
 
 通信融合（communication fusion）是把多个参数或梯度装入一个较大的 bucket，再发起一次 collective。它不一定减少 FSDP 的有效网络字节，主要是在两类成本之间做交换：
 
@@ -144,7 +144,7 @@ T_{\text{copy}}
 
 “融合”也不必然等于“每轮执行 `cat`”。Megatron-FSDP 可以在初始化时就把参数放进固定 offset 的连续 buffer；HyperParallel 的 HSDP 路径还可以让逐参数 RS 直接写入融合 AR buffer 的各个 view。两者都保留了大消息通信的好处，同时减少运行时的重复拼接。
 
-## 06 · overlap 隐藏的是等待，不是通信量 { #overlap }
+## 06 · overlap 与关键路径等待 { #overlap }
 
 如果通信与一段没有数据依赖的计算并行，理想情况下暴露在关键路径上的时间近似为：
 
@@ -165,7 +165,7 @@ T_{\text{exposed}}
 
 因此，时间线上“通信块与计算块重叠”只是必要条件。最终要看 step time 是否下降，以及等待点是否真正移出了关键路径。
 
-## 07 · 用哪些指标判断优化是否有效 { #measurement }
+## 07 · 通信优化的观测指标 { #measurement }
 
 分析一次通信时，至少要同时观察：
 

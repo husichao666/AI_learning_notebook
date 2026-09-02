@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 14 800 137" role="img" aria-label="Megatron 默认 BF16 加 Adam 下每参数 18 字节的构成">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 14 800 137" role="img" aria-label="本文 Megatron BF16 加 Adam 账本中每参数 18 字节的构成">
   <style>
     [fill="#eaeefb"]{fill:#172033}[fill="#9aa3b2"]{fill:#5f6b7a}[fill="#cdd5ff"]{fill:#334a8a}[fill="#bbf7d0"]{fill:#166534}[fill="#86efac"]{fill:#15803d}[fill="#fde68a"]{fill:#92400e}
   </style>

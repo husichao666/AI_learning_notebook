@@ -1,28 +1,32 @@
 ---
 title: "4.3 · Loss Parallel"
-description: "当词表大到把 logits 全聚合（all-gather）变得不可承受时，如何只用几个标量的通信就算出一模一样的交叉熵？ 本文从数学原理出发，逐行解读 Megatron-LM 的显式 autograd 实现，并介绍与之正交、同样降显存的分块计算（chunked loss）技术。"
+description: "从交叉熵的可分片归约出发，解释词表并行 logits 如何以三个逐 token 统计量完成前向，并追踪 Megatron-LM 的 autograd 与分块计算实现。"
 type: deep-dive
 status: stable
 level: advanced
-updated: 2026-08-25
+updated: 2026-09-02
 tags: [distributed-training, loss-parallel, tensor-parallel]
 ---
 
-# Loss Parallel 深入解析 词表并行交叉熵的原理与 Megatron-LM 实现
+# Loss Parallel：词表并行交叉熵与 Megatron-LM 实现
 
 <div class="notebook-hero" markdown>
 
 <span class="chapter-kicker">第 4 章 · Tensor Parallel 与 Sequence Parallel</span>
 
-当词表大到把 logits 全聚合（all-gather）变得不可承受时，如何只用几个标量的通信就算出一模一样的交叉熵？
-本文从数学原理出发，逐行解读 Megatron-LM 的显式 autograd 实现，并介绍与之正交、同样降显存的分块计算（chunked loss）技术。
+词表并行让每个 TP rank 只持有 logits 的一个词表切片，但标准交叉熵需要全局最大值、目标类 logit 和 softmax 分母。Loss Parallel 不聚合完整 logits，而是归约三个 `[B,S]` 的逐 token 统计量。本文先推导等价公式，再追踪 Megatron-LM 的显式 autograd 实现，并介绍与它正交的分块计算（chunked loss）。
 
-**本章关键词：** 📐 Log-Sum-Exp 分解 · 🔁 All-Reduce vs All-Gather · 🟢 Megatron-LM 源码 · 🧮 反向传播零通信
+**本章关键词：** 📐 Log-Sum-Exp 分解 · 🔁 All-Reduce vs All-Gather · 🟢 Megatron-LM 源码 · 🧮 交叉熵算子的本地反向
 
 </div>
 
 
-## 01 · 为什么需要 Loss Parallel { #bg }
+!!! note "实现基线"
+
+    本文的 Megatron-LM 源码路径对应提交 `88894e3ee`。词表分片交叉熵的数学推导不依赖该版本；类名、融合后端、dtype 转换与 label smoothing 支持属于具体实现。
+
+
+## 01 · 词表并行 logits 的交叉熵问题 { #bg }
 
 现代 LLM 的词表（vocabulary）越来越大：Llama 3 是 `128,256`，一些多语言模型超过 `256k`。
 当我们用 **张量并行（Tensor Parallelism, TP）** 训练时，最后的输出投影 `lm_head`
@@ -46,14 +50,14 @@ tags: [distributed-training, loss-parallel, tensor-parallel]
     以 $S=8192,\ B=1,\ V=128256$、fp32 为例，完整 logits 张量约为
     $8192 \times 128256 \times 4\,\text{B} \approx \mathbf{4.2\,GB}$。这个张量不仅要在
     **通信**上全聚合一遍，还要在每个 rank 上完整**驻留**用于反向 —— 在长序列下直接 OOM。
-    而它仅仅是为了得到一个 `[B, S]` 的标量 loss。
+    而它仅仅是为了得到一个 `[B, S]` 的逐 token loss 张量。
 
 
-**Loss Parallel（也叫 Vocab Parallel Cross Entropy）** 的核心洞察是：
+**Loss Parallel（这里特指 Vocab Parallel Cross Entropy，词表并行交叉熵）** 的核心洞察是：
 交叉熵的最终结果只是每个 token 的一个标量，沿词表维 $V$ 做的是**归约（reduction）**操作。
 既然如此，我们完全可以让每个 rank 在自己的 $V/tp$ 切片上做局部归约，
-再用 `all-reduce` 把几个 `[B, S]` 大小的**标量**合并起来 ——
-通信量从「整个 logits 张量」骤降到「三个逐 token 标量」。
+再用 `all-reduce` 合并几个 `[B, S]` 大小的**逐 token 统计张量** ——
+通信对象从完整 logits 变为全局最大值、目标 logit 与 sum-exp 三组标量场。这里“标量”是指每个 token 对应一个数，整个通信张量仍含 $B\times S$ 个元素。
 
 
 ## 02 · 数学原理：交叉熵的可分片分解 { #math }
@@ -85,8 +89,8 @@ $$
 
 !!! tip "🔑 核心结论"
 
-    原本需要传输 $O(B\!\cdot\!S\!\cdot\!V)$ 的完整 logits，现在只需 **3 次** 对
-    $O(B\!\cdot\!S)$ 标量的 all-reduce。目标 logit 的「只有持有者贡献、其余贡献 0」这一性质，
+    原本需要聚合 $O(B\!\cdot\!S\!\cdot\!V)$ 的完整 logits，现在只需 **3 次** 对
+    $O(B\!\cdot\!S)$ 逐 token 统计张量的 all-reduce。目标 logit 的「只有持有者贡献、其余贡献 0」这一性质，
     正是通过一个 **target mask** 实现的 —— 这是词表并行交叉熵实现里反复出现的关键技巧。
 
 
@@ -121,17 +125,16 @@ mask 让非持有者贡献 0）④局部 Σexp，再用三次小 all-reduce 合�
 
 
 
-## 03 · 通信量分析：省了几个数量级 { #comm }
+## 03 · 通信量与常驻 logits 对比 { #comm }
 
 用上面的配置（$S=8192,\ B=1,\ V=128256,\ \text{tp}=8$，fp32）对比一下：
 
-| 方案 | 跨 rank 传输的张量 | 单次量级 | 是否需驻留完整 logits |
+| 方案 | 逻辑通信对象 | 理想 ring 算法下每 rank 发送量 | 是否需驻留完整 logits |
 | --- | --- | --- | --- |
-| 朴素 all-gather + CE | 完整 logits `[B, S, V]` | ≈ 4.2 GB | ✅ 需要（反向也要） |
-| **Loss Parallel** | 3 × 标量 `[B, S]` | ≈ 3 × 32 KB ≈ **96 KB** | ❌ 只需本地 `[B,S,V/tp]` |
+| 朴素 all-gather + CE | 完整 logits `[B, S, V]`，约 4.20 GB | $(tp-1)/tp\times 4.20\,\text{GB}\approx\mathbf{3.68\,GB}$ | ✅ 需要（反向也要） |
+| **Loss Parallel（未融合）** | 3 × 逐 token 统计张量 `[B, S]`，每个 32 KiB | $3\times 2(tp-1)/tp\times 32\,\text{KiB}\approx\mathbf{168\,KiB}$ | ❌ 只需本地 `[B,S,V/tp]` |
 
-通信量相差约 **4 个数量级**，而且每个 rank 的峰值显存里再也不会出现完整的 $V$ 维 logits。
-更妙的是，正如第 7 节会展开的，**反向传播完全不需要额外通信**。
+这里用标准 ring all-gather / all-reduce 的载荷模型计算每个 rank 的发送字节数，未计协议头、对齐与集合通信启动开销；融合版仍归约相同的元素，只是把两个 SUM 统计量合成一次调用。按这个口径，载荷相差约 $2.1\times 10^4$ 倍，即 **4 个数量级**。此外，每个 rank 的峰值显存里不再出现完整的 $V$ 维 logits。第 7 节还会说明，词表并行交叉熵算子自身的 backward 不再发起词表维集合通信。
 
 
 ## 04 · Megatron-LM 源码逐行解读 { #megatron }
@@ -153,7 +156,7 @@ Megatron 把上面的数学**显式地**写成一个 `torch.autograd.Function`�
 ```python
 @staticmethod
 def calculate_logits_max(vocab_parallel_logits):
-    vocab_parallel_logits = vocab_parallel_logits.float()      # CE 一律在 fp32 下算，保证数值稳定
+    vocab_parallel_logits = vocab_parallel_logits.float()      # 本实现转为 FP32 工作张量，增强数值稳定性
     logits_max = torch.max(vocab_parallel_logits, dim=-1)[0]   # 沿本地 V/tp 维取局部最大
     return vocab_parallel_logits, logits_max
 ```
@@ -254,15 +257,13 @@ def calculate_cross_entropy_loss(exp_logits, predicted_logits, sum_exp_logits):
 ```
 
 
-!!! note "💡 注意 in-place 的连环妙用："
+!!! note "工作张量的原地复用"
 
-    `vocab_parallel_logits` 先被原地减 max、再被原地 `exp` 覆盖成 `exp_logits`，
-    最后又被原地 `div_` 成 softmax。整个过程**没有额外分配一份 $V/tp$ 大小的张量**，
-    对长序列训练的显存非常友好。
+    `calculate_logits_max()` 先通过 `.float()` 得到 FP32 工作张量：输入本来不是 FP32 时，这一步会分配一份与本地 logits `[B,S,V/tp]` 同形状的转换结果。此后该工作张量依次被原地减 max、`exp` 覆盖成 `exp_logits`，再由 `div_` 归一化为 softmax 切片，避免在这些阶段继续保留多份同尺寸中间量。因而这里的优化是**转换后的工作区复用**，不是整个过程绝对零额外分配。
 
 
 
-### 4.3 模型侧如何接入
+### 4.3 模型侧接入路径
 
 在 `language_module.compute_language_model_loss` 里，先把 `[b, s]` 转成序列优先的
 `[s, b]`，再根据配置选择 融合 / 原生 / TE 版本：
@@ -301,7 +302,7 @@ def calculate_predicted_logits(vocab_parallel_logits, target, logits_max,
                                vocab_start_index, vocab_end_index):
     (target_mask, masked_target_1d, predicted_logits, sum_exp_logits, exp_logits) = \
         VocabParallelCrossEntropy.calculate_predicted_logits(...)
-    # 【合并通信】把两个 [s,b] 标量拼成一个张量，下面只需一次 all_reduce
+    # 【合并通信】把两个 [s,b] 逐 token 统计张量拼接，下面只需一次 all_reduce
     predicted_logits_sum_exp_logits = torch.cat((predicted_logits, sum_exp_logits))
     return target_mask, masked_target_1d, predicted_logits_sum_exp_logits, exp_logits
 
@@ -317,16 +318,16 @@ class _VocabParallelCrossEntropy(torch.autograd.Function):
         ...
 ```
 
-区别一目了然：未融合版发 **3 次** all-reduce（MAX + 2×SUM），融合版只发 **2 次**
-（MAX + 1×SUM）。在 TP 通信频繁的训练里，少一次 kernel launch 和一次集合通信握手是有意义的。
-融合版还把梯度直接 cast 回 `bfloat16`，省一步类型转换。
+未融合版发 **3 次** all-reduce（MAX + 2×SUM），融合版只发 **2 次**
+（MAX + 1×SUM）。两者归约的元素总数相同，融合版减少的是一次集合通信启动与相应调度开销。
+本文摘录的 native fused backward 还会显式把梯度转换为 `bfloat16`；这说明该路径按 BF16 训练配置设计，而不是对任意输入 dtype 都透明的算法性质。
 
 
-!!! note "🧩 三个后端："
+!!! note "三个后端的共同点与边界"
 
     `native`（上面的 JIT 融合版）、`te`
     （TransformerEngine 的 CUDA kernel，支持 CUDA Graph 捕获 `is_cg_capturable`）、以及不开融合时的
-    `vocab_parallel_cross_entropy`。三者数学等价，差别只在 kernel 实现与通信打包方式。
+    `vocab_parallel_cross_entropy` 都实现词表分片下的交叉熵。在无 label smoothing、dtype 等配置一致时，它们共享本节推导的数学主干；但特性覆盖、梯度 dtype 与通信打包方式并不完全相同。例如本文源码基线的未融合路径支持 `label_smoothing` 参数，而 native fused 路径的接口没有这一参数。
 
 
 
@@ -373,7 +374,7 @@ Loss Parallel 解决的是 *跨 rank* 的词表维通信。但即便词表被切
 
 
 
-## 07 · 反向传播为何零通信 { #backward }
+## 07 · 反向传播的本地梯度 { #backward }
 
 这是 Loss Parallel 最优雅的地方。交叉熵对 logits 的梯度有一个干净的闭式解：
 
@@ -386,7 +387,7 @@ $$
 - **softmax 切片**：前向时 `exp_logits` 已被原地归一化成本地 softmax（除以的是 all-reduce 后的全局分母），所以它已经是*正确的全局 softmax* 的本地切片。
 - **one-hot 项**：只在持有该 target 的 rank 上、对应列减 1 —— 用的还是前向那个 `target_mask`。
 
-因此整个 backward **没有任何 all-reduce / all-gather**，纯本地逐元素运算：
+因此这个词表并行交叉熵算子的 backward **没有任何 all-reduce / all-gather**，只做本地逐元素运算：
 
 
 **megatron/core/tensor_parallel/cross_entropy.py · backward**
@@ -405,16 +406,16 @@ def backward(ctx, grad_output):
 ```
 
 直观来看：前向输出沿词表维做的是**归约**，其反向自然对应每个 rank 各自持有的本地梯度，
-不需要把梯度沿词表维再拼回去，所以整个 backward **不产生词表维通信**。
+不需要把梯度沿词表维再拼回去，所以该算子的 backward **不产生词表维通信**。这不意味着整层反向零通信：`lm_head` 或更上游的 TP 线性层仍可能按其切分方式执行归约。
 
 
 ## 08 · 总结与实践要点 { #summary }
 
-- **本质**：交叉熵沿词表维是归约操作，所以可以「局部归约 + 小标量 all-reduce」代替「巨型 logits all-gather」，通信省约 4 个数量级，显存峰值不再出现完整 $V$ 维张量。
+- **本质**：交叉熵沿词表维是归约操作，所以可以用“局部归约 + `[B,S]` 统计张量 all-reduce”代替完整 logits all-gather；在本文数值示例中，参与通信的数据规模相差约 4 个数量级，且每个 rank 不再常驻完整 $V$ 维 logits。
 - **数学三件套**：全局 `max`（MAX 归约）、目标 logit（SUM 归约，靠 target mask 让非持有者贡献 0）、全局 `sum-exp`（SUM 归约）。log-sum-exp 稳定化在分片下依然严格等价。
-- **反向零通信**：梯度 = softmax − onehot，两项都已在本地，是该技术最漂亮的性质。
-- **Megatron 的工程选择**：用*显式手写*的 `torch.autograd.Function` 完全掌控通信 —— 自己调 `all_reduce`、logits 全程 in-place 复用、融合版把两次 SUM 合并成一次，并提供 native(JIT) / TE(CUDA kernel) / 未融合三个数学等价的后端。透明、可调、对显存与 kernel 完全掌控。
-- **落地建议**：启用条件通常是「TP 开启且未显式禁用」；务必确认 `lm_head` 输出确实是词表维分片（vocab-parallel）；长序列叠加序列维分块计算（chunked loss）可进一步降显存；CE 一律在 fp32 下计算以保证数值稳定。
+- **算子反向的通信边界**：梯度 = softmax − onehot，两项都已在本地，因此词表并行交叉熵算子自身的 backward 不需要词表维通信；上游 TP 层仍按各自规则通信。
+- **Megatron 的工程选择**：用显式 `torch.autograd.Function` 安排 `all_reduce`，在转为 FP32 工作张量后原地复用中间结果；融合版把两次 SUM 合并成一次，并提供 native(JIT)、TE 与未融合后端。
+- **落地建议**：启用条件取决于训练框架；务必确认 `lm_head` 输出确实沿词表维分片。长序列可叠加序列维分块计算。本文展示的 Megatron 路径把交叉熵工作张量提升到 FP32 以增强数值稳定性，这不是所有框架实现都必须采用的算法定义。
 
 ---
 

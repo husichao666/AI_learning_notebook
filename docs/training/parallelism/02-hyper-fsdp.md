@@ -4,17 +4,17 @@ description: "沿 HyperParallel fully_shard 源码，从原因、目标、做法
 type: source-note
 status: stable
 level: advanced
-updated: 2026-08-27
+updated: 2026-09-02
 tags: [distributed-training, fsdp, hsdp, hyperparallel, performance]
 ---
 
-# HyperParallel 如何优化 FSDP / HSDP
+# HyperParallel 的 FSDP / HSDP 性能优化
 
 <div class="notebook-hero" markdown>
 
 <span class="chapter-kicker">第 3 章 · 模型状态分片</span>
 
-FSDP / HSDP 的算法通信量确定之后，端到端性能仍会被两类工程开销拖慢：collective 前后的本地数据搬运，以及异步通信落入反向关键路径后的等待。HyperParallel 的优化目标不是减少理论网络字节，而是让相同的 AG / RS / AR **少搬一次数据、少阻塞一次计算**。为此，它在数据路径上按网络层级选择通信粒度，在时间路径上把逐参数 RS 与融合 AR 接成跨 unit 流水。
+Fully Sharded Data Parallel（FSDP）沿一个数据并行组切分模型状态；Hybrid Sharded Data Parallel（HSDP）再增加复制轴，使参数只在内层 shard 组切分、相同 shard 在外层 replicate 组保留副本。两者的算法通信量确定之后，端到端性能仍会被 collective 前后的本地数据搬运，以及异步通信落入反向关键路径后的等待拖慢。HyperParallel 的优化目标不是减少理论网络字节，而是让相同的 AG / RS / AR **少搬一次数据、少阻塞一次计算**。为此，它在数据路径上按网络层级选择通信粒度，在时间路径上把逐参数 RS 与融合 AR 接成跨 unit 流水。
 
 </div>
 
@@ -22,7 +22,7 @@ FSDP / HSDP 的算法通信量确定之后，端到端性能仍会被两类工�
 
     本节讨论 [HyperParallel](https://atomgit.com/mindspore/hyper-parallel) 的 **Torch 后端**，源码基于 2026-08-26 的 `master` 提交 `b8f55f71efb1e838ff7e8adac36690dafedcd16c`。重点是 `fully_shard(..., comm_fusion=False)` 默认路径；`comm_fusion=True` 的行为会单独说明。第 4、6 节的 PyTorch FSDP2 对照基于同日 `main` 提交 `3691693263d2b66a68867e39b7449876844e06cf`。MindSpore 后端共享部分调度抽象，但 buffer 与优化器约束不同，不能把本节的 Torch 实现细节直接推广过去。
 
-## 01 · 总览：为什么优化、目标是什么 { #overview }
+## 01 · 优化目标与两条主线 { #overview }
 
 先看结论。HyperParallel `fully_shard` 的性能设计可以归纳为两项核心优化：
 
@@ -36,7 +36,7 @@ FSDP / HSDP 的算法通信量确定之后，端到端性能仍会被两类工�
 - 第一项优化**数据怎么流动**，减少 HBM 上为通信融合而产生的额外读写；
 - 第二项优化**操作何时发生**，安排 RS、AR 的提交位置与同步位置。
 
-### HSDP 为什么天然存在两种通信条件
+### HSDP 的两个通信域
 
 设二维数据并行 mesh 为 `(replicate=R, shard=S)`：
 
@@ -48,7 +48,7 @@ FSDP / HSDP 的算法通信量确定之后，端到端性能仍会被两类工�
 
 不过，源码不会自动识别哪个设备属于“超节点”。**拓扑感知来自调用方如何构造二维 `DeviceMesh`**：HyperParallel 只根据 mesh 的两个轴取得 process group，再分别执行 shard 与 replicate 通信。
 
-## 02 · 理解优化前，先固定一次迭代的骨架 { #iteration }
+## 02 · 一次迭代的运行骨架 { #iteration }
 
 一个 FSDP unit 的参数在 `SHARDED` 与 `UNSHARDED` 之间切换，Hook 则把通信插入前向和反向边界：
 
@@ -134,7 +134,7 @@ _sharded_param_data
 2. collective 直接写入该参数的完整参数 buffer；
 3. `_unsharded_param` 只在这块 storage 上建立原始形状的 view。
 
-#### 完整参数 buffer 从哪里来，是否常驻
+#### 完整参数 buffer 的分配与生命周期
 
 这块 buffer 不是 `fully_shard()` 初始化时就常驻的一份完整参数。每个 `TorchHSDPParamV2` 初始化时只有一个空列表 `unsharded_param_buffers=[]`；第一次 unshard 才由 `init_unsharded_param_buffers()` 延迟执行：
 
@@ -277,7 +277,7 @@ root backward callback 由 autograd engine 在本次反向结束时执行。它�
 
 代价也来自同一条流水。下一 unit 的 Hook 会显式 `Work.wait()` 前一个 unit 的 RS；如果一个 unit 的反向计算不足以覆盖它，这个实现同步点就会形成气泡。每个 pending `AllReduceParamGroup` 还会持有自己的融合 buffer，直到 root callback 等待 AR、切出梯度 view 后才释放引用。这里的“AR 不阻塞逐层 Hook”只是说逐层 Hook 不等待 AR 完成，不代表 AR 耗时或资源占用消失；如果反向计算不足以覆盖通信，root callback 仍会留下 AR 尾巴。
 
-## 05 · 为什么还需要 `comm_fusion=True` { #fusion-path }
+## 05 · `comm_fusion=True` 的全路径融合 { #fusion-path }
 
 默认逐参数路径用更多 collective 换掉本地 pack，并不适合所有模型。大量小参数可能让 Host 下发和 collective launch 成为新瓶颈，因此 HyperParallel 保留了完整通信融合路径。
 
@@ -308,7 +308,7 @@ Torch 后端在 `comm_fusion=True` 且未显式设置 `comm_fusion_zero_copy` �
 
 这不是脱离环境的优劣排序。PyTorch 的融合路径减少 collective 次数，适合更通用的网络与模型；HyperParallel 默认路径则假设 shard 通信域足够快，希望用更多 collective 换掉 flat buffer 搬运，再单独保留慢 replicate 维的融合。HyperParallel 自己也提供 `comm_fusion=True`，说明通信粒度最终仍应由消息大小、Host 下发能力、拓扑和 profiler 结果共同决定。
 
-## 07 · 总结：从原因到收益再看一遍 { #summary }
+## 07 · 数据路径与反向时序总结 { #summary }
 
 HyperParallel 没有改变 FSDP / HSDP 的理论通信量。它解决的是相同网络字节背后的本地搬运与调度问题：
 
@@ -330,7 +330,7 @@ HyperParallel 没有改变 FSDP / HSDP 的理论通信量。它解决的是相�
 
     HyperParallel 的核心思路是：根据拓扑决定“哪里融合”，再用跨 unit 流水连接两级归约——shard 维优先减少本地 pack，replicate 维优先减少慢网 collective；当前 Hook 发起 RS，下一 Hook 消费其输出并发起融合 AR，最后由 root callback 排空通信。
 
-## 08 · 按什么顺序继续读源码 { #source-reading }
+## 08 · 源码阅读顺序 { #source-reading }
 
 1. [`core/fully_shard/api.py`](https://atomgit.com/mindspore/hyper-parallel/blob/master/hyper_parallel/core/fully_shard/api.py)：看 `fully_shard()` 参数，以及 Torch 后端如何解析 `comm_fusion_zero_copy` 默认值。
 2. [`core/fully_shard/hsdp_scheduler.py`](https://atomgit.com/mindspore/hyper-parallel/blob/master/hyper_parallel/core/fully_shard/hsdp_scheduler.py)：看 module tree 如何共享 `HSDPSchedulerContext` 与各条 pending 队列。

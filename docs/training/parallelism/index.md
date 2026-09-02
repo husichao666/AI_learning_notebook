@@ -4,7 +4,7 @@ description: 从训练状态与集合通信出发，系统学习 DP、ZeRO、FSD
 type: series-hub
 status: stable
 level: beginner-to-advanced
-updated: 2026-08-26
+updated: 2026-09-02
 tags:
   - distributed-training
   - parallelism
@@ -44,6 +44,6 @@ tags:
     - [7.3 · 专家并行性能优化](06-ep-performance.md)
     - [7.4 · MoE 辅助损失](moe-aux-loss.md)
 8. [第 8 章 · 多维组合并行](07-nd.md)
-   把各并行维度放入同一张设备网格，形成完整的选型与调优方法。
+   把各并行维度放入同一张逻辑 rank 网格，再结合 launcher 映射与硬件拓扑形成选型和调优方法。
 
 所有正文都以 Markdown 维护；左侧目录按“章—节”组织，右侧目录定位文章内部主题，顶部搜索可以跨整本书检索。

@@ -4,11 +4,11 @@ description: "沿一次训练前向逐层下钻：先进入 Router 的选路算�
 type: source-note
 status: stable
 level: advanced
-updated: 2026-08-25
+updated: 2026-09-02
 tags: [distributed-training, expert-parallel, megatron]
 ---
 
-# Megatron EP 源码：Router、Dispatcher 与 Experts 如何真正执行
+# Megatron EP 源码：Router、Dispatcher 与 Experts 执行链
 
 <div class="notebook-hero" markdown>
 
@@ -23,11 +23,11 @@ tags: [distributed-training, expert-parallel, megatron]
 
 !!! warning "阅读基线"
 
-    本文以 Megatron Core 当前训练路径为准：dropless top-k、`MoEAlltoAllTokenDispatcher`、`TEGroupedMLP`。为突出主干，图和代码省略 shared expert、latent MoE、FP8/FP4 padding、CUDA Graph 与 DeepEP/Flex dispatcher；遇到这些分支时会说明它们插入主路径的位置。
+    本文基于 Megatron-LM 提交 `88894e3ee`，选取 dropless top-k、`MoEAlltoAllTokenDispatcher` 与 `TEGroupedMLP` 组成的训练路径。为突出主干，图和代码省略 shared expert、latent MoE、FP8/FP4 padding、CUDA Graph 与 DeepEP/Flex dispatcher。类名、字段和分支条件属于 Megatron Core 实现，不是 EP 算法的稳定接口。
 
 
 
-## 01 · 前向总览：四个模块依次做什么 { #overview }
+## 01 · 前向总览与模块职责 { #overview }
 
 `MoELayer` 不实现路由算法、通信算法或专家 MLP，它只把四段能力串成一次前向。
 
@@ -319,7 +319,7 @@ ranking_scores = weight_scores + expert_bias
 
 
 
-#### 2.6.4 三者如何组合
+#### 2.6.4 三种控制机制的组合
 
 | 方案 | 典型配置关系 | 训练行为 |
 | --- | --- | --- |
@@ -329,7 +329,7 @@ ranking_scores = weight_scores + expert_bias
 capacity 解决的是“最坏情况下本轮最多执行多少”，aux loss 和 expert bias 解决的是“后续路由怎样少制造热点”。因此 capacity 可以和任一均衡方案同时使用。z-loss 则属于数值稳定机制：它约束 logits 不要无限增大，不负责专家负载均衡，已在 2.1 说明。
 
 
-## 03 · All-to-All Dispatcher：路由关系如何变成专家连续布局 [token\_dispatcher.py ↗](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/token_dispatcher.py) { #dispatcher }
+## 03 · All-to-All Dispatcher：从路由关系到专家连续布局 [token\_dispatcher.py ↗](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/token_dispatcher.py) { #dispatcher }
 
 
 ![All-to-All Dispatcher 主干流程](assets/06-ep-source-figure-03.svg)
@@ -338,7 +338,7 @@ capacity 解决的是“最坏情况下本轮最多执行多少”，aux loss �
 
 
 
-### 3.1 统计收发量：`preprocess` 回答“给每个 peer 发多少行”
+### 3.1 `preprocess` 计算收发 splits
 
 
 **metadata 主干 · dropless 路径**
@@ -367,7 +367,7 @@ tokens_per_expert = local_expert_counts.sum(dim="source")   # [E/P_e]
 
 
 
-### 3.2 按目标专家排序：Permutation 1 如何复制并分桶 token
+### 3.2 Permutation 1：复制 assignment 并按目标分桶
 
 Dropless 非融合实现把 `routing_map [T,E]` 转置成 expert-major，再对 True 位置排序。最终 `sorted_indices` 中保存原 token 行号；同一 token 若选了 k 个专家，它的行号会出现 k 次。这里用 $M_{send}$ 表示本 rank 准备发出的 assignment 行数，dropless 时 $M_{send}=Tk$。
 
@@ -415,7 +415,7 @@ global_probs = all_to_all(
 发送 buffer 已经按目标 rank 连续，因此 collective 只按 `input_splits` 切段，不再理解 expert id。token 和 probability 分开通信，但必须使用完全相同的 splits，才能保持逐行对应。$M_{recv}=\sum \mathrm{output\_splits}$ 表示本 rank 在 A2A 后实际收到的 assignment 行数。
 
 
-### 3.4 按本地专家收齐：为什么 A2A 后还要再排序
+### 3.4 Permutation 2：从来源布局变为本地专家布局
 
 A2A 接收布局天然是 source-rank-major：先是 rank 0 发来的本地专家块，再是 rank 1 发来的块。Grouped GEMM 需要 local-expert-major：expert 0 的所有来源 token 连续，然后是 expert 1。`sort_chunks_by_idxs` 只重排整块，不重新运行 Router。
 
@@ -438,7 +438,7 @@ x_expert, p_expert = sort_chunks_by_idxs(
 
 ### 3.5 Experts 计算：执行专家 MLP
 
-此时 Dispatcher 已经输出按本地专家连续排列的 `x_expert`，以及每个专家的行数 `tokens_per_expert`。Experts 只按这些分段执行 Grouped FC1、SwiGLU 和 Grouped FC2，并保持行顺序不变。具体实现放在第四章；这里把它作为 Dispatch 转入 Combine 的中间步骤。
+此时 Dispatcher 已经输出按本地专家连续排列的 `x_expert`，以及每个专家的行数 `tokens_per_expert`。Experts 只按这些分段执行 Grouped FC1、SwiGLU 和 Grouped FC2，并保持行顺序不变。具体实现放在本节第 4 节；这里先把它作为 Dispatch 转入 Combine 的中间步骤。
 
 
 ### 3.6 撤销本地排序：`combine_preprocess` 恢复来源分组
@@ -500,7 +500,7 @@ return output.view(hidden_shape)                # [S,B,H]
 当前 `TEGroupedMLP` 主路径已经把 `permuted_probs` 乘进专家中间激活，所以这里的 `unpermute` 主要执行 scatter-add：同一原 token 的 k 个专家分支被累加回同一行。若另一条实现把 probs 延迟到 unpermute，它也支持在恢复顺序时再乘权重。
 
 
-## 04 · Experts：GroupedMLP 如何用一条连续 tensor 表示多个专家 [experts.py ↗](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/experts.py) { #experts }
+## 04 · Experts：GroupedMLP 的连续 tensor 与专家分段 [experts.py ↗](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/experts.py) { #experts }
 
 
 ![TEGroupedMLP 主干流程](assets/06-ep-source-figure-04.svg)
@@ -548,7 +548,7 @@ Dispatcher 已经把相同专家的 token 排成连续段，所以 Experts 不�
 | expert e | `x[offset[e]:offset[e+1]]` | `W1[e]` | 同一批 grouped GEMM 中的第 e 个问题 |
 
 
-### 4.2 `bias_act_func` 为什么同时接收 `permuted_probs`
+### 4.2 `bias_act_func` 中的路由权重
 
 SwiGLU 先把 FC1 的 $2F$ 输出拆成 gate/up，再计算 `SiLU(gate) * up`。Megatron 随后在 FC2 之前乘路由权重：
 
@@ -573,7 +573,7 @@ FC2 在无 bias 时是线性的，因此“FC2 前乘概率”等价于“FC2 �
 | `moe_mlp_glu_interleave_size` | 若 FC1 输出采用交错 GLU 布局，先重排为连续 gate/up 两半再执行激活。 |
 
 
-## 05 · 把源码串起来：一次前向应满足哪些不变量 { #trace }
+## 05 · 一次前向的数据布局不变量 { #trace }
 
 | 检查点 | 应观察的变量 | dropless 路径的不变量 |
 | --- | --- | --- |

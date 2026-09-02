@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 350" role="img" aria-label="ZeRO 三阶段每卡静态显存递减（N=8）">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 350" role="img" aria-label="ZeRO 三阶段的每卡模型状态理想容量递减（N=8）">
 <style>
   /* The book treats diagrams as daylight-mode figures in every site theme. */
   [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
@@ -20,7 +20,7 @@
   stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
   [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
 </style>
-  <text x="20" y="26" fill="#eaeefb" font-size="15" font-weight="700">每卡「静态显存」= 模型状态（N=8）</text>
+  <text x="20" y="26" fill="#eaeefb" font-size="15" font-weight="700">每卡模型状态理想账本（N=8，无 padding）</text>
   <!-- legend -->
   <rect x="352" y="15" width="15" height="14" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/><text x="373" y="27" fill="#9aa3b2" font-size="13">参数 2P</text>
   <rect x="452" y="15" width="15" height="14" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/><text x="473" y="27" fill="#9aa3b2" font-size="13">FP32 梯度 4P</text>
@@ -44,14 +44,14 @@
     <rect x="222" y="176" width="15" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
     <rect x="237" y="176" width="45" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
     <text x="292" y="196" fill="#9aa3b2">2P + 16P/8 = 4P</text>
-    <!-- ZeRO-3 (FSDP) -->
-    <text x="20" y="254" fill="#4ade80" font-weight="700">ZeRO-3（FSDP）</text>
+    <!-- ZeRO-3 / full-shard -->
+    <text x="20" y="254" fill="#4ade80" font-weight="700">ZeRO-3 / full-shard</text>
     <rect x="162" y="234" width="8"  height="30" fill="rgba(124,147,255,0.28)" stroke="#7c93ff"/>
     <rect x="170" y="234" width="15" height="30" fill="rgba(74,222,128,0.24)" stroke="#4ade80"/>
     <rect x="185" y="234" width="45" height="30" fill="rgba(255,138,76,0.22)" stroke="#ff8a4c"/>
     <text x="240" y="254" fill="#86efac" font-weight="700">18P/8 = 2.25P（降到 1/8）</text>
   </g>
-  <text x="20" y="300" fill="#4ade80" font-size="13.5">✅ ZeRO 切的是<tspan font-weight="700">静态显存</tspan>（模型状态）：参数/梯度/优化器状态随卡数线性降到 1/N。</text>
-  <text x="20" y="322" fill="#fbbf24" font-size="13.5">⚠️ 不动<tspan font-weight="700">动态显存</tspan>：激活值仍是每卡一份，得靠激活重计算 / 序列并行另行解决。</text>
-  <text x="20" y="344" fill="#9aa3b2" font-size="13.5">⚠️ ZeRO-3 还新增一笔<tspan font-weight="700" fill="#cbd5e1">瞬时峰值</tspan> = 当前层 all-gather 出的完整参数，用完即弃（下一节）。</text>
+  <text x="20" y="300" fill="#4ade80" font-size="13.5">✅ ZeRO 逐阶段切分<tspan font-weight="700">模型状态</tspan>：理想容量可随分片组增大降到 1/N。</text>
+  <text x="20" y="322" fill="#fbbf24" font-size="13.5">⚠️ 不直接切分<tspan font-weight="700">激活</tspan>：其每卡容量还由 local batch、SP/CP 与重计算策略决定。</text>
+  <text x="20" y="344" fill="#9aa3b2" font-size="13.5">⚠️ ZeRO-3 还有一笔<tspan font-weight="700" fill="#cbd5e1">瞬时峰值</tspan>：及时 reshard 路径会物化当前 unit 的完整参数。</text>
 </svg>

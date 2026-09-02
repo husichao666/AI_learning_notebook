@@ -3,7 +3,7 @@ title: TorchTitan 源码
 description: 从训练入口、图编译与分布式并行实现理解 TorchTitan
 type: hub
 status: growing
-updated: 2026-08-29
+updated: 2026-09-01
 tags: [torchtitan, distributed-training, source-code]
 ---
 
@@ -50,18 +50,20 @@ TorchTitan 目前同时保留 `partial_dtensor` 和 `spmd_types` 两种 SPMD 后
 | 文章 | 核心问题 | 状态 |
 | --- | --- | --- |
 | [第 5 章 · ShardingConfig 与 spmd_types 后端](05-sharding-config-spmd-types.md) | 同一份布局配置怎样变成本地状态分片、SPMD 类型、forward 包装和显式 collective | 已整理 |
+| [第 6 章 · torch.compile 与显式通信](06-torch-compile-explicit-collectives.md) | 并行化后的 TransformerBlock 怎样生成前反向编译图，以及显式 collective 怎样进入图级优化 | 已整理 |
 
-后续章节将继续展开 `spmd_types` 的算子类型传播，以及这些表示怎样服务于编译和入图。
+第 6 章沿当前默认的 `spmd_types` 路线继续向下追踪，但关注点已经从类型检查转向真正执行的计算图：编译器看到的是本地算子和显式 collective，而不是检查元数据。
 
-两条路线讲清后，再继续进入模型构建、训练循环、检查点与性能工程等共用主题。章节号按知识依赖逐步展开。
+### `GraphTrainer` 路线
 
-## 独立源码分析
-
-实验性功能和专题源码分析不占用正文章节号：
+普通 `Trainer` 通过 `torch.compile` 为 TransformerBlock 建立局部编译区域；实验性的 `GraphTrainer` 则显式构造包含前向、loss 和反向的联合 FX 图，再由 TorchTitan 自己组织后续 graph pass。这条路线会复用前面的 DTensor 和编译基础，但当前模型配置使用 `partial_dtensor` 与 SimpleFSDP，不沿用第 5 章的 `spmd_types` 类型检查路径。
 
 | 文章 | 核心问题 | 状态 |
 | --- | --- | --- |
-| [GraphTrainer：整步训练图如何捕获、变换与执行](graph-trainer.md) | 前向、loss、反向、SimpleFSDP collective 和 CUDA Graph 如何进入同一套图变换流水线 | 已整理 |
+| [第 7 章 · GraphTrainer 的整步训练图](07-graph-trainer-step-graph.md) | GraphTrainer 怎样把模型状态、前向、loss 和参数反向变成一张联合 FX 图，并让图输出的梯度回到基础训练循环 | 已整理 |
+| [第 8 章 · GraphTrainer 的图变换流水线](08-graph-trainer-passes.md) | 联合图怎样依次完成结构规范化、激活生命周期管理、分布式通信调度、Inductor 编译与 CUDA Graph 包装 | 已整理 |
+
+下一章将继续解释 SimpleFSDP 的参数与通信生命周期。两条 Trainer 路线都讲清后，再进入训练循环、检查点与性能工程等共用主题。
 
 ## 推荐阅读基础
 
