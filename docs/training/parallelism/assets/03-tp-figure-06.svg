@@ -22,9 +22,10 @@
 </style>
   <defs><marker id="tarr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker></defs>
   <text x="20" y="28" fill="#eaeefb" font-size="16" font-weight="700">一个 dense Transformer layer（前向）</text>
-  <line x1="83" y1="65" x2="83" y2="382" stroke="#475569" stroke-width="2"/>
   <g text-anchor="middle">
     <rect x="30" y="50" width="106" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="83" y="75" fill="#fff" font-size="12.5">hidden states</text>
+    <path d="M83 90V112H80V128" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#tarr)"/>
+    <text x="101" y="113" fill="#5f6b7a" font-size="10.5">x₀</text>
     <rect x="180" y="50" width="135" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="247" y="75" fill="#d7dbe4" font-size="12.5">RMSNorm</text>
     <line x1="136" y1="70" x2="176" y2="70" stroke="#64748b" marker-end="url(#tarr)"/>
     <rect x="350" y="50" width="170" height="40" rx="8" fill="rgba(124,147,255,.14)" stroke="#7c93ff"/><text x="435" y="67" fill="#cdd5ff" font-size="12.5">QKV · Column</text><text x="435" y="82" fill="#9aa3b2" font-size="10.5">按 Q/K/V heads 切</text>
@@ -41,7 +42,10 @@
     <rect x="30" y="132" width="100" height="40" rx="8" fill="rgba(74,222,128,.09)" stroke="#4ade80"/><text x="80" y="157" fill="#bbf7d0" font-size="12.5">+ residual</text>
 
     <rect x="180" y="220" width="135" height="40" rx="8" fill="#1c2030" stroke="#64748b"/><text x="247" y="245" fill="#d7dbe4" font-size="12.5">RMSNorm</text>
-    <line x1="83" y1="172" x2="83" y2="240" stroke="#64748b"/><line x1="83" y1="240" x2="176" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+    <path d="M80 172V298" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#tarr)"/>
+    <circle cx="80" cy="240" r="3" fill="#475569"/>
+    <line x1="80" y1="240" x2="176" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
+    <text x="98" y="204" fill="#5f6b7a" font-size="10.5">x₁</text>
     <rect x="350" y="220" width="170" height="40" rx="8" fill="rgba(124,147,255,.14)" stroke="#7c93ff"/><text x="435" y="237" fill="#cdd5ff" font-size="12.5">FC1 / gate+up · Column</text><text x="435" y="252" fill="#9aa3b2" font-size="10.5">FFN hidden 切分</text>
     <line x1="315" y1="240" x2="346" y2="240" stroke="#64748b" marker-end="url(#tarr)"/>
     <rect x="555" y="220" width="120" height="40" rx="8" fill="rgba(124,147,255,.08)" stroke="#7c93ff"/><text x="615" y="245" fill="#cdd5ff" font-size="12.5">GeLU / SwiGLU</text>

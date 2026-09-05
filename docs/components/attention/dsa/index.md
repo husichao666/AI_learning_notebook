@@ -4,7 +4,7 @@ description: DSA 闪电索引器、Token-wise 稀疏注意力、IndexShare 与 I
 type: component
 status: stable
 level: advanced
-updated: 2026-09-02
+updated: 2026-09-03
 tags:
   - attention
   - sparse-attention
@@ -239,7 +239,7 @@ MLA 的核心技巧是**低秩压缩**：先把高维向量压小再算，省显
 
 > **一句话抓住索引器**：它的 Q/K 计算和 MLA 几乎一样，就是个**“微缩版 MLA”**——头数 64（vs MLA 的 128）、每头维度 128（vs MLA 的 576），算量大约只有 MLA 对应部分的 **1/9**。在 V3.2 的 128K 上下文中，这个较小的常数让索引开销可以接受；但它没有消除对全部历史位置的扫描，prefill 仍是 O(L²)。当上下文继续增长到 1M token，主注意力被 `k` 限制住，而索引器的扫描量仍随 `L` 增长，于是瓶颈会逐渐转移到“海选”阶段。
 
-#### 2.2 索引分数计算
+#### 2.2 从索引分数到训练分布和整数索引
 
 对于每个 Query Token $h_t$ 和历史 Token $h_s$，索引器计算索引分数：
 
@@ -251,16 +251,33 @@ $$I_{t,s} = \sum_{j=1}^{H^I} w_{t,j}^I \cdot \text{ReLU}(q_{t,j}^I \cdot k_s^I)$
 - $w_{t,j}^I$：可学习的头权重，由 `weights_proj` 生成，控制每个索引头的重要性
 - $H^I$：索引头数量
 
+虽然模块名叫 Indexer，但上式首先得到的并不是整数 index，而是 query $t$ 对每个历史位置 $s$ 的**连续相关性分数**。同一份分数 $\mathbf I_t$ 随后分成两条用途：
+
+| 对象 | 计算方式 | 含义与用途 |
+| --- | --- | --- |
+| 索引分数 $\mathbf I_t$ | Indexer 对所有合法历史位置打分 | 连续实数向量，是后续两条分支的共同输入 |
+| 学生分布 $\mathbf q_t$ | $\operatorname{Softmax}(\mathbf I_t)$ | 训练时用于和主注意力教师分布计算 KL，不是最终索引 |
+| 整数索引 $\mathcal S_t$ | $\operatorname{TopK}(\mathbf I_t,k)$ | 真正的 token 位置编号，决定 Sparse MLA 读取哪些 KV |
+
+因此，训练时比较的是两个概率分布，执行稀疏注意力时使用的才是整数位置：
+
+$$
+\mathbf q_t=\operatorname{Softmax}(\mathbf I_t),\qquad
+\mathcal S_t=\operatorname{TopK}(\mathbf I_t,k)
+$$
+
+推理不需要蒸馏损失，可以跳过第一条分支，只对 $\mathbf I_t$ 做 Top-k 并保留 $\mathcal S_t$。
+
 **为什么选择 ReLU 而不是 Softmax？**
 
-这是一个工程导向的决策：
+这里的 ReLU 是作用在每个索引头的 $q^I\cdot k^I$ 上、用于构造索引分数；上面的 Softmax 则只在训练时沿历史位置归一化 $\mathbf I_t$、用于计算 KL。两者处在不同步骤，并不冲突。选择 ReLU 构造分数是一个工程导向的决策：
 - ReLU 只需一次简单的阈值操作，计算成本低
 - ReLU 不需要全局归一化，天然适合并行化和低精度实现
 - ReLU 对 FP8 量化友好，而 Softmax 的指数运算在低精度下容易溢出
 
 #### 2.3 源码解读：Indexer（闪电索引器）
 
-以下代码移除了量化相关逻辑，仅保留核心模型结构：
+以下代码基于公开的**推理实现**，移除了量化相关逻辑，仅保留核心模型结构。推理不计算 KL，所以 `forward()` 最终只返回 `topk_indices`；训练实现还需要保留 Top-k 之前的 `index_score`，用它构造学生分布：
 
 ```python
 class Indexer(torch.nn.Module):
@@ -313,7 +330,7 @@ class Indexer(torch.nn.Module):
         index_score = torch.einsum("bshd,btd->bsht", q, self.k_cache[:bsz, :end_pos])
         index_score = (index_score.relu_() * weights.unsqueeze(-1)).sum(dim=2)
 
-        # 6. Top-k 选择
+        # 6. Top-k 选择；推理只需整数位置，训练还会保留 index_score 计算 KL
         topk_indices = index_score.topk(min(self.index_topk, end_pos), dim=-1)[1]
         return topk_indices
 ```
@@ -506,18 +523,20 @@ graph LR
 
 **阶段一：Dense Warm-up**
 
-冻结主模型参数，只训练索引器。对于每个 Query Token，计算原始多头注意力在所有历史 Token 上的 score 分布，然后用 KL 散度让索引器的输出逼近这个分布：
+冻结主模型参数，只训练索引器。对于每个 Query Token，计算原始多头注意力在所有历史 Token 上的教师分布 $P_{\text{attn}}$；Indexer 则先输出连续分数 $\mathbf I_t$，再用 $P_{\text{indexer}}=\operatorname{Softmax}(\mathbf I_t)$ 得到学生分布：
 
 $$\mathcal{L}_{\text{indexer}} = D_{\text{KL}}(P_{\text{attn}} \| P_{\text{indexer}})$$
 
-这个阶段学习率设为 `1e-3`，仅训练索引器 1000 步，每步 16 个 128K 长度序列，总计约 2.1B tokens。本质上是让索引器先学会"像旧模型那样看世界"。
+KL 比较的是两份概率分布，不是 Top-k 产生的整数位置。这个阶段学习率设为 `1e-3`，仅训练索引器 1000 步，每步 16 个 128K 长度序列，总计约 2.1B tokens。本质上是让索引器先学会"像旧模型那样看世界"。
 
 **阶段二：Sparse Training**
 
 引入 Top-k 选择机制，解冻主模型参数，让主模型和索引器同时更新。关键设计是 **梯度解耦**：
 
 - 索引器的输入从计算图中 `detach`，主模型只根据语言建模损失反向传播
-- 索引器只根据 KL 损失更新（此时 KL 只在被选中的 Top-k token 集合上对齐）
+- Indexer 先对全部历史位置输出分数，再由 $\mathcal S_t=\operatorname{TopK}(\mathbf I_t,k)$ 产生整数位置
+- 主注意力只在 $\mathcal S_t$ 内产生教师分布，Indexer 则计算 $\operatorname{Softmax}(\mathbf I_{t,\mathcal S_t})$；KL 只在这两个 Top-k 分布之间对齐
+- 索引器只根据上述 KL 损失更新，主注意力产生的教师分布不接收这条损失的梯度
 - 这避免了"索引器改了导致主模型改变，主模型改变又导致索引器需要重新适配"的恶性循环
 
 这个阶段学习率设为 `7.3e-6`，每个 query token 选 2048 个 KV，主模型与索引器同时训练 15000 步，每步 480 个 128K 长度序列，总计约 943.7B tokens。
@@ -551,7 +570,84 @@ $$S_t^{(\ell+r)} \leftarrow S_t^{(\ell)}$$
 
 GLM-5.2 的主体配置采用一组四层共享一次索引结果的模式，可从模型配置中的 `index_topk_freq: 4` 以及 `indexer_types` 的 `full/shared` 序列直接看到。官方报告称，这一设计在 1M 上下文下将 per-token FLOPs 降低 2.9 倍；IndexCache 论文在 30B DSA 模型上移除 75% 的索引器计算后，最高取得 1.82 倍 prefill 加速和 1.48 倍 decode 加速。
 
-跨层 Top-k 重合并不意味着任意模型都能无损地套用固定的 `F → S → S → S` 模式。IndexCache 区分了两种适用方式：已有 DSA 模型可以在校准集上搜索应保留哪些 Full 层；从训练阶段引入共享时，则可以让一个 Full 层的索引器同时蒸馏多个目标层的注意力分布。层模式与训练方式都属于具体模型实现，不能写成 DSA 算法本身的固定定义。
+跨层 Top-k 重合并不意味着任意模型都能无损地套用固定的 `F → S → S → S` 模式。IndexCache 区分了两种适用方式：已有 DSA 模型可以在校准集上搜索应保留哪些 Full 层；如果能从训练阶段引入共享，则可以通过多层蒸馏，主动把一个 Full 层的索引器训练成整组层共用的索引器。层模式与训练方式都属于具体模型实现，不能写成 DSA 算法本身的固定定义。
+
+#### 训练阶段：一个 Full Indexer 学习多层共识
+
+> **先给结论**：Full Indexer 先产生连续分数 $\mathbf I_t^{(\ell)}$，Top-k 再把它变成一份共享的整数位置集合。Full 层与后续 Shared 层复用的是这份位置集合，但各层仍会在这些位置上算出不同的主注意力权重；这些权重是多个教师，$\operatorname{Softmax}(\mathbf I_t^{(\ell)})$ 是唯一的学生。Shared 层不运行自己的 Indexer。
+
+先看标准 DSA 怎样在 **Dense warm-up** 阶段训练单层索引器。此时主注意力仍保持稠密：对于层 $\ell$ 的 query 位置 $t$，每个注意力头都会在因果掩码允许的全部历史位置 $s\le t$ 上计算主注意力的 $QK^\top$ 分数和 softmax 权重。各头归一化后的权重再被汇总，形成定义在全部历史位置上的教师分布 $\mathbf{p}_t^{(\ell)}$；索引器分数 $\mathbf{I}_t^{(\ell)}$ 经过 softmax 后形成学生分布：
+
+$$\mathbf{q}_t^{(\ell)}=\operatorname{Softmax}\left(\mathbf{I}_t^{(\ell)}\right)$$
+
+其中，$\mathbf{I}_t^{(\ell)}$ 是连续分数，$\mathbf{q}_t^{(\ell)}$ 才是为蒸馏构造的概率分布；二者都不是 Top-k 之后的整数索引。标准训练只让层 $\ell$ 的索引器拟合本层教师：
+
+$$\mathcal{L}_{\text{single}}^{(\ell)}=\sum_t D_{\mathrm{KL}}\!\left(\mathbf{p}_t^{(\ell)}\;\|\;\mathbf{q}_t^{(\ell)}\right)$$
+
+这里的“稠密”描述的是计算依赖：每个 query 都要考虑全部合法的历史 Key，因此主注意力的理论计算量仍为 $O(L^2)$。使用 FlashAttention 一类分块内核时，并不要求在 HBM 中常驻一份完整的 $L\times L$ 分数矩阵，不能把“计算完整 $QK^\top$”等同于“物化完整 attention matrix”。
+
+Dense warm-up 结束后，情况会发生变化。在 **Sparse training** 阶段，Full Indexer 仍先对全部历史位置计算轻量索引分数 $I_{t,s}$，并由 $\mathcal S_t=\operatorname{TopK}(\mathbf I_t^{(\ell)},k)$ 得到共享的整数位置；主 MLA 只在 $s\in\mathcal S_t$ 上计算真正的 $QK^\top$、softmax 和 Value 聚合。各层由此产生自己的教师分布 $\mathbf p_{t,\mathcal S_t}^{(\ell+j)}$，再与 Full Indexer 在相同位置上归一化得到的学生分布比较：
+
+$$
+D_{\mathrm{KL}}\!\left(
+\mathbf p_{t,\mathcal S_t}^{(\ell+j)}
+\;\middle\|\;
+\operatorname{Softmax}(\mathbf I_{t,\mathcal S_t}^{(\ell)})
+\right)
+$$
+
+同一轮前向中的 Top-k 是硬选择，KL 不会穿过 Top-k，也不能直接给未入选位置提供监督；它主要校准当前候选内部的相对分数。参数更新后，下一轮会重新对全部历史位置打分，Top-k 集合仍可能随之改变。因而，全局选位能力主要由 Dense warm-up 的完整教师建立，Sparse training 的作用是在主模型持续变化时做局部对齐，而不是凭当前固定的 Top-k 直接发现集合外遗漏的 token。
+
+这会得到一个擅长服务本层的索引器，却不能保证它选出的 Top-k 也适合后续层。假设 IndexShare 采用一组 `F → S → S → S`，Full 层 $\ell$ 的索引结果还要交给 $\ell+1$、$\ell+2$、$\ell+3$ 三个 Shared 层。训练时，这四层仍分别产生自己的教师分布：
+
+$$\mathbf{p}_t^{(\ell)},\quad \mathbf{p}_t^{(\ell+1)},\quad
+\mathbf{p}_t^{(\ell+2)},\quad \mathbf{p}_t^{(\ell+3)}$$
+
+但学生只有一个，即 Full 层 $\ell$ 保留下来的 $\mathbf{q}_t^{(\ell)}$。下面先用 Dense warm-up 的完整历史分布写出多层目标；到了 Sparse training，只需把每一项教师和学生都替换为前面定义的 $\mathcal S_t$ 内分布。多层蒸馏让同一个学生同时拟合四个教师：
+
+$$
+\mathcal{L}_{\text{multi}}^{(\ell)}=
+\frac{1}{4}\sum_{j=0}^{3}\sum_t
+D_{\mathrm{KL}}\!\left(
+\mathbf{p}_t^{(\ell+j)}\;\|\;\mathbf{q}_t^{(\ell)}
+\right)
+$$
+
+更一般地，如果一个 Full 层后面有 `m` 个 Shared 层，系数就是 $1/(m+1)$，教师范围为 $\ell$ 到 $\ell+m$。这里的“同时蒸馏”有三个准确含义：
+
+- **教师有多个**：每个被服务层都用自己的主注意力分布表达“本层希望关注哪些历史位置”。
+- **学生只有一个**：只有 Full 层保留 Indexer；Shared 层没有需要单独训练的 Indexer 参数。
+- **损失集中回传**：四项 KL 损失都更新 Full Indexer，使它输出一份对整组层都合用的候选分布，而不是只复现 Full 层自己的偏好。
+
+这个目标还可以从“平均教师”角度理解。定义四层教师分布的平均值：
+
+$$
+\bar{\mathbf{p}}_t=
+\frac{1}{4}\sum_{j=0}^{3}\mathbf{p}_t^{(\ell+j)}
+$$
+
+对于 Full Indexer 的参数 $\theta$，论文证明：
+
+$$
+\nabla_{\theta}\mathcal{L}_{\text{multi}}^{(\ell)}
+=
+\nabla_{\theta}\sum_t
+D_{\mathrm{KL}}\!\left(
+\bar{\mathbf{p}}_t\;\|\;\mathbf{q}_t^{(\ell)}
+\right)
+$$
+
+因此，多层蒸馏对 Indexer 的训练效果等价于让它学习四层注意力分布的“中心”。这里等价的是**相对于 Indexer 参数的梯度**，不是说两个损失的数值必须完全相同。最终的 Top-k 也不是四层各自 Top-k 的简单并集；Indexer 仍输出固定大小的 `k` 个位置，只是这些位置会更偏向覆盖多层共同需要的 token。
+
+以一个最小例子看，假设四层最关注的位置分别是 `{A,B,C}`、`{A,B,D}`、`{A,C,D}` 和 `{A,B,C}`。平均教师会让四层都需要的 `A` 获得最高概率，同时综合权衡 `B/C/D`；Full Indexer 必须在固定的 Top-k 预算内学习这份共识，而不是为每层各保留一套索引。
+
+训练与推理的数据生命周期如下：
+
+1. **Dense warm-up**：主模型冻结，各层产生完整教师分布；一组中的所有教师共同计算 $\mathcal{L}_{\text{multi}}$，只更新 Full Indexer。
+2. **Sparse training**：各层开始使用共享 Top-k；主模型通过语言建模损失更新，Full Indexer 继续通过多层 KL 损失更新。与标准 DSA 一样，Indexer 路径与主模型梯度解耦；论文在这一阶段只对已选 Top-k 位置计算 KL。
+3. **Inference**：教师分布和 KL 损失全部消失。Full 层运行一次 Indexer 并缓存位置集合，后续 Shared 层只读取这份整数索引，各自完成 Sparse MLA。
+
+这也解释了多层蒸馏为什么能支持更规则的共享模式：如果仍按标准 DSA 只用 $\mathbf{p}_t^{(\ell)}$ 训练 Full Indexer，那么 Shared 层在推理时会突然接收到为另一层优化的索引，产生分布偏移；多层蒸馏把这种跨层复用提前放进训练目标，让一份索引从训练开始就面向整组层。
 
 ### 2. IndexPool：池化索引 Key 后再检索
 
