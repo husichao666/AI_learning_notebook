@@ -98,7 +98,11 @@ nav = [
       { "5 · 异步与 overlap" = "engineering/gpu-basics/05-concurrency.md" },
       { "6 · 怎样观察这些开销" = "engineering/gpu-basics/06-profiling.md" },
     ] },
-    { "训练性能采集与分析" = "engineering/training-performance.md" },
+    { "训练性能优化" = [
+      { "专题总览" = "engineering/training-optimization/index.md" },
+      { "1 · 训练性能指标" = "engineering/training-performance.md" },
+      { "2 · 训练性能优化流程" = "engineering/training-optimization/02-optimization-workflow.md" },
+    ] },
   ] },
 ]
 

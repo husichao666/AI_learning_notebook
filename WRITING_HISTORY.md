@@ -27,6 +27,7 @@
 | 日期 | 文档位置 | 具体问题 | 原因 | 处理方式 |
 | --- | --- | --- | --- | --- |
 | 2026-08-31 | `docs/torchtitan/05-sharding-config-spmd-types.md` 原第 5、6 节 | 第 5 节写 `parallelize()` 安装 forward 包装，第 6 节才解释这个包装，两个同属一个机制的内容被拆成同级章节 | 按“初始化”和“运行时”表面阶段分段，没有优先保持安装动作与被安装逻辑的从属关系 | 将 forward 包装并入第 5 节作为 5.2，后续章节顺延 |
+| 2026-09-11 | `docs/engineering/training-optimization/02-optimization-workflow.md` 原第 4、5 节 | 第 4 节把 Profile 分析声明为“正向/逆向”两条路径，但逆向分析只包含通信问题；同属异常归因的 Device 空闲和 Host 下发被拆成独立第 5 节，导致分析流程和标题层级不一致 | 按现象类别分段时，没有保持“先验证执行正确，再沿关键路径定位瓶颈”的时间顺序，也把逆向定位的下位内容提升成了同级阶段 | 改为执行正确性检查、瓶颈定位和优化验证三个连续阶段；将通信暴露、collective 等待、Device 空闲与 Host 瓶颈统一收进瓶颈定位 |
 
 ## H004 · 标题承担了不必要的解释
 
@@ -43,6 +44,8 @@
 | 2026-09-02 | `docs/components/attention/dsa/index.md` IndexPool 小节 | 只写“候选池映射回原始 token 位置”，没有明确选中一个池后是只取代表、再选一个 token，还是把池内四个 token 全部送入主注意力，读者无法跟踪池化表示与原始 MLA KV 的去向 | 把池级粗筛和 token 级精算压缩在一句话里，没有分别说明索引 Key Cache 与主 MLA KV Cache 的数据生命周期 | 增加 `p=4` 流程图，明确池化只发生在索引 Key 路径；完整池入选后展开为四个 token 位置，各自读取原始 MLA KV 并独立计算注意力权重，同时画出未满池 tail 的直通路径 |
 | 2026-09-02 | `docs/training/parallelism/06-ep.md` Dispatch / Combine 小节 | 原理篇只画出来源端 permute、两次 all-to-all 与最终 unpermute，读者会以为接收后天然按本地专家连续，与源码篇显式的第二次 permutation 不一致 | 为简化概念图，把接收端 source-major → local-expert-major 的布局变换隐式合并到 all-to-all 结果，却没有标出这个抽象边界 | 在表格、图注和 SVG 中声明概念图折叠了接收端 regroup，并补全标准路径的来源端 permute、接收端 expert regroup 及其 combine 逆过程 |
 | 2026-09-04 | `docs/training/parallelism/03-tp.md` Row Parallel 与 Transformer layer 图 | Row Parallel 图中的本地输入画成 `4×4`、本地权重画成 `2×4`，矩阵维度无法相乘，也没有画出两张完整形状的部分和；Transformer layer 图的残差竖线穿过节点和文字 | 绘图时只强调切分方向和通信位置，没有按每个 rank 的实际 GEMM 形状检查矩阵网格，也没有让连线在节点边界终止 | 将本地 GEMM 明确画为 `4×2 · 2×4 → 4×4`，补全两张部分和及其归约结果；拆分残差旁路线，在节点边界使用箭头和分支点连接 |
+| 2026-09-11 | `docs/training/parallelism/03-tp.md` MLP 的 Column → Row 图 | 图中用一组外观相近的文字框描述两个 rank，既没有延续上文矩阵图的视觉口径，也难以直接看出两种切分怎样组合以及通信发生在哪里；第一次改图又拆成上下两个独立步骤，组合关系仍不够直接 | 只画出了算子调用顺序；修改时虽然换成矩阵，却仍按“先解释 Column、再解释 Row”组织画面，没有把组合后的数据流作为主结构 | 延续前两图的矩阵网格，并合并为一条从左到右的数据流：$W_1$ 纵向列切产生 $A$ 分片，同色 $A^{(i)}$ 与横向行切的 $W_2^{(i)}$ 本地相乘，最后只在部分和之后画 all-reduce |
+| 2026-09-11 | `docs/training/parallelism/03-tp.md` 输入 Embedding 小节 | 最初只用“范围外 token 清零、本地 lookup、all-reduce”概括词表并行；补充时又加入区间和分段函数公式，使本可用查表示例说明的简单机制变得过重 | 第一次省略了数据流，第二次则把“解释完整”误写成“形式化推导完整”，没有按机制难度选择表达方式 | 删除区间公式和逐 rank 表格，改用一张图展示 token id 复制、两个词表分片各自查表并补零、all-reduce 合成完整 embedding 的过程；正文只保留求和成立的原因和工程含义 |
 
 ## H006 · 省略机制生效的范围
 
@@ -66,3 +69,15 @@
 | --- | --- | --- | --- | --- |
 | 2026-09-02 | `docs/training/parallelism/05-cp.md` 注意力显存动机 | 把数学上的 `[S,S]` 注意力分数矩阵直接当作现代注意力内核会在 HBM 常驻的 buffer，并据此解释 CP 的全部显存收益 | 没有区分注意力的逻辑数据依赖、平方计算量与 FlashAttention 等分块内核的真实物化行为 | 在正文、图注和 SVG 中分开说明逻辑矩阵与物理工作区，并把 CP 目标改为分摊序列激活及 query-key 配对计算 |
 | 2026-09-02 | `docs/training/parallelism/loss-parallel.md` 通信量小节 | 把三个 `[B,S]` 统计张量称为“几个标量”，并用逻辑张量总大小直接比较 all-gather 与 all-reduce 通信量 | 混用了单 token 元素、逻辑 payload 与集合通信算法的每 rank 链路发送量 | 改称逐 token 统计张量，并在同一理想 ring 模型下分别计算 all-gather 与三次 all-reduce 的每 rank 发送字节数，同时注明融合只减少 collective 次数、不减少元素总量 |
+
+## H009 · 专题范围与单篇文章层级混淆
+
+| 日期 | 文档位置 | 具体问题 | 原因 | 处理方式 |
+| --- | --- | --- | --- | --- |
+| 2026-09-08 | `docs/engineering/training-performance.md` 与性能工程导航 | 文章元数据标题是“训练性能采集与分析”，正文一级标题却使用范围更大的“训练性能优化”；导航又把它作为单篇内容平铺，读者无法区分整个优化专题与其中的数据采集章节 | 最初用宽泛标题承载单篇草稿，后续缩小文章范围时只修改了元数据，没有同步建立专题层级和统一正文标题 | 新建“训练性能优化”专题总览，将采集与分析文章作为第一个子章节，并统一该文章的元数据、一级标题和开篇范围说明 |
+
+## H010 · Markdown 结构导致公式未进入渲染链路
+
+| 日期 | 文档位置 | 具体问题 | 原因 | 处理方式 |
+| --- | --- | --- | --- | --- |
+| 2026-09-11 | `docs/engineering/training-optimization/02-optimization-workflow.md` 扩展效率公式 | $X_{\mathrm{small}}$、$N_{\mathrm{small}}$ 和 $N_{\mathrm{large}}$ 显示为普通括号文本，块公式也直接显示 `$$`，没有经过 MathJax 渲染 | 行内变量缺少有效数学定界符；块公式缩进在编号列表下，却没有形成扩展要求的独立数学块，最终被解析为普通段落 | 行内变量统一使用 `$...$`，将块公式移到列表之外并保留前后空行；严格构建后检查生成 HTML 中的 `arithmatex` 标记 |
