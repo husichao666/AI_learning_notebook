@@ -351,8 +351,91 @@
   text-align: center;
 }
 
+.repo-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 3.5rem 0 1.5rem;
+  padding: 1.35rem 1.45rem;
+  border: 1px solid color-mix(in srgb, var(--notebook-accent) 30%, var(--kb-border));
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 100% 0, rgba(74, 222, 128, 0.12), transparent 34%),
+    var(--kb-surface-soft);
+}
+
+.repo-actions--home {
+  margin-top: 2.4rem;
+}
+
+.repo-actions__copy {
+  max-width: 42rem;
+}
+
+.repo-actions__eyebrow {
+  margin: 0 0 0.35rem;
+  color: var(--notebook-accent) !important;
+  font-size: 0.65rem !important;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.repo-actions h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--kb-text);
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.repo-actions__copy > p:last-child {
+  margin: 0.55rem 0 0;
+  color: var(--kb-muted);
+  font-size: 0.76rem;
+  line-height: 1.65;
+}
+
+.repo-actions__buttons {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.repo-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.45rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--kb-border);
+  border-radius: 0.6rem;
+  background: var(--kb-surface);
+  color: var(--kb-text) !important;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.repo-action-button:hover {
+  border-color: var(--notebook-accent);
+  transform: translateY(-1px);
+}
+
+.repo-action-button--primary {
+  border-color: #5c6fe3;
+  background: #5c6fe3;
+  color: #ffffff !important;
+}
+
 .kb-domain-card:focus-visible,
-.kb-button:focus-visible {
+.kb-button:focus-visible,
+.repo-action-button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--notebook-accent) 50%, transparent);
   outline-offset: 3px;
 }
@@ -366,4 +449,14 @@
   .kb-domain-card { min-height: 10.5rem; }
   .kb-path-card p { min-height: 0; }
   .kb-updates > div { grid-template-columns: 1fr; gap: 0.2rem; }
+
+  .repo-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .repo-actions__buttons {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

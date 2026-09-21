@@ -4,7 +4,7 @@ description: "沿 HyperParallel fully_shard 源码，从原因、目标、做法
 type: source-note
 status: stable
 level: advanced
-updated: 2026-09-02
+updated: 2026-09-20
 tags: [distributed-training, fsdp, hsdp, hyperparallel, performance]
 ---
 
@@ -94,7 +94,7 @@ root backward callback
 
 ### 3.1 原因：融合减少通信次数，却增加本地数据搬运
 
-把一个 unit 的多个参数融合成一次 collective，通常需要经历：
+以参数 all-gather 为例，把一个 unit 的多个参数融合成一次 collective，常见路径是：
 
 ```text
 多个参数 shard
@@ -103,7 +103,7 @@ root backward callback
   → copy-out 到每参数 buffer
 ```
 
-融合减少了 collective 数量，有利于小消息和高时延网络；但 copy-in / copy-out 会额外读写完整通信数据，消耗设备显存带宽，还可能把 copy kernel 暴露到计算关键路径。
+融合减少了 collective 数量，有利于小消息和高时延网络；但 copy-in / copy-out 会额外读写通信数据，消耗设备显存带宽，还可能把 copy kernel 暴露到计算关键路径。梯度归约的输出不一定需要逐参数复制：PyTorch FSDP2 的普通路径在 RS / AR 后从结果中切出梯度 view，具体存储关系见第 4 节。
 
 HSDP 的两个通信域条件不同：高带宽 shard 组更可能隐藏逐参数通信，而较慢的 replicate 组更怕小消息和频繁 launch。如果两边都强制融合，会在快通信域付出不必要的 copy；如果两边都逐参数，又会在慢通信域付出过多 collective 开销。
 
@@ -170,14 +170,14 @@ torch.empty(
 2. 为每个参数切出 view，把它传给 `reduce_scatter_grad(output_buffer=...)`；
 3. 各参数的 RS 结果直接落入这些 view；
 4. 等 RS 完成后，对整块 `fused_buffer` 发起一次异步 AR；
-5. AR 完成后，每个参数继续使用原 view，不再从融合输出复制到参数专属 buffer。
+5. AR 完成后，先把各参数的结果 view 交给通信上下文，随后按需转换 dtype、卸载或累加，再写入优化器梯度；没有这些额外处理时，最终梯度可以直接共享融合 buffer。
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"background": "#ffffff", "primaryColor": "#eef6ff", "primaryTextColor": "#1f2937", "primaryBorderColor": "#2563eb", "secondaryColor": "#f0fdf4", "tertiaryColor": "#fff7ed", "lineColor": "#64748b"}}}%%
 flowchart LR
-    G1["参数 1 完整梯度"] --> RS1["逐参数 RS 1"]
-    G2["参数 2 完整梯度"] --> RS2["逐参数 RS 2"]
-    G3["参数 3 完整梯度"] --> RS3["逐参数 RS 3"]
+    G1["参数 1 的 _grad<br/>RS 输入"] --> RS1["逐参数 RS 1"]
+    G2["参数 2 的 _grad<br/>RS 输入"] --> RS2["逐参数 RS 2"]
+    G3["参数 3 的 _grad<br/>RS 输入"] --> RS3["逐参数 RS 3"]
 
     subgraph B["AllReduceParamGroup.fused_buffer"]
         V1["参数 1 view"]
@@ -189,8 +189,8 @@ flowchart LR
     RS1 --> V1
     RS2 --> V2
     RS3 --> V3
-    B --> AR["一次 replicate 组 All-Reduce"]
-    AR --> OUT["原 view 成为各参数最终梯度"]
+    B --> AR["整块 fused_buffer 上<br/>原地 All-Reduce"]
+    AR --> OUT["结果 view 交给各参数<br/>按需转换 / 卸载 / 累加后应用"]
 ```
 
 源码对整块融合 buffer 固定使用 `SUM`；如果用户要求 `AVG`，就在 AR 完成、切分各参数 view 时再除以 `replicate_world_size`。buffer 初始化为 0，保证尾部 padding 不改变求和结果。
@@ -214,13 +214,27 @@ flowchart LR
 
 ## 04 · 优化二：把逐参数 RS 与融合 AR 接成跨 unit 流水 { #backward-pipeline }
 
-![PyTorch FSDP2 HSDP 与 HyperParallel 默认路径的反向通信时序](assets/02-hyper-fsdp-rs-ar-timeline.svg)
+先区分梯度归约的输入与输出。PyTorch 把完整梯度打包到 **RS 输入块**，RS 另外写出更小的 **输出块**，后者才是原地 AR 的输入；图中用 `I3`、`O3` 表示 L3 的这两块存储。HyperParallel 默认路径则直接使用各参数的 RS 输入，把输出写入 group 预先分配的融合 buffer；图中用 `B3` 表示 L3 某个 AR group 的 `fused_buffer`，其他层同理。
 
-*上半部分是 PyTorch FSDP2 原生 HSDP：当前 unit 的 `foreach_reduce()` 通过 stream dependency 排入 `RS_i → AR_i`。下半部分是 HyperParallel 默认路径：当前 Hook 发 `RS_i`，下一 Hook 等待它完成，再排入当前 `RS_{i-1}` 和前序融合 `AR_i`。两条路径都满足 `AR_i` 读取已完成 `RS_i` 输出的数据依赖；方块长度只表示先后与可重叠关系，不代表真实耗时比例。*
+![PyTorch FSDP2 HSDP 与 HyperParallel 的反向时序：RS 输入回收与 AR 输出保留](assets/02-hyper-fsdp-rs-ar-timeline.svg)
+
+*上半部分是 PyTorch FSDP2 原生 HSDP：当前 unit 的 `foreach_reduce()` 通过 stream dependency 排入 `RS_i → AR_i`；`post L2` 只回收 RS3 的输入 `I3`，AR3 继续使用独立输出 `O3`。中间展开 PyTorch L3 的存储流向。下半部分是 HyperParallel 默认路径：下一 Hook 等待各参数 RS 后释放其输入 `_grad`，group 仍持有输出 buffer `B3`，随后发起原地 AR3。图中 Hook 框表示提交与依赖设置的位置，不能据此判断 CPU 是否阻塞；`Work.wait()` 的具体行为取决于通信后端与配置。方块长度只表示先后与可重叠关系，不代表真实耗时比例。*
 
 ### 4.1 原因：PyTorch 原生方案把 RS 粒度与 AR 启动位置绑定在一起
 
-PyTorch FSDP2 在当前 unit 的 `foreach_reduce()` 中，把完整梯度 copy-in 到 flat input，依次排入融合 RS 和原地 AR；两个通信 stream 通过 `wait_stream()` 建立 `RS → AR` 依赖。默认最多保留一个 RS input，后续 Hook 会等旧 RS event 后再回收这块 buffer。
+PyTorch FSDP2 在当前 unit 的 `foreach_reduce()` 中，先把完整梯度 copy-in 到 `reduce_scatter_input`，再分配独立的 `reduce_output` 接收 RS 结果。设打包后的完整梯度含 $M$ 个元素（包括 padding），shard 组有 $S$ 个 rank，前者含 $M$ 个元素，后者只有 $M/S$ 个元素。随后 AR 在 `reduce_output` 上原地执行，两个通信 stream 通过 `wait_stream()` 建立 `RS → AR` 依赖。“原地”描述的是 **AR 复用 RS 输出**，并不表示 RS 输入和输出是同一块存储。
+
+以 L3 为例，三段数据的生命周期分别是：
+
+| 对象 | 使用者 | 保留与回收条件 |
+| --- | --- | --- |
+| 完整参数梯度 | copy-in / `chunk_cat` | 打包后不再被 RS 直接读取，可释放原梯度引用；设备端复制与后续复用仍受 stream 顺序约束 |
+| `I3 = reduce_scatter_input` | RS3 | 由 `ReduceScatterState(input, event)` 保留；后续 Hook 建立对 RS3 event 的等待后，释放这一输入引用 |
+| `O3 = reduce_output` | RS3 写入，AR3 原地读写，后处理读取 | 由 L3 自己的 `AllReduceState` 保留通信 buffer；AR 和后处理完成前不能复用，最终梯度还可能通过 view 持有这块存储 |
+
+默认最多保留一个 RS input，因此 `post L2` 会在当前计算 stream 上设置 `wait_event(RS3_done)`，再删除 `I3` 的 keepalive 引用，为 L2 的 copy-in 腾出可复用空间。**它没有等待 AR3，也没有释放 `O3`。** AR3 可以同时在另一条 stream 上使用 `O3`；两者只共享“RS3 已完成”这一前提，没有相互等待的关系。这里的 `wait_event()` 是设备 stream 依赖，不是要求 Python 线程等到 GPU 完成才执行 `del`。[输入回收与输出保留源码](https://github.com/pytorch/pytorch/blob/3691693263d2b66a68867e39b7449876844e06cf/torch/distributed/fsdp/_fully_shard/_fsdp_param_group.py#L655-L819)
+
+AR 后仍有结果处理：按需缩放、转换回参数原始 dtype，再用 `as_strided()` 为各参数建立本地梯度 view。普通路径在 `.grad` 尚为空、没有 CPU offload 且不需要 dtype 转换时，可以直接让梯度共享 `O3`，无需再逐参数 copy-out；dtype 转换会分配另一块结果存储，已有 `.grad` 时需要累加，CPU offload 则有设备到主机的复制。因此完整流程应写成 **copy-in → RS 写独立输出 → AR 原地更新输出 → 按需转换 / view-out / 累加**，不能把它们都理解为对一个大 buffer 连续操作。[归约与 view-out 源码](https://github.com/pytorch/pytorch/blob/3691693263d2b66a68867e39b7449876844e06cf/torch/distributed/fsdp/_fully_shard/_fsdp_collectives.py#L595-L775)
 
 这套方案把 **unit 级 flat RS、直接复用整组 RS 输出、当前 Hook 发起 AR** 绑定在一起。HyperParallel 想改成“逐参数 RS + 融合 AR”：各参数 RS 有独立 `Work`，必须全部完成后，整块融合 buffer 才能交给 AR。因此 PyTorch 的同组链式流程不能直接复用，需要增加跨 unit 的状态与同步点。
 
@@ -252,6 +266,25 @@ post L1：wait RS2 → 发 RS1 → 发 AR2
 root callback：wait RS1 → 发 AR1 → wait pending AR
 ```
 
+#### L3 的 RS 输入释放与融合输出保留
+
+以 L3 中属于同一个 AR group 的多个参数为例，`post L3` 先分配融合输出 `B3 = group.fused_buffer`，再让每个参数的 RS 直接写入 `B3` 中自己的区域。RS 的输入是各参数的 `_grad`；在 dim-0、可整除且 dtype 相同的常见路径中，它是完整梯度的展平 view，不需要先把整层梯度 copy-in 到一块大输入。dtype 转换、padding 或非 dim-0 重排则可能创建新的输入存储。[逐参数 RS 源码](https://github.com/mindspore-ai/hyper-parallel/blob/b8f55f71efb1e838ff7e8adac36690dafedcd16c/hyper_parallel/platform/torch/fully_shard/param.py#L1128-L1208)
+
+进入 `post L2` 后，`_wait_prev_reduce_scatter()` 对 L3 各参数依次执行以下操作：
+
+1. `reduce_scatter_output()` 等待该参数的 RS handle，然后对 **输入** `_grad.untyped_storage()` 执行 `resize_(0)`，释放输入 storage。
+2. `clear_reduce_scatter_output()` 把参数通信上下文中的 **输出 view 引用**设为 `None`；这一步没有对输出 storage 执行 `resize_(0)`。
+3. 清理完整梯度的来源引用，并把仍持有 `B3` 的 group 返回给当前 Hook。
+
+这两种清理操作的区别直接决定了 AR 能否继续：**输入 storage 已经不再需要，输出 view 虽从参数上下文移除，整块输出仍由 group 的 `fused_buffer` 持有。** `post L2` 随后先发 L2 的 RS，再对 `B3` 发融合 AR3，将 group 放进 `pending_all_reduce_groups`。因此，AR3 使用的 `B3` 从未在 RS 输入回收时被释放。[等待与引用交接源码](https://github.com/mindspore-ai/hyper-parallel/blob/b8f55f71efb1e838ff7e8adac36690dafedcd16c/hyper_parallel/platform/torch/fully_shard/state.py#L387-L432)
+
+| 对照项 | PyTorch 原生 HSDP | HyperParallel 默认 HSDP |
+| --- | --- | --- |
+| RS 输入 | unit 级 copy-in 后的大块 `I3` | 各参数的 `_grad`，常见路径无需 unit 级 pack |
+| RS 输出 / AR 输入 | 独立分配的 `O3` | 预分配 `B3` 的各参数 view |
+| 下一 Hook 回收 | 等 RS event 后删除输入保留引用 | 等各 RS handle 后释放 `_grad` storage，并清理参数上的 RS 输出 view 引用 |
+| AR 期间谁保留输出 | L3 的 `AllReduceState` | 待处理队列中的 `AllReduceParamGroup.fused_buffer` |
+
 以 `RS2` 为例，`L1 backward` 并不读取 `L2` 已归约的参数梯度。`post L1` 调用 `Work.wait(RS2)`，是因为 Hyper 选择在这里确认 `AllReduceParamGroup.fused_buffer` 已经完整，随后发起 `AR2`；它是软件流水的消费点，不是 `L1` 反向的数据依赖。如果 `RS2` 尚未完成，这个同步点会暴露为性能等待，但不会改变数学结果。
 
 第 3 步先于第 4 步也是源码中的确定顺序：同一个 Hook 先调用 `_issue_reduce_scatter_for_current_module()`，再调用 `_issue_prev_fused_all_reduce()`。它的直接效果是，当前 shard 组 RS 的提交先于前序 replicate 组 AR；源码没有把这一顺序定义为算法正确性的要求。不同后端和拓扑能否从该提交顺序获益，需要结合 profiler 判断。
@@ -266,6 +299,8 @@ root backward callback 由 autograd engine 在本次反向结束时执行。它�
 4. 从融合 buffer view 取得每个参数的最终梯度；
 5. 完成 source mesh 上仍需要的复制轴归约；
 6. 把结果写入优化器持有的 `sharded_param.grad`，再清理临时引用。
+
+其中 `wait_and_split_grads()` 在等待 AR 后，把各参数的结果 view 写入 `all_reduce_comm_ctx.all_reduce_output`，然后才设置 `group.fused_buffer = None`。这是输出引用从 group 向各参数的交接，view 仍持有底层 storage，并未因为 group 字段清空就丢失数据。随后 `apply_reduced_grad()` 按需转回原始 dtype、CPU offload 或累加；普通同 dtype、无卸载且没有已有梯度时，`.grad` 可以继续共享这块 storage，不需要额外 copy-out。配置 `apply_grad_on_fp32_main_grad` 时，结果写入的是 `main_grad`。因此，group 的结束与融合输出 storage 的最终释放是两个不同时间点。[结果 view 交接](https://github.com/mindspore-ai/hyper-parallel/blob/b8f55f71efb1e838ff7e8adac36690dafedcd16c/hyper_parallel/platform/torch/fully_shard/param_group.py#L1046-L1056)、[梯度应用](https://github.com/mindspore-ai/hyper-parallel/blob/b8f55f71efb1e838ff7e8adac36690dafedcd16c/hyper_parallel/platform/torch/fully_shard/param.py#L445-L503)
 
 ### 4.5 收益与边界
 

@@ -1,22 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 330" role="img" aria-labelledby="title desc">
-<title id="title">TP + SP 的 MLP 前向流程，T=2</title>
-<desc id="desc">蓝色块表示前半序列，橙色块表示后半序列。每卡只对自己的半段序列执行 Norm；all-gather 后恢复全部 token，MLP 分片计算后 reduce-scatter，各卡对本地结果执行 Dropout 和残差加法。</desc>
+<title id="title">TP 的 MLP 前向流程，T=2</title>
+<desc id="desc">蓝色块表示前半序列，橙色块表示后半序列。两卡均对完整序列执行 Norm；MLP 分片计算后 all-reduce，两卡对完整结果执行 Dropout 和残差加法。</desc>
 <defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7" fill="#64748b"/></marker></defs>
 <rect width="1240" height="330" rx="12" fill="white"/>
 <g font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">
-<text x="25" y="35" text-anchor="start" font-size="23" fill="#172033" font-weight="700">TP + SP  ·  T = 2</text>
+<text x="25" y="35" text-anchor="start" font-size="23" fill="#172033" font-weight="700">TP  ·  T = 2</text>
 <rect x="948" y="21" width="16" height="12" rx="2" fill="#60a5fa" stroke="none"/>
 <text x="976" y="33" text-anchor="start" font-size="15" fill="#5f6b7a" font-weight="400">前半序列</text>
 <rect x="1090" y="21" width="16" height="12" rx="2" fill="#fb923c" stroke="none"/>
 <text x="1118" y="33" text-anchor="start" font-size="15" fill="#5f6b7a" font-weight="400">后半序列</text>
 <text x="38" y="131" text-anchor="middle" font-size="16" fill="#172033" font-weight="700">rank 0</text>
+<rect x="82" y="97" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="82" y="111" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
-<rect x="82" y="125" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
+<rect x="82" y="125" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="82" y="139" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
 <path d="M125 125H151" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<rect x="153" y="96" width="90" height="58" rx="7" fill="#ecfdf5" stroke="#6ee7b7"/>
+<rect x="153" y="96" width="90" height="58" rx="7" fill="#fff7ed" stroke="#fdba74"/>
 <text x="198" y="131" text-anchor="middle" font-size="20" fill="#172033" font-weight="700">Norm</text>
-<path d="M243 125H280" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<path d="M400 125H427" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
+<path d="M243 125H427" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
 <rect x="430" y="97" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="430" y="111" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="430" y="125" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
@@ -27,20 +28,23 @@
 <path d="M773 125H820" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
 <text x="796" y="113" text-anchor="middle" font-size="16" fill="#5f6b7a" font-weight="400">P₀</text>
 <path d="M960 125H987" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
+<rect x="990" y="97" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="990" y="111" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
-<rect x="990" y="125" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
+<rect x="990" y="125" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="990" y="139" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
 <path d="M1034 125H1062" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<rect x="1065" y="96" width="150" height="58" rx="7" fill="#ecfdf5" stroke="#6ee7b7"/>
+<rect x="1065" y="96" width="150" height="58" rx="7" fill="#fff7ed" stroke="#fdba74"/>
 <text x="1140" y="122" text-anchor="middle" font-size="19" fill="#172033" font-weight="700">Dropout</text>
 <text x="1140" y="145" text-anchor="middle" font-size="16" fill="#172033" font-weight="400">+ 残差</text>
 <text x="38" y="261" text-anchor="middle" font-size="16" fill="#172033" font-weight="700">rank 1</text>
-<rect x="82" y="241" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="82" y="227" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
+<rect x="82" y="241" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="82" y="255" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="82" y="269" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
 <path d="M125 255H151" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<rect x="153" y="226" width="90" height="58" rx="7" fill="#ecfdf5" stroke="#6ee7b7"/>
+<rect x="153" y="226" width="90" height="58" rx="7" fill="#fff7ed" stroke="#fdba74"/>
 <text x="198" y="261" text-anchor="middle" font-size="20" fill="#172033" font-weight="700">Norm</text>
-<path d="M243 255H280" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<path d="M400 255H427" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
+<path d="M243 255H427" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
 <rect x="430" y="227" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="430" y="241" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="430" y="255" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
@@ -51,14 +55,14 @@
 <path d="M773 255H820" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
 <text x="796" y="243" text-anchor="middle" font-size="16" fill="#5f6b7a" font-weight="400">P₁</text>
 <path d="M960 255H987" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<rect x="990" y="241" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="990" y="227" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
+<rect x="990" y="241" width="40" height="11" rx="2" fill="#60a5fa" stroke="none"/>
 <rect x="990" y="255" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
+<rect x="990" y="269" width="40" height="11" rx="2" fill="#fb923c" stroke="none"/>
 <path d="M1034 255H1062" stroke="#64748b" stroke-width="1.7" fill="none" marker-end="url(#arrow)"/>
-<rect x="1065" y="226" width="150" height="58" rx="7" fill="#ecfdf5" stroke="#6ee7b7"/>
+<rect x="1065" y="226" width="150" height="58" rx="7" fill="#fff7ed" stroke="#fdba74"/>
 <text x="1140" y="252" text-anchor="middle" font-size="19" fill="#172033" font-weight="700">Dropout</text>
 <text x="1140" y="275" text-anchor="middle" font-size="16" fill="#172033" font-weight="400">+ 残差</text>
-<rect x="280" y="95" width="120" height="190" rx="7" fill="#f8fafc" stroke="#94a3b8"/>
-<text x="340" y="196" text-anchor="middle" font-size="18" fill="#172033" font-weight="700">all-gather</text>
 <rect x="820" y="95" width="140" height="190" rx="7" fill="#f8fafc" stroke="#94a3b8"/>
-<text x="890" y="196" text-anchor="middle" font-size="18" fill="#172033" font-weight="700">reduce-scatter</text>
+<text x="890" y="196" text-anchor="middle" font-size="18" fill="#172033" font-weight="700">all-reduce</text>
 </g></svg>

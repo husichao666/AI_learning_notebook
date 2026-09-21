@@ -1,0 +1,346 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880.0 329" role="img" aria-label="DualPipe 多 stage 的 micro-batch 前后向时间线">
+<style>text{font-family:system-ui,sans-serif;fill:#334155}</style>
+<rect width="880.0" height="329" fill="#fff"/>
+<text x="14" y="25" font-size="17" text-anchor="start" font-weight="600" style="fill:#334155">DualPipe</text>
+<text x="862.0" y="25" font-size="13" text-anchor="end" font-weight="400" style="fill:#64748b">P = 4 · 每个方向 M = 6</text>
+<rect x="14" y="42" width="9" height="14" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1"/>
+<rect x="23" y="42" width="9" height="14" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="1"/>
+<text x="39" y="54" font-size="12" text-anchor="start" font-weight="400" style="fill:#334155">F 前向</text>
+<rect x="159" y="42" width="9" height="14" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="1"/>
+<rect x="168" y="42" width="9" height="14" rx="2" fill="#318362" stroke="#247249" stroke-width="1"/>
+<text x="184" y="54" font-size="12" text-anchor="start" font-weight="400" style="fill:#334155">B 完整反向</text>
+<rect x="304" y="42" width="9" height="14" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="1"/>
+<rect x="313" y="42" width="9" height="14" rx="2" fill="#287c94" stroke="#236d83" stroke-width="1"/>
+<text x="329" y="54" font-size="12" text-anchor="start" font-weight="400" style="fill:#334155">X 输入梯度</text>
+<rect x="449" y="42" width="9" height="14" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="1"/>
+<rect x="458" y="42" width="9" height="14" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="1"/>
+<text x="474" y="54" font-size="12" text-anchor="start" font-weight="400" style="fill:#334155">W 参数梯度</text>
+<text x="14" y="75" font-size="12" text-anchor="start" font-weight="400" style="fill:#64748b">浅色 = 副本 A；深色 = 副本 B；黑框 = F+B 配对；斜纹 = 重叠区间</text>
+<text x="14" y="94" font-size="12" text-anchor="start" font-weight="400" style="fill:#64748b">数字 = micro-batch 编号；空白 = 等待</text>
+<text x="862.0" y="94" font-size="12" text-anchor="end" font-weight="400" style="fill:#64748b">时间 →</text>
+<rect x="6" y="111" width="866.0" height="33" rx="4" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<text x="13" y="131.0" font-size="12" text-anchor="start" font-weight="600" style="fill:#334155">GPU 0</text>
+<rect x="6" y="151" width="866.0" height="33" rx="4" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<text x="13" y="171.0" font-size="12" text-anchor="start" font-weight="600" style="fill:#334155">GPU 1</text>
+<rect x="6" y="191" width="866.0" height="33" rx="4" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<text x="13" y="211.0" font-size="12" text-anchor="start" font-weight="600" style="fill:#334155">GPU 2</text>
+<rect x="6" y="231" width="866.0" height="33" rx="4" fill="#f8fafc" stroke="none" stroke-width="1"/>
+<text x="13" y="251.0" font-size="12" text-anchor="start" font-weight="600" style="fill:#334155">GPU 3</text>
+<path d="M78.0 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="78.0" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">0</text>
+<path d="M169.76470588235293 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="169.76470588235293" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">4</text>
+<path d="M261.52941176470586 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="261.52941176470586" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">8</text>
+<path d="M353.29411764705884 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="353.29411764705884" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">12</text>
+<path d="M445.05882352941177 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="445.05882352941177" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">16</text>
+<path d="M536.8235294117646 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="536.8235294117646" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">20</text>
+<path d="M628.5882352941177 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="628.5882352941177" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">24</text>
+<path d="M720.3529411764706 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="720.3529411764706" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">28</text>
+<path d="M812.1176470588235 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="812.1176470588235" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">32</text>
+<path d="M858.0 107 V264" stroke="#e2e8f0" stroke-width="1"/>
+<text x="858.0" y="290" font-size="11" text-anchor="middle" font-weight="400" style="fill:#64748b">34</text>
+<rect x="79.0" y="115" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="89.47058823529412" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">1</text>
+<rect x="101.94117647058823" y="115" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="112.41176470588235" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">2</text>
+<rect x="124.88235294117646" y="115" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="135.35294117647058" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">3</text>
+<rect x="147.8235294117647" y="115" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="158.2941176470588" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="170.76470588235293" y="115" width="20.941176470588236" height="22" rx="2" fill="#287c94" stroke="#236d83" stroke-width="0.7"/>
+<text x="181.23529411764704" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="193.70588235294116" y="115" width="20.941176470588236" height="22" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="0.7"/>
+<text x="204.17647058823528" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="216.64705882352942" y="115" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="227.11764705882354" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<defs><pattern id="overlap-0-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="239.58823529411765" y="115" width="10.470588235294116" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="250.05882352941177" y="115" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-0-3-1)" stroke="none" stroke-width="1"/>
+<rect x="261.52941176470586" y="115" width="33.411764705882376" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="239.58823529411765" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="244.8235294117647" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">4</text>
+<text x="278.2352941176471" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<defs><pattern id="overlap-0-2-0" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="319.88235294117646" y="115" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="330.3529411764706" y="115" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-0-2-0)" stroke="none" stroke-width="1"/>
+<rect x="341.8235294117647" y="115" width="33.411764705882376" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="319.88235294117646" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="325.11764705882354" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<text x="358.5294117647059" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">1</text>
+<defs><pattern id="overlap-0-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="377.2352941176471" y="115" width="10.470588235294088" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="387.70588235294116" y="115" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-0-4-2)" stroke="none" stroke-width="1"/>
+<rect x="399.1764705882353" y="115" width="33.411764705882376" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="377.2352941176471" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="382.47058823529414" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">5</text>
+<text x="415.8823529411765" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<defs><pattern id="overlap-0-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="434.5882352941176" y="115" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="445.05882352941177" y="115" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-0-3-1)" stroke="none" stroke-width="1"/>
+<rect x="456.5294117647059" y="115" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="434.5882352941176" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="439.8235294117647" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<text x="473.2352941176471" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">2</text>
+<defs><pattern id="overlap-0-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="491.94117647058823" y="115" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="502.4117647058824" y="115" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-0-5-3)" stroke="none" stroke-width="1"/>
+<rect x="513.8823529411765" y="115" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="491.94117647058823" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="497.1764705882353" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">6</text>
+<text x="530.5882352941176" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<defs><pattern id="overlap-0-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="549.2941176470588" y="115" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="559.7647058823529" y="115" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-0-4-2)" stroke="none" stroke-width="1"/>
+<rect x="571.2352941176471" y="115" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="549.2941176470588" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="554.5294117647059" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<text x="587.9411764705882" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">3</text>
+<rect x="606.6470588235294" y="115" width="43.88235294117647" height="22" rx="2" fill="#318362" stroke="#247249" stroke-width="0.7"/>
+<text x="628.5882352941177" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<defs><pattern id="overlap-0-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="664.0" y="115" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="674.4705882352941" y="115" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-0-5-3)" stroke="none" stroke-width="1"/>
+<rect x="685.9411764705883" y="115" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="664.0" y="115" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="669.2352941176471" y="130" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<text x="702.6470588235294" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">4</text>
+<rect x="721.3529411764706" y="115" width="43.88235294117647" height="22" rx="2" fill="#318362" stroke="#247249" stroke-width="0.7"/>
+<text x="743.2941176470589" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="767.2352941176471" y="115" width="20.941176470588236" height="22" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="0.7"/>
+<text x="777.7058823529412" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#236d83">5</text>
+<rect x="790.1764705882352" y="115" width="20.941176470588236" height="22" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="0.7"/>
+<text x="800.6470588235294" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#956a20">5</text>
+<rect x="813.1176470588235" y="115" width="20.941176470588236" height="22" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="0.7"/>
+<text x="823.5882352941177" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#236d83">6</text>
+<rect x="836.0588235294118" y="115" width="20.941176470588236" height="22" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="0.7"/>
+<text x="846.529411764706" y="131" font-size="14" text-anchor="middle" font-weight="400" style="fill:#956a20">6</text>
+<rect x="101.94117647058823" y="155" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="112.41176470588235" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">1</text>
+<rect x="124.88235294117646" y="155" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="135.35294117647058" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="147.8235294117647" y="155" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="158.2941176470588" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">2</text>
+<rect x="170.76470588235293" y="155" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="181.23529411764704" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<rect x="193.70588235294116" y="155" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="204.17647058823528" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">3</text>
+<rect x="216.64705882352942" y="155" width="43.88235294117647" height="22" rx="2" fill="#318362" stroke="#247249" stroke-width="0.7"/>
+<text x="238.58823529411765" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<defs><pattern id="overlap-1-2-0" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="262.52941176470586" y="155" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="273.0" y="155" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-1-2-0)" stroke="none" stroke-width="1"/>
+<rect x="284.47058823529414" y="155" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="262.52941176470586" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="267.7647058823529" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<text x="301.1764705882353" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">1</text>
+<defs><pattern id="overlap-1-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="319.88235294117646" y="155" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="330.3529411764706" y="155" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-1-3-1)" stroke="none" stroke-width="1"/>
+<rect x="341.8235294117647" y="155" width="33.411764705882376" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="319.88235294117646" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="325.11764705882354" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">4</text>
+<text x="358.5294117647059" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<defs><pattern id="overlap-1-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="377.2352941176471" y="155" width="10.470588235294088" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="387.70588235294116" y="155" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-1-3-1)" stroke="none" stroke-width="1"/>
+<rect x="399.1764705882353" y="155" width="33.411764705882376" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="377.2352941176471" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="382.47058823529414" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<text x="415.8823529411765" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">2</text>
+<defs><pattern id="overlap-1-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="434.5882352941176" y="155" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="445.05882352941177" y="155" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-1-4-2)" stroke="none" stroke-width="1"/>
+<rect x="456.5294117647059" y="155" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="434.5882352941176" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="439.8235294117647" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">5</text>
+<text x="473.2352941176471" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<defs><pattern id="overlap-1-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="491.94117647058823" y="155" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="502.4117647058824" y="155" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-1-4-2)" stroke="none" stroke-width="1"/>
+<rect x="513.8823529411765" y="155" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="491.94117647058823" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="497.1764705882353" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<text x="530.5882352941176" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">3</text>
+<defs><pattern id="overlap-1-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="549.2941176470588" y="155" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="559.7647058823529" y="155" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-1-5-3)" stroke="none" stroke-width="1"/>
+<rect x="571.2352941176471" y="155" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="549.2941176470588" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="554.5294117647059" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">6</text>
+<text x="587.9411764705882" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<defs><pattern id="overlap-1-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="606.6470588235294" y="155" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="617.1176470588235" y="155" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-1-5-3)" stroke="none" stroke-width="1"/>
+<rect x="628.5882352941177" y="155" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="606.6470588235294" y="155" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="611.8823529411765" y="170" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<text x="645.2941176470588" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">4</text>
+<rect x="664.0" y="155" width="43.88235294117647" height="22" rx="2" fill="#318362" stroke="#247249" stroke-width="0.7"/>
+<text x="685.9411764705883" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<rect x="709.8823529411765" y="155" width="43.88235294117647" height="22" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="0.7"/>
+<text x="731.8235294117648" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">5</text>
+<rect x="767.2352941176471" y="155" width="20.941176470588236" height="22" rx="2" fill="#287c94" stroke="#236d83" stroke-width="0.7"/>
+<text x="777.7058823529412" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="790.1764705882352" y="155" width="20.941176470588236" height="22" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="0.7"/>
+<text x="800.6470588235294" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#236d83">6</text>
+<rect x="813.1176470588235" y="155" width="20.941176470588236" height="22" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="0.7"/>
+<text x="823.5882352941177" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="836.0588235294118" y="155" width="20.941176470588236" height="22" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="0.7"/>
+<text x="846.529411764706" y="171" font-size="14" text-anchor="middle" font-weight="400" style="fill:#956a20">6</text>
+<rect x="101.94117647058823" y="195" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="112.41176470588235" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="124.88235294117646" y="195" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="135.35294117647058" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">1</text>
+<rect x="147.8235294117647" y="195" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="158.2941176470588" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<rect x="170.76470588235293" y="195" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="181.23529411764704" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">2</text>
+<rect x="193.70588235294116" y="195" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="204.17647058823528" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<rect x="216.64705882352942" y="195" width="43.88235294117647" height="22" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="0.7"/>
+<text x="238.58823529411765" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">1</text>
+<defs><pattern id="overlap-2-2-0" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="262.52941176470586" y="195" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="273.0" y="195" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-2-2-0)" stroke="none" stroke-width="1"/>
+<rect x="284.47058823529414" y="195" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="262.52941176470586" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="267.7647058823529" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">3</text>
+<text x="301.1764705882353" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<defs><pattern id="overlap-2-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="319.88235294117646" y="195" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="330.3529411764706" y="195" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-2-3-1)" stroke="none" stroke-width="1"/>
+<rect x="341.8235294117647" y="195" width="33.411764705882376" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="319.88235294117646" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="325.11764705882354" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<text x="358.5294117647059" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">2</text>
+<defs><pattern id="overlap-2-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="377.2352941176471" y="195" width="10.470588235294088" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="387.70588235294116" y="195" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-2-3-1)" stroke="none" stroke-width="1"/>
+<rect x="399.1764705882353" y="195" width="33.411764705882376" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="377.2352941176471" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="382.47058823529414" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">4</text>
+<text x="415.8823529411765" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<defs><pattern id="overlap-2-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="434.5882352941176" y="195" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="445.05882352941177" y="195" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-2-4-2)" stroke="none" stroke-width="1"/>
+<rect x="456.5294117647059" y="195" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="434.5882352941176" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="439.8235294117647" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<text x="473.2352941176471" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">3</text>
+<defs><pattern id="overlap-2-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="491.94117647058823" y="195" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="502.4117647058824" y="195" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-2-4-2)" stroke="none" stroke-width="1"/>
+<rect x="513.8823529411765" y="195" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="491.94117647058823" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="497.1764705882353" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">5</text>
+<text x="530.5882352941176" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<defs><pattern id="overlap-2-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="549.2941176470588" y="195" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="559.7647058823529" y="195" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-2-5-3)" stroke="none" stroke-width="1"/>
+<rect x="571.2352941176471" y="195" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="549.2941176470588" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="554.5294117647059" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<text x="587.9411764705882" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">4</text>
+<defs><pattern id="overlap-2-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="606.6470588235294" y="195" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="617.1176470588235" y="195" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-2-5-3)" stroke="none" stroke-width="1"/>
+<rect x="628.5882352941177" y="195" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="606.6470588235294" y="195" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="611.8823529411765" y="210" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">6</text>
+<text x="645.2941176470588" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<rect x="664.0" y="195" width="43.88235294117647" height="22" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="0.7"/>
+<text x="685.9411764705883" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">5</text>
+<rect x="709.8823529411765" y="195" width="43.88235294117647" height="22" rx="2" fill="#318362" stroke="#247249" stroke-width="0.7"/>
+<text x="731.8235294117648" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<rect x="767.2352941176471" y="195" width="20.941176470588236" height="22" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="0.7"/>
+<text x="777.7058823529412" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#236d83">6</text>
+<rect x="790.1764705882352" y="195" width="20.941176470588236" height="22" rx="2" fill="#287c94" stroke="#236d83" stroke-width="0.7"/>
+<text x="800.6470588235294" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="813.1176470588235" y="195" width="20.941176470588236" height="22" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="0.7"/>
+<text x="823.5882352941177" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#956a20">6</text>
+<rect x="836.0588235294118" y="195" width="20.941176470588236" height="22" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="0.7"/>
+<text x="846.529411764706" y="211" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="79.0" y="235" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="89.47058823529412" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<rect x="101.94117647058823" y="235" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="112.41176470588235" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<rect x="124.88235294117646" y="235" width="20.941176470588236" height="22" rx="2" fill="#526abd" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="135.35294117647058" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<rect x="147.8235294117647" y="235" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="158.2941176470588" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">1</text>
+<rect x="170.76470588235293" y="235" width="20.941176470588236" height="22" rx="2" fill="#c9e9f3" stroke="#236d83" stroke-width="0.7"/>
+<text x="181.23529411764704" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#236d83">1</text>
+<rect x="193.70588235294116" y="235" width="20.941176470588236" height="22" rx="2" fill="#ffebc4" stroke="#956a20" stroke-width="0.7"/>
+<text x="204.17647058823528" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#956a20">1</text>
+<rect x="216.64705882352942" y="235" width="20.941176470588236" height="22" rx="2" fill="#dfe7ff" stroke="#3f56a4" stroke-width="0.7"/>
+<text x="227.11764705882354" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#3f56a4">2</text>
+<defs><pattern id="overlap-3-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="239.58823529411765" y="235" width="10.470588235294116" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="250.05882352941177" y="235" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-3-3-1)" stroke="none" stroke-width="1"/>
+<rect x="261.52941176470586" y="235" width="33.411764705882376" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="239.58823529411765" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="244.8235294117647" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<text x="278.2352941176471" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">2</text>
+<defs><pattern id="overlap-3-2-0" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="319.88235294117646" y="235" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="330.3529411764706" y="235" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-3-2-0)" stroke="none" stroke-width="1"/>
+<rect x="341.8235294117647" y="235" width="33.411764705882376" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="319.88235294117646" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="325.11764705882354" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">3</text>
+<text x="358.5294117647059" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">1</text>
+<defs><pattern id="overlap-3-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="377.2352941176471" y="235" width="10.470588235294088" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="387.70588235294116" y="235" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-3-4-2)" stroke="none" stroke-width="1"/>
+<rect x="399.1764705882353" y="235" width="33.411764705882376" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="377.2352941176471" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="382.47058823529414" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<text x="415.8823529411765" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">3</text>
+<defs><pattern id="overlap-3-3-1" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="434.5882352941176" y="235" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="445.05882352941177" y="235" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-3-3-1)" stroke="none" stroke-width="1"/>
+<rect x="456.5294117647059" y="235" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="434.5882352941176" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="439.8235294117647" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">4</text>
+<text x="473.2352941176471" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">2</text>
+<defs><pattern id="overlap-3-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#526abd"/><rect width="3" height="6" fill="#d9eee3"/></pattern></defs>
+<rect x="491.94117647058823" y="235" width="10.470588235294144" height="22" rx="0" fill="#526abd" stroke="none" stroke-width="1"/>
+<rect x="502.4117647058824" y="235" width="11.470588235294088" height="22" rx="0" fill="url(#overlap-3-5-3)" stroke="none" stroke-width="1"/>
+<rect x="513.8823529411765" y="235" width="33.41176470588232" height="22" rx="0" fill="#d9eee3" stroke="none" stroke-width="1"/>
+<rect x="491.94117647058823" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="497.1764705882353" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<text x="530.5882352941176" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">4</text>
+<defs><pattern id="overlap-3-4-2" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="549.2941176470588" y="235" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="559.7647058823529" y="235" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-3-4-2)" stroke="none" stroke-width="1"/>
+<rect x="571.2352941176471" y="235" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="549.2941176470588" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="554.5294117647059" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">5</text>
+<text x="587.9411764705882" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">3</text>
+<rect x="606.6470588235294" y="235" width="43.88235294117647" height="22" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="0.7"/>
+<text x="628.5882352941177" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">5</text>
+<defs><pattern id="overlap-3-5-3" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#dfe7ff"/><rect width="3" height="6" fill="#318362"/></pattern></defs>
+<rect x="664.0" y="235" width="10.470588235294144" height="22" rx="0" fill="#dfe7ff" stroke="none" stroke-width="1"/>
+<rect x="674.4705882352941" y="235" width="11.470588235294144" height="22" rx="0" fill="url(#overlap-3-5-3)" stroke="none" stroke-width="1"/>
+<rect x="685.9411764705883" y="235" width="33.41176470588232" height="22" rx="0" fill="#318362" stroke="none" stroke-width="1"/>
+<rect x="664.0" y="235" width="55.35294117647059" height="22" rx="2" fill="none" stroke="#1e293b" stroke-width="1.3"/>
+<text x="669.2352941176471" y="250" font-size="11" text-anchor="middle" font-weight="400" style="fill:#3f56a4">6</text>
+<text x="702.6470588235294" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">4</text>
+<rect x="721.3529411764706" y="235" width="43.88235294117647" height="22" rx="2" fill="#d9eee3" stroke="#247249" stroke-width="0.7"/>
+<text x="743.2941176470589" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#247249">6</text>
+<rect x="767.2352941176471" y="235" width="20.941176470588236" height="22" rx="2" fill="#287c94" stroke="#236d83" stroke-width="0.7"/>
+<text x="777.7058823529412" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<rect x="790.1764705882352" y="235" width="20.941176470588236" height="22" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="0.7"/>
+<text x="800.6470588235294" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">5</text>
+<rect x="813.1176470588235" y="235" width="20.941176470588236" height="22" rx="2" fill="#287c94" stroke="#236d83" stroke-width="0.7"/>
+<text x="823.5882352941177" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<rect x="836.0588235294118" y="235" width="20.941176470588236" height="22" rx="2" fill="#9b691f" stroke="#956a20" stroke-width="0.7"/>
+<text x="846.529411764706" y="251" font-size="14" text-anchor="middle" font-weight="400" style="fill:#ffffff">6</text>
+<text x="14" y="317" font-size="12" text-anchor="start" font-weight="400" style="fill:#64748b">F = 1，B = 2，X = W = 1；配对重叠 0.5，共占 2.5（示意）。</text>
+</svg>

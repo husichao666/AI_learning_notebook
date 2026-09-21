@@ -13,6 +13,7 @@ use_directory_urls = true
 extra_css = ["stylesheets/extra.css"]
 extra_javascript = [
   "javascripts/mathjax.js",
+  "javascripts/repo-actions.js",
   "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js",
 ]
 
@@ -46,6 +47,7 @@ nav = [
       { "第 1 章 · 训练状态与集合通信" = "training/parallelism/00-foundations.md" },
       { "第 2 章 · Data Parallel" = "training/parallelism/01-dp.md" },
       { "第 3 章 · 模型状态分片" = [
+        { "3.0 · FSDP 要点与面试题" = "training/parallelism/02-fsdp-overview.md" },
         { "3.1 · ZeRO 与 FSDP" = "training/parallelism/02-fsdp.md" },
         { "3.2 · 通信开销基础" = "training/parallelism/02-communication-cost.md" },
         { "3.3 · Megatron 实现方案" = "training/parallelism/02-megatron-fsdp.md" },
@@ -57,7 +59,10 @@ nav = [
         { "4.2 · Sequence Parallel" = "training/parallelism/03-sp.md" },
         { "4.3 · Loss Parallel" = "training/parallelism/loss-parallel.md" },
       ] },
-      { "第 5 章 · Pipeline Parallel" = "training/parallelism/04-pp.md" },
+      { "第 5 章 · Pipeline Parallel" = [
+        { "5.1 · 原理与调度" = "training/parallelism/04-pp.md" },
+        { "5.2 · Megatron 性能优化" = "training/parallelism/04-pp-megatron.md" },
+      ] },
       { "第 6 章 · Context Parallel" = "training/parallelism/05-cp.md" },
       { "第 7 章 · Expert Parallel" = [
         { "7.1 · 原理" = "training/parallelism/06-ep.md" },
@@ -117,9 +122,14 @@ features = [
   "navigation.footer",
   "navigation.path",
   "toc.follow",
+  "content.action.edit",
+  "content.action.view",
   "content.code.copy",
   "search.highlight",
 ]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
 
 [[project.theme.palette]]
 media = "(prefers-color-scheme: dark)"

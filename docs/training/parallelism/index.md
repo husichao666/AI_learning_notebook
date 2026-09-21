@@ -4,7 +4,7 @@ description: 从训练状态与集合通信出发，系统学习 DP、ZeRO、FSD
 type: series-hub
 status: stable
 level: beginner-to-advanced
-updated: 2026-09-02
+updated: 2026-09-17
 tags:
   - distributed-training
   - parallelism
@@ -25,6 +25,7 @@ tags:
 2. [第 2 章 · Data Parallel](01-dp.md)
    从模型副本和数据切分出发，理解梯度同步与计算通信重叠。
 3. **第 3 章 · 模型状态分片**
+    - [3.0 · FSDP 要点与面试题](02-fsdp-overview.md)
     - [3.1 · ZeRO 与 FSDP](02-fsdp.md)
     - [3.2 · 通信开销基础](02-communication-cost.md)
     - [3.3 · Megatron 实现方案](02-megatron-fsdp.md)
@@ -34,8 +35,9 @@ tags:
     - [4.1 · Tensor Parallel](03-tp.md)
     - [4.2 · Sequence Parallel](03-sp.md)
     - [4.3 · Loss Parallel](loss-parallel.md)
-5. [第 5 章 · Pipeline Parallel](04-pp.md)
-   沿模型深度切分计算，理解气泡、micro-batch 与 1F1B 调度。
+5. **第 5 章 · Pipeline Parallel**
+    - [5.1 · 原理与调度](04-pp.md)
+    - [5.2 · Megatron 性能优化](04-pp-megatron.md)
 6. [第 6 章 · Context Parallel](05-cp.md)
    沿序列维切分注意力，比较 Ring Attention、Ulysses 与 all-gather 路线。
 7. **第 7 章 · Expert Parallel**

@@ -4,7 +4,7 @@ description: "从负载偏斜、All-to-All 拓扑、小 GEMM 与动态路由四�
 type: engineering-note
 status: stable
 level: advanced
-updated: 2026-09-02
+updated: 2026-09-17
 tags: [distributed-training, expert-parallel, performance]
 ---
 
@@ -118,7 +118,7 @@ expert_bias += sign(offset) * bias_update_rate
 
 
 
-### 解法 C：capacity 是最后的硬边界，不是负载均衡算法
+### 解法 C：用专家容量限制执行负载
 
 Capacity factor 给每个专家设上限。超限 assignment 可以按概率或位置丢弃；配合 `--moe-pad-expert-input-to-capacity` 还能把专家输入补到固定形状。它能限制最坏延迟和显存，但容量太小会丢 token，容量太大又会空算。
 
@@ -127,6 +127,28 @@ Capacity factor 给每个专家设上限。超限 assignment 可以按概率或�
 --moe-token-drop-policy probs
 --moe-pad-expert-input-to-capacity
 ```
+
+容量的计算必须先确定路由范围。以标准 Megatron A2A dispatcher、expert TP=1 为例，令 $T_{\mathrm{local}}$ 为一个来源 rank 本次路由的 token 数，$E$ 为全局专家数，$k$ 为每 token 选择的专家数，$c$ 为 capacity factor（容量系数）。该来源 rank 为每个专家预留的槽位数为：
+
+$$
+C_{\mathrm{local}}=\left\lceil\frac{T_{\mathrm{local}}k}{E}c\right\rceil.
+$$
+
+这里限制的是**一个来源 rank 发往一个专家的 assignment 数**。若各来源 rank 使用相同容量，专家在接收端汇集整个 EP 组的输入后，定长槽位数为 $\mathrm{EP}\times C_{\mathrm{local}}$；不能把来源端容量直接当作接收端总容量。局部截断也可能在其他来源仍有空余槽位时丢弃当前来源的分支。
+
+例如，一个来源 rank 有 1024 个 token，top-2，8 个专家，$c=1.25$，则每专家平均分配 256 条 assignment，容量为 320。假设它对各专家的原始分配为 `[390,300,280,260,240,220,190,168]`：
+
+| 项目 | 结果 |
+| --- | --- |
+| 原始 assignment 数 | $1024\times2=2048$ |
+| 丢弃的分支 | 最忙专家超出容量的 70 条 |
+| 保留的有效分支 | $2048-70=1978$ |
+| 固定槽位数 | $8\times320=2560$ |
+| Padding 槽位 | $2560-1978=582$ |
+| Assignment 丢弃率 | $70/2048\approx3.4\%$ |
+| Padding 占比 | $582/2560\approx22.7\%$ |
+
+两种比例的分母不同：丢弃率相对原始 assignment 数，padding 占比相对实际分配的槽位数。丢弃一条 assignment 也不等于丢掉一个 token 的全部分支。固定槽位有利于 buffer 规划和图捕获，但仍需执行路由、重排与通信；padding 占比也不能直接等同于运行时间增加比例。实现中的容量范围可对照 [Megatron Dispatcher](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/moe/token_dispatcher.py)。
 
 
 !!! tip "推荐观测值"
@@ -140,7 +162,7 @@ Capacity factor 给每个专家设上限。超限 assignment 可以按概率或�
 
 ### 问题与成因
 
-每个本地 token 都要被发送给 top-k 个专家，专家输出还要沿原路径发回。设每 rank 有 $T$ 个 token、top-k=$k$、隐藏维 $H$、通信 dtype 每元素 $b$ 字节；在近似均匀路由下，dispatch + combine 的跨 rank payload 为：
+每个本地 token 都要被发送给 top-k 个专家，专家输出还要沿原路径发回。设每 rank 有 $T$ 个 token、top-k=$k$、隐藏维 $H$、通信 dtype 每元素 $b$ 字节；按专家分支分别传输、未做通信去重时，在近似均匀路由下，dispatch + combine 的跨 rank payload 为：
 
 **$V_{A2A,rank}\approx2\,T\,k\,H\,b\left(1-\dfrac{1}{EP}\right)$**
 
@@ -165,9 +187,9 @@ local_output = all_to_all(
 ```
 
 
-### 解法 A：从标准 A2A 到 DeepEP / HybridEP
+### 解法 A：通信去重与融合
 
-三条路线做的是同一件事：把 token 送到专家所在 rank，再把专家输出送回原 rank。差别不在数学，而在**是否理解分层拓扑、跨域 token 是否去重、重排与通信融合到什么边界**。
+下面比较标准 A2A、DeepEP 和 HybridEP，并用 MindFormers 的两种去冗余实现对照。它们都把 token 送到专家所在 rank，再把专家输出送回原 rank；区别在于**哪些重复数据可以合并传输，以及重排与通信融合到什么边界**。
 
 
 #### 1. 标准 NCCL All-to-All：先排好，再交换
@@ -184,42 +206,77 @@ Megatron 的标准路径先把 token 按目标 EP rank 排列，计算每个 pee
 ```
 
 
-#### 2. DeepEP：按节点分层转发，融合通信侧的重排
+#### 2. DeepEP 与 MindFormers：按节点或按 rank 去重
 
-DeepEP 不把 EP group 当成一张均匀的全连接网，而是区分**机内 NVLink/NVSwitch 域**与**机间 RDMA 域**。它接收稀疏的 `[token, top-k expert]` 索引，先计算通信 layout，再用自定义 dispatch kernel 完成打包和分层转发：
+这里以 DeepEP V1 的高吞吐路径为例：它区分**机内 NVLink/NVSwitch**与**机间 RDMA**。RDMA（远程直接内存访问）用于跨机器搬运数据；这里优先减少跨节点重复传输，再在目标节点内分发。
 
-1. **机内聚合**：按目标节点把 token 汇聚到能走 RDMA 的发送路径。
-2. **机间传输**：同一 token 若在同一远端节点命中多个 expert，可跨 RDMA 只发送该节点需要的一份，再在目标节点复制；避免按目标 rank 重复穿越慢链路。
-3. **机内散发**：到达目标节点后，再经 NVLink/NVSwitch 送到具体 expert rank。
+固定两个节点：A 为 rank0–3，B 为 rank4–7，**每卡两个专家**。rank0 的一个 token `x` 采用 top-8，选中图中绿色的 E2、E3、E4、E10、E11、E12、E13、E14。**rank4 的专家均未命中，它在分层方案中只负责中转。** 所有面板保持设备位置和路由结果一致，只改变传输方式。
 
 
-![DeepEP 节点级聚合减少跨节点重复 token](assets/06-ep-performance-figure-02.svg)
+![两节点各四卡的 EP 分发对照：普通 EP、DeepEP、MindFormers 按 rank 去重与节点间 AllGather](assets/06-ep-performance-figure-02.svg?v=a9c9cbd7)
 
 
-**为什么要这样做？** 因为 EP 的通信域是非对称的：机内 NVLink/NVSwitch 带宽通常显著高于跨节点 RDMA，而 top-k 又可能让同一 token 在一个远端节点命中多个专家。若按目标 rank 独立发送，昂贵的 H 维激活会重复穿越最慢链路；先按节点去重、跨节点搬一次、到达后再机内复制，才能让 RDMA 字节量更接近“访问了多少个节点”，而不是“命中了多少个远端专家”。
+*橙色为跨节点传输，蓝色为节点内传输；箭头上的 ×2 表示携带两份相同的 token 激活，可装在同一条消息里。只画 `x` 的 dispatch，省略卡内展开、元数据、padding 和 combine；一份表示一个 token 激活完成一次卡间传输，中转后再次发送另计一份；不统计同一卡内复制或交换机内部跳数。*
 
-这与 group-limited routing 很契合：把 expert group 对齐到节点，router 先限制每个 token 访问的节点数，DeepEP 再高效完成节点内外转发。它的通信 kernel 可以控制占用的 SM 数，在吞吐与“给 expert GEMM 留多少 SM”之间调节。
+- **DeepEP：同时按目标节点和目标 rank 去重。** 发往 rank5、6、7 的五份 `x`，跨节点合为一份送到 rank4，再各转发一份到三张目标卡。加上节点 A 内的两份，共传输 **1 + 5 = 6 份**。
+- **MindFormers 按 rank 去重（`alltoall_zero_redundancy`）：直接发送到目标卡。** 发往 rank5、6 的两份各合为一份，rank7 一份；节点 A 内发往 rank1、2 各一份，共 **3 + 2 = 5 份**。
+- **MindFormers 节点间 AllGather（`alltoall_deredundency`）：先收集原始 token，再按专家展开。** rank0 向 rank4 传一份，rank4 再向 rank5、6、7 分别发两份、两份、一份；节点 A 内仍发三份，共 **1 + 8 = 9 份**。AllGather 在跨节点相同卡序号组成的组内执行，如 `[rank0, rank4]`；若增加未命中专家的节点，其对应卡也会收到 `x`。
 
-在本章对应的 Megatron `deepep` backend 中，`fused_dispatch` 已融合第一次 token 重排与跨 rank 通信，并返回一个 `handle` 保存逆向 combine 所需的路由信息；但接收后仍要把 token 从通信布局再排成本地 expert 连续布局：
+**DeepEP 在本例中少传两份跨节点数据，却多传三份机内数据，总量增加一份。** 原因是 rank4 不消费 `x`，只负责中转；若 rank4 自己也命中专家，这次接收同时满足本卡计算，总量才可能与按 rank 去重相同。因此应分别比较跨节点与机内流量，不能把跨节点去重等同于总通信量最少。
+
+两种分层方案都由目标节点相同卡序号的卡接收，但 MindFormers AllGather 全量收集原始 token，DeepEP 只发送目标节点需要的 token。DeepEP 的节点与 rank 两级计数可见 [dispatch layout 源码](https://github.com/deepseek-ai/DeepEP/blob/main/csrc/kernels/legacy/layout.cu)。
+
+MindFormers 对照基于提交 `95eb1f1dc` 的训练图实现，见 [token_dispatcher.py](https://gitcode.com/mindspore/mindformers/blob/95eb1f1dc63f06ff4539bcba01c63a2b3fb7c5d6/mindformers/parallel_core/training_graph/transformer/moe/token_dispatcher.py)。它在框架层组合通信与重排算子；DeepEP 将分层搬运封装在专用通信 kernel 中。
+
+**四种通信路径的特点与取舍**如下，比较时保持路由结果和通信精度相同。
+
+| 方案 | 核心特点 | 优势 | 局限 |
+| --- | --- | --- | --- |
+| 普通 EP | 按专家分支复制，发往目标 rank | 流程直接，使用通用通信算子；路由分散时去重空间本来就小 | 同卡、同节点多个专家需要的相同激活仍可能重复传输 |
+| MindFormers 按 rank 去重 | 每个目标 rank 一份，接收后按专家展开 | 消除同卡专家的重复通信；直接到目标卡，无显式节点中转 | 同节点不同卡仍分别跨机；每卡专家少、路由分散时收益有限 |
+| MindFormers 节点间 AllGather | 每个节点都收集一份，再在机内按专家分发 | 节点少、top-k 大、路由覆盖多数节点时，可减少跨机重复传输 | 未命中的节点也接收；机内仍按专家复制；中间收集 buffer 随节点数增大 |
+| DeepEP 两级去重 | 每个命中节点一份，节点内每个目标 rank 一份 | 同时消除两级重复发送；专用 kernel 支持流水转发，适合跨机带宽紧张、机内带宽充足的场景 | 中转可能增加总字节数；缓冲区与同步管理更复杂，收益依赖拓扑和负载 |
+
+**总字节数少不等于耗时短。** 按 rank 去重可能传输更少的总字节；DeepEP 即使总量更多，也可能因减少慢链路传输而更快。实际比较应分别观察跨机与机内带宽、最忙 rank 的负载，以及重排、同步和通信重叠的开销。
+
+DeepEP 的节点级去重与 group-limited routing 很契合：把 expert group 对齐到节点，router 先限制每个 token 访问的节点数，DeepEP 再高效完成节点内外转发。它的通信 kernel 可以控制占用的 SM 数，在吞吐与“给 expert GEMM 留多少 SM”之间调节。
+
+在本章对应的 Megatron `deepep` backend 中，`fused_dispatch` 是由 `FusedDispatch(torch.autograd.Function)` 实现的封装接口，**一次接口调用内部包含多个 CUDA kernel 和 CPU 调度步骤**。它将通信侧 token 打包与跨 rank 搬运融合，并返回 `handle` 保存逆向 combine 所需的路由信息；接收后仍需按本地 expert 重排：
 
 
 **Megatron-LM · token_dispatcher.py · _DeepepManager**
 
 
 ```python
-# 稠密 routing_map -> 稀疏 top-k indices / probs
+# 普通框架算子：提取稀疏 top-k indices / probs
 token_probs, token_indices = torch.topk(probs, router_topk, dim=-1)
 
-# 融合通信侧 permute + 分层 dispatch，handle 留给 combine
+# 调用封装接口：内部还包含布局计算、计数交换与 CPU 等待
 hidden, recv_indices, recv_probs, counts, handle = fused_dispatch(...)
 
-# Megatron 仍需按 local expert 做第二次 permute
+# 独立重排算子；moe_permute_fusion 决定是否使用融合重排实现
 hidden, permuted_probs, reversed_mapping, ... = permute(
-    hidden, dispatched_routing_map, probs=dispatched_probs, ...)
+    hidden, dispatched_routing_map, probs=dispatched_probs,
+    fused=config.moe_permute_fusion, ...)
 
-# combine 使用同一 handle 走逆向路径
+# combine 封装接口：底层融合节点内归约与通信，复用同一 handle
 hidden, _ = fused_combine(hidden, group, handle, ...)
 ```
+
+展开 `FusedDispatch.forward()`，V1 高吞吐路径首次处理本次路由时，跨机调用顺序如下：
+
+```text
+fused_dispatch(...)                         [封装接口，不是单个 kernel]
+├─ buffer.get_dispatch_layout(...)          [专用统计 kernel]
+└─ buffer.dispatch(...)
+   ├─ notify_dispatch kernel               [专用计数交换 kernel]
+   ├─ 等待接收计数，分配 recv_x              [CPU 逻辑，可能造成断流]
+   └─ dispatch kernel                      [融合通信 kernel]
+```
+
+**这里明确称为融合通信 kernel 的是底层 `dispatch` 和 `combine`**：前者融合 token 打包、RDMA 发送与 NVLink 转发，后者融合节点内结果归约与返回通信。`get_dispatch_layout` 和 `notify_dispatch` 分别负责统计与计数交换，属于独立的专用 kernel，不属于上述激活搬运融合。接收后的 `permute` 即使开启 `moe_permute_fusion`，也只是**单独的融合重排算子**，没有并入 DeepEP 通信。
+
+这些融合没有消除动态接收长度依赖。GPU 直接写入 CPU 可见的锁页内存，省去了单独的显式 D2H 拷贝调用，但 CPU 仍需等计数后才能分配输出并启动激活 dispatch；`async_finish=True` 也不跳过这段等待，见 [DeepEP 接收计数与输出分配](https://github.com/deepseek-ai/DeepEP/blob/main/csrc/legacy/buffer.hpp#L998-L1055)。
 
 
 #### 3. HybridEP：把两侧重排也并入层次化通信
@@ -233,10 +290,10 @@ HybridEP 面向大 NVLink 域和多节点拓扑，把节点内扩展（scale-up�
 **combine\_with\_unpermute = 逆 expert 重排 + 分层 A2A + 恢复原 token 顺序**
 
 
-![HybridEP 扩大融合边界并减少 HBM 中间落地](assets/06-ep-performance-figure-03.svg)
+![HybridEP 扩大融合边界并减少 HBM 中间落地](assets/06-ep-performance-figure-03.svg?v=8eb13b8e)
 
 
-DeepEP 缓解跨节点网络瓶颈后，独立的 local-expert permute/unpermute 可能成为新的暴露开销：每次都要把整块 token 激活写回 HBM、重新读取并启动索引 kernel，这些 CUDA kernel 还会占用本可留给专家 GEMM 的 SM。HybridEP 扩大融合边界，让 token 在通信过程中直接落到 expert-contiguous 位置，优化对象从网络传输扩展到 HBM 搬运、SM 占用和 kernel launch。
+DeepEP 缓解跨节点网络瓶颈后，独立的 local-expert permute/unpermute 仍会增加显存读写和 kernel 启动开销。同一批 token 先完成重排，再进入专家 GEMM，这段重排耗时会推迟专家计算开始。HybridEP 将重排融入通信，让 token 直接写入按本地专家连续排列的位置，减少中间数据搬运及独立 kernel 的启动，缩短专家计算前后的处理时间。
 
 因此 HybridEP 输出已经是 Grouped GEMM 可直接消费的 expert-contiguous layout；Megatron 的 `get_permuted_hidden_states_by_experts()` 和恢复函数在这条路径上直接返回输入，不再单独发起第二套 permute/unpermute kernel。
 

@@ -3,7 +3,7 @@ title: 性能工程
 description: Profiling、性能数据采集、瓶颈分析与优化验证
 type: hub
 status: growing
-updated: 2026-09-08
+updated: 2026-09-20
 ---
 
 # 性能工程

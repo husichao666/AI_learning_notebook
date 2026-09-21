@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 414" role="img" aria-labelledby="title desc">
+<title id="title">GPU1 的 VPP 稳态收发流程</title>
+<desc id="desc">B1 结束后向 GPU0 发送 DX1 并从 GPU2 预接收 B2 梯度，在 F6 期间推进传输。F6 结束后向 GPU2 发激活6、从 GPU0 收激活7，确认梯度2就绪才计算 B2。B2 结束后向 GPU0 发 DX2、从 GPU2 收梯度3，确认激活7就绪后计算 F7。</desc>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#64748b"/></marker></defs>
+<rect width="780" height="414" fill="#fff"/>
+<g font-family="system-ui, sans-serif" fill="#334155">
+<text x="20" y="27" font-size="17" fill="#334155" text-anchor="start" font-weight="600">GPU1 · VPP / 交错 1F1B 的稳态</text>
+<text x="20" y="49" font-size="13" fill="#64748b" text-anchor="start">B1 已结束；从 F6 开始观察。前向在 chunk 0，反向在 chunk 1。</text>
+<path d="M140 72 H740" fill="none" stroke="#94a3b8" marker-end="url(#arrow)"/>
+<text x="749" y="76" font-size="12" fill="#334155" text-anchor="start">时间</text>
+<path d="M240 96 V357" stroke="#94a3b8" stroke-dasharray="3 4"/>
+<text x="245" y="93" font-size="11" fill="#64748b" text-anchor="start">检查梯度2</text>
+<path d="M440 96 V357" stroke="#94a3b8" stroke-dasharray="3 4"/>
+<text x="445" y="93" font-size="11" fill="#64748b" text-anchor="start">检查激活7</text>
+<path d="M540 96 V357" stroke="#94a3b8" stroke-dasharray="3 4"/>
+<text x="545" y="93" font-size="11" fill="#64748b" text-anchor="start">检查梯度3</text>
+<text x="20" y="123" font-size="14" fill="#334155" text-anchor="start" font-weight="600">GPU1 计算</text>
+<rect x="140" y="104" width="100" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="190.0" y="119" font-size="14" fill="#334155" text-anchor="middle">F6</text>
+<text x="190.0" y="133" font-size="11" fill="#334155" text-anchor="middle">chunk 0</text>
+<rect x="240" y="104" width="200" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="340.0" y="119" font-size="14" fill="#334155" text-anchor="middle">B2</text>
+<text x="340.0" y="133" font-size="11" fill="#334155" text-anchor="middle">chunk 1</text>
+<rect x="440" y="104" width="100" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="490.0" y="119" font-size="14" fill="#334155" text-anchor="middle">F7</text>
+<text x="490.0" y="133" font-size="11" fill="#334155" text-anchor="middle">chunk 0</text>
+<rect x="540" y="104" width="200" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="640.0" y="119" font-size="14" fill="#334155" text-anchor="middle">B3</text>
+<text x="640.0" y="133" font-size="11" fill="#334155" text-anchor="middle">chunk 1</text>
+<text x="20" y="178" font-size="13" fill="#334155" text-anchor="start">发送激活</text>
+<text x="20" y="195" font-size="12" fill="#64748b" text-anchor="start">GPU1 → GPU2</text>
+<path d="M140 182 H740" stroke="#e2e8f0"/>
+<rect x="240" y="165" width="90" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="285.0" y="187" font-size="14" fill="#334155" text-anchor="middle">激活6</text>
+<rect x="540" y="165" width="90" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="585.0" y="187" font-size="14" fill="#334155" text-anchor="middle">激活7</text>
+<text x="20" y="227" font-size="13" fill="#334155" text-anchor="start">接收激活</text>
+<text x="20" y="244" font-size="12" fill="#64748b" text-anchor="start">GPU0 → GPU1</text>
+<path d="M140 231 H740" stroke="#e2e8f0"/>
+<rect x="240" y="214" width="140" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="310.0" y="236" font-size="14" fill="#334155" text-anchor="middle">激活7</text>
+<rect x="540" y="214" width="140" height="34" rx="4" fill="#dfe7ff" stroke="#9aaad7"/>
+<text x="610.0" y="236" font-size="14" fill="#334155" text-anchor="middle">激活8</text>
+<text x="20" y="276" font-size="13" fill="#334155" text-anchor="start">发送梯度</text>
+<text x="20" y="293" font-size="12" fill="#64748b" text-anchor="start">GPU1 → GPU0</text>
+<path d="M140 280 H740" stroke="#e2e8f0"/>
+<rect x="140" y="263" width="80" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="180.0" y="285" font-size="14" fill="#334155" text-anchor="middle">DX1</text>
+<rect x="440" y="263" width="80" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="480.0" y="285" font-size="14" fill="#334155" text-anchor="middle">DX2</text>
+<text x="20" y="325" font-size="13" fill="#334155" text-anchor="start">接收梯度</text>
+<text x="20" y="342" font-size="12" fill="#64748b" text-anchor="start">GPU2 → GPU1</text>
+<path d="M140 329 H740" stroke="#e2e8f0"/>
+<rect x="140" y="312" width="80" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="180.0" y="334" font-size="14" fill="#334155" text-anchor="middle">梯度2</text>
+<rect x="440" y="312" width="80" height="34" rx="4" fill="#d9eee3" stroke="#8db7a2"/>
+<text x="480.0" y="334" font-size="14" fill="#334155" text-anchor="middle">梯度3</text>
+<path d="M220 329 H240" stroke="#64748b" stroke-width="1.3" marker-end="url(#arrow)"/>
+<path d="M380 231 H440" stroke="#64748b" stroke-width="1.3" marker-end="url(#arrow)"/>
+<path d="M520 329 H540" stroke="#64748b" stroke-width="1.3" marker-end="url(#arrow)"/>
+<text x="20" y="379" font-size="13" fill="#64748b" text-anchor="start">虚线处：接收完成才进入对应计算；未完成则等待。图示为通信被计算覆盖的情况。</text>
+<text x="20" y="400" font-size="12" fill="#64748b" text-anchor="start">发送与接收分别画出；每一行都是 GPU1 的活动，块宽不是实测耗时。</text>
+</g></svg>

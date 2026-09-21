@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 191" role="img" aria-label="不同 micro-batch 的计算与 A2A 通信交替重叠的局部片段">
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#64748b"/></marker></defs>
+<g font-family="system-ui, sans-serif" fill="#334155" font-size="13">
+<text x="31" y="26" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">局部时间 →</text>
+<text x="65" y="78" font-size="13" fill="#334155" font-weight="600" text-anchor="middle">计算</text>
+<text x="65" y="133" font-size="13" fill="#334155" font-weight="600" text-anchor="middle">通信</text>
+<rect x="117" y="47" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
+<text x="195" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的计算片段</text>
+<rect x="117" y="103" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
+<text x="195" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的 A2A</text>
+<rect x="288" y="47" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
+<text x="366" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的计算片段</text>
+<rect x="288" y="103" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
+<text x="366" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的 A2A</text>
+<rect x="459" y="47" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
+<text x="537" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的计算片段</text>
+<rect x="459" y="103" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
+<text x="537" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的 A2A</text>
+<text x="330" y="177" font-size="12" fill="#64748b" font-weight="400" text-anchor="middle">i ≠ j · 每项工作先满足自身依赖，再与另一任务重叠</text>
+</g></svg>

@@ -1,58 +1,400 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 410" role="img" aria-label="DeepEP 节点级聚合减少跨节点重复 token">
-<style>
-  /* The book treats diagrams as daylight-mode figures in every site theme. */
-  [fill="#fff"],[fill="#ffffff"],[fill="#eaeefb"],[fill="#d7dbe4"],[fill="#eaf0ff"],[fill="#e6ebff"]{fill:#172033}
-  [fill="#9aa3b2"],[fill="#94a3b8"],[fill="#7c8499"]{fill:#5f6b7a}
-  [fill="#cdd5ff"],[fill="#aab6ff"],[fill="#c7cff5"],[fill="#dbe4ff"],[fill="#8b95c9"]{fill:#334a8a}
-  [fill="#bbf7d0"],[fill="#86efac"],[fill="#daffe9"],[fill="#eafff2"],[fill="#eafff2"],[fill="#d8ffe6"]{fill:#166534}
-  [fill="#fde68a"],[fill="#fbbf24"],[fill="#fcd34d"],[fill="#ffd9a8"],[fill="#ffcfaa"],[fill="#ffcf8a"]{fill:#92400e}
-  [fill="#fca5a5"],[fill="#ffb0b0"]{fill:#991b1b}
-  [fill="#c4b5fd"],[fill="#d8b4fe"]{fill:#6b21a8}
-  [fill="#ffb380"],[fill="#ffd0ad"],[fill="#ffddc2"],[fill="#ff9c63"]{fill:#9a3412}
-  rect[fill="#161922"],rect[fill="#1c2030"],rect[fill="#12151d"],rect[fill="#101320"],rect[fill="#141824"],rect[fill="#11151f"],rect[fill="#13161f"],rect[fill="#242938"],rect[fill="#20243a"],circle[fill="#161922"]{fill:#f8fafc}
-  rect[fill="#293b91"],rect[fill="#3a56d4"],rect[fill="#17213b"],rect[fill="#26336b"],rect[fill="#18203a"],rect[fill="#1b2246"],rect[fill="#202a4c"],rect[fill="#1a2340"],rect[fill="#24377e"],rect[fill="#1b3650"]{fill:#e8edff}
-  rect[fill="#12351f"],rect[fill="#1f7a4d"],rect[fill="#14251d"],rect[fill="#10251a"],rect[fill="#173d31"],rect[fill="#1e6443"],rect[fill="#20352f"]{fill:#dcfce7}
-  rect[fill="#b9703f"],rect[fill="#251e18"],rect[fill="#402d21"],rect[fill="#8a5a2e"]{fill:#ffedd5}
-  rect[fill="#6f57bd"],rect[fill="#211c28"],rect[fill="#2d2450"]{fill:#f3e8ff}
-  rect[fill="#4b5563"],rect[fill="#42595a"]{fill:#e2e8f0}
-  rect[fill="rgba(255,255,255,0.03)"],rect[fill="rgba(255,255,255,.025)"],rect[fill="rgba(255,255,255,0.02)"]{fill:rgba(15,23,42,.04)}
-  stop[stop-color="#293b91"]{stop-color:#e0e7ff}
-  stop[stop-color="#1f6f66"]{stop-color:#d1fae5}
-  [stroke="#2f3650"],[stroke="#2a2f3e"],[stroke="#333a52"]{stroke:#cbd5e1}
-</style>
-<text x="460" y="26" fill="#eaeefb" font-size="16" font-weight="700" text-anchor="middle">例：token x 同时命中远端节点 B 上的 E4 与 E5</text>
-
-<text x="22" y="83" fill="#ffb0b0" font-size="13" font-weight="700">按 rank 直接发送</text>
-<rect x="120" y="51" width="245" height="116" rx="12" fill="#1c2030" stroke="#39405a"/>
-<text x="242" y="74" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 A · NVLink 域</text>
-<rect x="190" y="91" width="105" height="48" rx="8" fill="#6f57bd"/>
-<text x="242" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU0 · x</text>
-<rect x="555" y="51" width="245" height="116" rx="12" fill="#1c2030" stroke="#39405a"/>
-<text x="677" y="74" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 B · NVLink 域</text>
-<rect x="580" y="91" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="621" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU4 · E4</text>
-<rect x="692" y="91" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="733" y="120" fill="#fff" font-size="12" text-anchor="middle">GPU5 · E5</text>
-<path d="M295 106C395 65 475 65 580 106" fill="none" stroke="#ff6b6b" stroke-width="3"/>
-<path d="M295 124C410 165 570 165 692 124" fill="none" stroke="#ff6b6b" stroke-width="3"/>
-<text x="460" y="92" fill="#ffb0b0" font-size="11.5" text-anchor="middle">RDMA：发送 x</text>
-<text x="500" y="157" fill="#ffb0b0" font-size="11.5" text-anchor="middle">RDMA：再次发送 x</text>
-<text x="460" y="188" fill="#ffb0b0" font-size="12.5" text-anchor="middle">同一份 H 维激活两次穿越慢链路：约 2Hb 字节</text>
-
-<line x1="30" y1="211" x2="890" y2="211" stroke="#39405a" stroke-width="1"/>
-
-<text x="22" y="266" fill="#86efac" font-size="13" font-weight="700">DeepEP 分层转发</text>
-<rect x="120" y="232" width="245" height="116" rx="12" fill="#1c2030" stroke="#4ade80"/>
-<text x="242" y="255" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 A · NVLink 聚合</text>
-<rect x="145" y="273" width="82" height="48" rx="8" fill="#6f57bd"/><text x="186" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU0 · x</text>
-<rect x="257" y="273" width="82" height="48" rx="8" fill="#293b91"/><text x="298" y="294" fill="#fff" font-size="11.5" text-anchor="middle">RDMA</text><text x="298" y="310" fill="#fff" font-size="11.5" text-anchor="middle">forwarder</text>
-<path d="M227 297H257" stroke="#7c93ff" stroke-width="3"/>
-
-<rect x="555" y="232" width="245" height="116" rx="12" fill="#1c2030" stroke="#4ade80"/>
-<text x="677" y="255" fill="#9aa3b2" font-size="12" text-anchor="middle">节点 B · NVLink 散发</text>
-<rect x="580" y="273" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="621" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU4 · E4</text>
-<rect x="692" y="273" width="82" height="48" rx="8" fill="#1f7a4d"/><text x="733" y="302" fill="#fff" font-size="12" text-anchor="middle">GPU5 · E5</text>
-<path d="M339 297H555" stroke="#4ade80" stroke-width="4"/>
-<text x="447" y="286" fill="#86efac" font-size="11.5" text-anchor="middle">RDMA：x 只跨一次</text>
-<path d="M555 297H580M555 297C620 350 675 350 692 297" fill="none" stroke="#7c93ff" stroke-width="3"/>
-<text x="460" y="377" fill="#86efac" font-size="12.5" text-anchor="middle">慢链路约 Hb 字节；复制留给更快的 NVLink/NVSwitch 域完成</text>
-<text x="460" y="399" fill="#9aa3b2" font-size="11.5" text-anchor="middle">示意图忽略 metadata；真实实现可有多个 RDMA rank / NIC 并行转发。</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 1512" role="img" aria-labelledby="title desc">
+<title id="title">同一 token 的四种 EP 分发路径：每节点四卡，每卡两个专家</title>
+<desc id="desc">rank0 的 token x 选择 E2、E3、E4、E10、E11、E12、E13、E14。所有面板保持 rank 与专家位置一致。橙色表示跨节点，蓝色表示节点内，箭头乘数表示激活副本数。普通 EP 跨节点五份；DeepEP 一份；MindFormers 按 rank 去重三份；MindFormers 节点间 AllGather 一份。rank4 不含选中专家，仅在分层方案中中转。仅示意此 token 的 dispatch。</desc>
+<defs>
+<marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#2563eb"/></marker>
+<marker id="orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10Z" fill="#c2410c"/></marker>
+</defs>
+<rect width="1040" height="1512" fill="#ffffff"/>
+<g font-family="Arial, PingFang SC, Microsoft YaHei, sans-serif">
+<text x="24" y="30" font-size="24" fill="#172033" font-weight="700" text-anchor="start">同一个 token，去重发生在哪里？</text>
+<path d="M26 57 H66" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<text x="77" y="63" font-size="15" fill="#172033" font-weight="400" text-anchor="start">跨节点</text>
+<path d="M195 57 H235" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<text x="246" y="63" font-size="15" fill="#172033" font-weight="400" text-anchor="start">节点内</text>
+<rect x="364" y="44" width="18" height="18" rx="4" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="393" y="59" font-size="15" fill="#172033" font-weight="400" text-anchor="start">选中专家</text>
+<text x="560" y="61" font-size="15" fill="#64748b" font-weight="400" text-anchor="start">×2 = 两份激活；仅画 rank0 的 token x</text>
+<g id="base" data-cross-node-copies="5" data-intra-node-copies="3" transform="translate(0 86)">
+<text x="24" y="24" font-size="21" fill="#172033" font-weight="700" text-anchor="start">① 普通 EP · 按专家发送</text>
+<rect x="628" y="3" width="388" height="30" rx="15" fill="#fff2e8" stroke="none"/>
+<text x="822" y="24" font-size="17" fill="#c2410c" font-weight="700" text-anchor="middle">跨机 5 + 机内 3 = 8 份</text>
+<rect x="24" y="42" width="414" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="608" y="42" width="408" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="44" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 A</text>
+<text x="630" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 B</text>
+<g data-rank="0">
+<rect x="48" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank0</text>
+<rect x="148" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E0</text>
+<rect x="232" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E1</text>
+</g>
+<g data-rank="1">
+<rect x="48" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank1</text>
+<rect x="148" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E2</text>
+<rect x="232" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="268.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E3</text>
+</g>
+<g data-rank="2">
+<rect x="48" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank2</text>
+<rect x="148" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E4</text>
+<rect x="232" y="191" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="211" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E5</text>
+</g>
+<g data-rank="3">
+<rect x="48" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank3</text>
+<rect x="148" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E6</text>
+<rect x="232" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E7</text>
+</g>
+<g data-rank="4">
+<rect x="714" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank4</text>
+<rect x="814" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="850.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E8</text>
+<rect x="898" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E9</text>
+</g>
+<g data-rank="5">
+<rect x="714" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank5</text>
+<rect x="814" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E10</text>
+<rect x="898" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E11</text>
+</g>
+<g data-rank="6">
+<rect x="714" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank6</text>
+<rect x="814" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E12</text>
+<rect x="898" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E13</text>
+</g>
+<g data-rank="7">
+<rect x="714" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank7</text>
+<rect x="814" y="245" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="265" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E14</text>
+<rect x="898" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E15</text>
+</g>
+<path d="M330 96 H351" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="370" cy="96" r="18" fill="#7c3aed"/>
+<text x="370" y="102" font-size="20" fill="#ffffff" font-weight="700" text-anchor="middle">x</text>
+<path d="M366 115 Q366 150 333 150" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<path d="M382 111 Q421 143 401 192 Q397 204 333 204" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="330" y="120" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="349" y="137" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×2</text>
+<rect x="332" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="351" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 L710 150" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="99" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="116" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×2</text>
+<path d="M390 96 L710 204" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="126" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="143" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×2</text>
+<path d="M390 96 L710 258" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="153" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="170" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<text x="24" y="333" font-size="16" fill="#64748b" font-weight="400" text-anchor="start">按专家分支发送：节点 A 三份，节点 B 五份</text>
+<path d="M24 347 H1016" stroke="#e2e8f0"/>
+</g>
+<g id="deep" data-cross-node-copies="1" data-intra-node-copies="5" transform="translate(0 438)">
+<text x="24" y="24" font-size="21" fill="#172033" font-weight="700" text-anchor="start">② DeepEP · 节点与 rank 两级去重</text>
+<rect x="628" y="3" width="388" height="30" rx="15" fill="#fff2e8" stroke="none"/>
+<text x="822" y="24" font-size="17" fill="#c2410c" font-weight="700" text-anchor="middle">跨机 1 + 机内 5 = 6 份</text>
+<rect x="24" y="42" width="414" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="608" y="42" width="408" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="44" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 A</text>
+<text x="630" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 B</text>
+<text x="997" y="65" font-size="16" fill="#c2410c" font-weight="600" text-anchor="end">rank4：仅中转</text>
+<g data-rank="0">
+<rect x="48" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank0</text>
+<rect x="148" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E0</text>
+<rect x="232" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E1</text>
+</g>
+<g data-rank="1">
+<rect x="48" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank1</text>
+<rect x="148" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E2</text>
+<rect x="232" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="268.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E3</text>
+</g>
+<g data-rank="2">
+<rect x="48" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank2</text>
+<rect x="148" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E4</text>
+<rect x="232" y="191" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="211" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E5</text>
+</g>
+<g data-rank="3">
+<rect x="48" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank3</text>
+<rect x="148" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E6</text>
+<rect x="232" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E7</text>
+</g>
+<g data-rank="4">
+<rect x="714" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank4</text>
+<rect x="814" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="850.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E8</text>
+<rect x="898" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E9</text>
+</g>
+<g data-rank="5">
+<rect x="714" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank5</text>
+<rect x="814" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E10</text>
+<rect x="898" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E11</text>
+</g>
+<g data-rank="6">
+<rect x="714" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank6</text>
+<rect x="814" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E12</text>
+<rect x="898" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E13</text>
+</g>
+<g data-rank="7">
+<rect x="714" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank7</text>
+<rect x="814" y="245" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="265" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E14</text>
+<rect x="898" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E15</text>
+</g>
+<path d="M330 96 H351" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="370" cy="96" r="18" fill="#7c3aed"/>
+<text x="370" y="102" font-size="20" fill="#ffffff" font-weight="700" text-anchor="middle">x</text>
+<path d="M366 115 Q366 150 333 150" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<path d="M382 111 Q421 143 401 192 Q397 204 333 204" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="330" y="120" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="349" y="137" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<rect x="332" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="351" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 H710" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="529" y="68" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="548" y="85" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<text x="522" y="129" font-size="15" fill="#c2410c" font-weight="600" text-anchor="middle">RDMA</text>
+<path d="M714 109 H679 V150 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="672" y="122" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="691" y="139" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M714 118 H652 V204 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="645" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="664" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M714 127 H625 V258 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="618" y="230" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="637" y="247" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<text x="24" y="333" font-size="16" fill="#64748b" font-weight="400" text-anchor="start">rank4 仅中转：省跨机传输，但总量比按 rank 去重多一份</text>
+<path d="M24 347 H1016" stroke="#e2e8f0"/>
+</g>
+<g id="zero" data-cross-node-copies="3" data-intra-node-copies="2" transform="translate(0 790)">
+<text x="24" y="24" font-size="21" fill="#172033" font-weight="700" text-anchor="start">③ MindFormers · 按目标 rank 去重</text>
+<rect x="628" y="3" width="388" height="30" rx="15" fill="#fff2e8" stroke="none"/>
+<text x="822" y="24" font-size="17" fill="#c2410c" font-weight="700" text-anchor="middle">跨机 3 + 机内 2 = 5 份</text>
+<rect x="24" y="42" width="414" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="608" y="42" width="408" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="44" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 A</text>
+<text x="630" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 B</text>
+<g data-rank="0">
+<rect x="48" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank0</text>
+<rect x="148" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E0</text>
+<rect x="232" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E1</text>
+</g>
+<g data-rank="1">
+<rect x="48" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank1</text>
+<rect x="148" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E2</text>
+<rect x="232" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="268.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E3</text>
+</g>
+<g data-rank="2">
+<rect x="48" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank2</text>
+<rect x="148" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E4</text>
+<rect x="232" y="191" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="211" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E5</text>
+</g>
+<g data-rank="3">
+<rect x="48" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank3</text>
+<rect x="148" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E6</text>
+<rect x="232" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E7</text>
+</g>
+<g data-rank="4">
+<rect x="714" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank4</text>
+<rect x="814" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="850.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E8</text>
+<rect x="898" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E9</text>
+</g>
+<g data-rank="5">
+<rect x="714" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank5</text>
+<rect x="814" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E10</text>
+<rect x="898" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E11</text>
+</g>
+<g data-rank="6">
+<rect x="714" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank6</text>
+<rect x="814" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E12</text>
+<rect x="898" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E13</text>
+</g>
+<g data-rank="7">
+<rect x="714" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank7</text>
+<rect x="814" y="245" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="265" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E14</text>
+<rect x="898" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E15</text>
+</g>
+<path d="M330 96 H351" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="370" cy="96" r="18" fill="#7c3aed"/>
+<text x="370" y="102" font-size="20" fill="#ffffff" font-weight="700" text-anchor="middle">x</text>
+<path d="M366 115 Q366 150 333 150" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<path d="M382 111 Q421 143 401 192 Q397 204 333 204" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="330" y="120" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="349" y="137" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<rect x="332" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="351" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 L710 150" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="99" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="116" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 L710 204" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="126" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="143" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 L710 258" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="533" y="153" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="552" y="170" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<text x="24" y="333" font-size="16" fill="#64748b" font-weight="400" text-anchor="start">直接发往 rank5、6、7；不经过 rank4</text>
+<path d="M24 347 H1016" stroke="#e2e8f0"/>
+</g>
+<g id="gather" data-cross-node-copies="1" data-intra-node-copies="8" transform="translate(0 1142)">
+<text x="24" y="24" font-size="21" fill="#172033" font-weight="700" text-anchor="start">④ MindFormers · 节点间 AllGather</text>
+<rect x="628" y="3" width="388" height="30" rx="15" fill="#fff2e8" stroke="none"/>
+<text x="822" y="24" font-size="17" fill="#c2410c" font-weight="700" text-anchor="middle">跨机 1 + 机内 8 = 9 份</text>
+<rect x="24" y="42" width="414" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<rect x="608" y="42" width="408" height="264" rx="12" fill="#f8fafc" stroke="#cbd5e1"/>
+<text x="44" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 A</text>
+<text x="630" y="65" font-size="16" fill="#64748b" font-weight="600" text-anchor="start">节点 B</text>
+<text x="997" y="65" font-size="16" fill="#c2410c" font-weight="600" text-anchor="end">rank4：仅中转</text>
+<g data-rank="0">
+<rect x="48" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank0</text>
+<rect x="148" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E0</text>
+<rect x="232" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E1</text>
+</g>
+<g data-rank="1">
+<rect x="48" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank1</text>
+<rect x="148" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E2</text>
+<rect x="232" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="268.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E3</text>
+</g>
+<g data-rank="2">
+<rect x="48" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank2</text>
+<rect x="148" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="184.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E4</text>
+<rect x="232" y="191" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="211" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E5</text>
+</g>
+<g data-rank="3">
+<rect x="48" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="62" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank3</text>
+<rect x="148" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="184.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E6</text>
+<rect x="232" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="268.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E7</text>
+</g>
+<g data-rank="4">
+<rect x="714" y="76" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="103" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank4</text>
+<rect x="814" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="850.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E8</text>
+<rect x="898" y="83" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="103" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E9</text>
+</g>
+<g data-rank="5">
+<rect x="714" y="130" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="157" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank5</text>
+<rect x="814" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E10</text>
+<rect x="898" y="137" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="157" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E11</text>
+</g>
+<g data-rank="6">
+<rect x="714" y="184" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="211" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank6</text>
+<rect x="814" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E12</text>
+<rect x="898" y="191" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="934.5" y="211" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E13</text>
+</g>
+<g data-rank="7">
+<rect x="714" y="238" width="282" height="42" rx="8" fill="#ffffff" stroke="#b9c5d3"/>
+<text x="728" y="265" font-size="17" fill="#172033" font-weight="600" text-anchor="start">rank7</text>
+<rect x="814" y="245" width="73" height="29" rx="6" fill="#dcfce7" stroke="#86bfa0"/>
+<text x="850.5" y="265" font-size="16" fill="#166534" font-weight="600" text-anchor="middle">E14</text>
+<rect x="898" y="245" width="73" height="29" rx="6" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="934.5" y="265" font-size="16" fill="#64748b" font-weight="400" text-anchor="middle">E15</text>
+</g>
+<path d="M330 96 H351" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="370" cy="96" r="18" fill="#7c3aed"/>
+<text x="370" y="102" font-size="20" fill="#ffffff" font-weight="700" text-anchor="middle">x</text>
+<path d="M366 115 Q366 150 333 150" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<path d="M382 111 Q421 143 401 192 Q397 204 333 204" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="330" y="120" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="349" y="137" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×2</text>
+<rect x="332" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="351" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<path d="M390 96 H710" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#orange)"/>
+<rect x="529" y="68" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="548" y="85" font-size="16" fill="#c2410c" font-weight="600" text-anchor="middle">×1</text>
+<text x="522" y="129" font-size="15" fill="#c2410c" font-weight="600" text-anchor="middle">AllGather</text>
+<path d="M714 109 H679 V150 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="672" y="122" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="691" y="139" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×2</text>
+<path d="M714 118 H652 V204 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="645" y="176" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="664" y="193" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×2</text>
+<path d="M714 127 H625 V258 H710" fill="none" stroke="#2563eb" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#blue)"/>
+<rect x="618" y="230" width="38" height="24" rx="5" fill="#ffffff" stroke="none"/>
+<text x="637" y="247" font-size="16" fill="#2563eb" font-weight="600" text-anchor="middle">×1</text>
+<text x="24" y="333" font-size="16" fill="#64748b" font-weight="400" text-anchor="start">rank4 仅中转；节点 B 内仍按五个专家分支发送</text>
+</g>
+</g>
 </svg>

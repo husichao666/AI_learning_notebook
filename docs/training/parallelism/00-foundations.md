@@ -4,7 +4,7 @@ description: 显存账本、集合通信原语、通信量与底层算法
 type: series
 status: stable
 level: beginner
-updated: 2026-09-02
+updated: 2026-09-16
 tags:
   - distributed-training
   - collectives
@@ -152,27 +152,31 @@ reduce-scatter 的**逆操作**：每张卡拿出手里的分片，**拼接**成
 
 ### 通信量的统计口径
 
-讨论「通信量」时最容易出现两倍甚至 $N$ 倍分歧，不一定是谁算错了，而是分母和口径不同。下面统一定义：
+讨论「通信量」时最容易出现两倍甚至 $N$ 倍分歧，不一定是谁算错了，而是张量基准和收发口径不同。为了让不同原语可以直接比较，下面始终使用同一个基准：
 
-- 通信组有 $N$ 个 rank；$X$ 表示**完整逻辑张量**的字节数。例如参数量为 $P$、dtype 为 BF16，则 $X=2P$ bytes。
-- 默认通信量 $V_{\mathrm{rank}}$ 指**每个 rank 发到链路上的字节数**（sent bytes / rank），这是判断单卡 NIC 或 NVLink 压力最实用的口径。对称 collective 的接收量与发送量相同，但**不再把 send + recv 相加**。
-- $V_{\mathrm{group}}$ 是全组所有 rank 发送量之和。若 profiler 用「收发总 I/O」，对称 collective 的数字会是下表 $V_{\mathrm{rank}}$ 的 2 倍。
+- 通信组有 $N$ 个 rank；$L$ 表示**通信开始前，每个参与 rank 的本地输入字节数**。不同原语执行后，本地输出可能仍为 $L$，也可能缩小到 $L/N$ 或扩大到 $NL$。
+- $V_{\mathrm{rank}}$ 指**每个 rank 发到链路上的字节数**（sent bytes / rank），这是判断单卡 NIC 或 NVLink 压力最实用的口径。对称 collective 的接收量与发送量相同，但**不再把 send + recv 相加**。
+- $V_{\mathrm{group}}$ 是全组所有 rank 的发送量之和。若 profiler 用「收发总 I/O」，对称 collective 的数字会是下表 $V_{\mathrm{rank}}$ 的 2 倍。
 - 下表采用无冗余传输的 ring / direct-exchange 理想模型，忽略协议头、对齐、padding、重复路由与重传；真实字节还受底层算法和拓扑影响。
 
-| 原语与 $X$ 的含义 | 每 rank 发送 $V_{\mathrm{rank}}$ | 全组发送 $V_{\mathrm{group}}$ | ring / 直接交换的轮数 |
-| --- | --- | --- | --- |
-| `all-reduce`：每卡输入/输出均为 $X$ | $2\frac{N-1}{N}X$ | $2(N-1)X$ | $2(N-1)$：前半 reduce-scatter，后半 all-gather |
-| `reduce-scatter`：每卡输入 $X$，输出 $X/N$ | $\frac{N-1}{N}X$ | $(N-1)X$ | $N-1$ |
-| `all-gather`：每卡输入 $X/N$，输出 $X$ | $\frac{N-1}{N}X$ | $(N-1)X$ | $N-1$ |
-| `all-to-all`：每卡共有 $X$，均分给 $N$ 卡 | $\frac{N-1}{N}X$ | $(N-1)X$ | 通常与 $N-1$ 个远端 peer 交换；具体调度依实现 |
-| `send / recv`：一条消息为 $X$ | 发送方 $X$；接收方 0 | $X$ | 1 次点对点传输 |
-| `broadcast`：root 的 $X$ 复制到全组 | 各 rank 不均匀，取决于 tree / chain | 理想下界 $(N-1)X$ | tree 深度约 $\lceil\log_2N\rceil$；chain 为 $N-1$ |
+| 原语 | 每 rank 输入 | 每 rank 输出 | 每 rank 发送 $V_{\mathrm{rank}}$ | 全组发送 $V_{\mathrm{group}}$ | ring / 直接交换的轮数 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `all-reduce` | $L$ | $L$ | $2\frac{N-1}{N}L$ | $2(N-1)L$ | $2(N-1)$：前半 reduce-scatter，后半 all-gather |
+| `reduce-scatter` | $L$ | $L/N$ | $\frac{N-1}{N}L$ | $(N-1)L$ | $N-1$ |
+| `all-gather` | $L$ | $NL$ | $(N-1)L$ | $N(N-1)L$ | $N-1$ |
+| `all-to-all` | $L$ | $L$ | $\frac{N-1}{N}L$ | $(N-1)L$ | 通常与 $N-1$ 个远端 peer 交换；留给自己的块不经过链路 |
+| `send / recv` | 发送方为 $L$ | 接收方得到 $L$ | 发送方 $L$；接收方 0 | $L$ | 1 次点对点传输 |
+| `broadcast` | root 为 $L$ | 每个 rank 为 $L$ | 各 rank 不均匀，取决于 tree / chain | 理想下界 $(N-1)L$ | tree 深度约 $\lceil\log_2N\rceil$；chain 为 $N-1$ |
+
+`all-gather` 与 `all-to-all` 的差别在固定本地输入 $L$ 后最明显。`all-gather` 的每个 rank 最终要获得其他 $N-1$ 个完整分片，因此发送 $(N-1)L$；`all-to-all` 先把本地 $L$ 切成 $N$ 块，其中一块留给自己，只把其余块发往远端，因此发送 $(N-1)L/N$。如果把 `all-gather` 聚合后的完整张量记成 $X=NL$，它也可以写成 $(N-1)X/N$；但此时 $X$ 与 `all-to-all` 的本地输入 $L$ 不是同一个对象，不能直接比较两个看似相同的公式。
 
 !!! example "4 卡、完整张量 1 GiB 的心算例子"
 
-    ring all-reduce 把 1 GiB 切成 4 块，每轮每卡发送 256 MiB：reduce-scatter 走 3 轮、all-gather 再走 3 轮，所以每卡发送 $6\times256=1536$ MiB = **1.5 GiB**，同时也接收 1.5 GiB；全组发送 $4\times1.5=6$ GiB。单独一次 reduce-scatter 或 all-gather 则是每卡 0.75 GiB。
+    ring all-reduce 中，每个 rank 的本地输入 $L=1$ GiB。算法把它切成 4 块，每轮每卡发送 256 MiB：reduce-scatter 走 3 轮、all-gather 再走 3 轮，所以每卡发送 $6\times256=1536$ MiB = **1.5 GiB**，同时也接收 1.5 GiB；全组发送 $4\times1.5=6$ GiB。
 
-张量元素数必须先乘 dtype 字节数。例如 $P$ 个 FP32 梯度做 ring all-reduce：
+    单独做 reduce-scatter 时，本地输入仍为 1 GiB，每卡发送 0.75 GiB，输出 256 MiB。若接着单独做 all-gather，它的本地输入是 256 MiB，每卡要转发 3 个这样的分片，因此也发送 0.75 GiB，输出重新变成 1 GiB。若改做 all-to-all，并令每卡本地输入为 1 GiB，则每卡将其切成 4 块、留下 1 块并发出另外 3 块，同样发送 0.75 GiB，但输出仍为 1 GiB，而不是扩大到 4 GiB。
+
+张量元素数必须先乘 dtype 字节数。例如 $P$ 个 FP32 梯度做 ring all-reduce 时，每个 rank 的本地输入为 $L=4P$ bytes：
 
 $$
 V_{\mathrm{rank}}=2\frac{N-1}{N}\cdot 4P\ \text{bytes}

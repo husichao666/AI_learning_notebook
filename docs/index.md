@@ -12,6 +12,7 @@ hide:
   <div class="kb-actions">
     <a class="kb-button kb-button-primary" href="start-here/">浏览学习路径</a>
     <a class="kb-button" href="training/parallelism/">继续并行训练</a>
+    <a class="kb-button" href="https://github.com/husichao666/AI_learning_notebook" target="_blank" rel="noopener">GitHub 仓库 · 欢迎 Star</a>
   </div>
   <p class="kb-search-hint">提示：按 <kbd>/</kbd> 可以随时搜索整座知识库</p>
 </section>
@@ -75,5 +76,17 @@ hide:
   <div><time>2026-08-24</time><a href="components/attention/dsa/">DeepSeek Sparse Attention：闪电索引与稀疏注意力</a></div>
   <div><time>2026-08-24</time><a href="models/qwen3-5/">Qwen3.5 模型架构与关键模块</a></div>
 </div>
+
+<section class="repo-actions repo-actions--home" aria-labelledby="repo-actions-home-title">
+  <div class="repo-actions__copy">
+    <p class="repo-actions__eyebrow">共同完善这份知识库</p>
+    <h2 id="repo-actions-home-title">让可靠的内容更容易被看见</h2>
+    <p>如果这些笔记对理解大模型有所帮助，可以在 GitHub 上收藏本仓库；如果发现表述错误、公式歧义或实现差异，欢迎提交 Issue。</p>
+  </div>
+  <div class="repo-actions__buttons">
+    <a class="repo-action-button repo-action-button--primary" href="https://github.com/husichao666/AI_learning_notebook" target="_blank" rel="noopener">在 GitHub 上 Star</a>
+    <a class="repo-action-button" href="https://github.com/husichao666/AI_learning_notebook/issues/new" target="_blank" rel="noopener">提交内容 Issue</a>
+  </div>
+</section>
 
 <p class="kb-footer-links"><a href="start-here/">阅读与写作约定</a> · <a href="glossary/">术语表</a> · <a href="https://github.com/husichao666/AI_learning_notebook">GitHub 仓库</a></p>

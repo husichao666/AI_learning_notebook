@@ -1,10 +1,10 @@
 ---
 title: "3.4 · PyTorch 原生方案"
-description: "沿 PyTorch FSDP2 源码，追踪 fully_shard、FSDPState、FSDPParamGroup、FSDPParam、Hook 与 collective 的完整实现。"
+description: "沿 PyTorch FSDP2 源码，追踪 fully_shard 的配置、混合精度与通信精度，以及参数分片、Hook 和 collective 的完整实现。"
 type: source-note
 status: stable
 level: intermediate
-updated: 2026-09-02
+updated: 2026-09-18
 tags: [distributed-training, fsdp, fsdp2, pytorch, torchtitan]
 ---
 
@@ -14,7 +14,7 @@ tags: [distributed-training, fsdp, fsdp2, pytorch, torchtitan]
 
 <span class="chapter-kicker">第 3 章 · 模型状态分片</span>
 
-PyTorch FSDP2 的公开入口只有一个 `fully_shard()`，真正的实现却分布在 `FSDPState`、`FSDPParamGroup`、`FSDPParam` 和 collective 函数中。它们分别负责安装 Hook、划定通信组、切换参数表示、发起 all-gather 与 reduce-scatter。本节不再把 FSDP2 当作 TorchTitan 的一个配置项，而是沿 PyTorch 源码追踪一个 `reshard_after_forward=True` 的 FSDP unit 如何完成初始化、前向和反向。
+PyTorch FSDP2 通过 `fully_shard()` 配置参数分片、混合精度、梯度通信精度和卸载策略，再由模块上的 `FSDPModule` 方法控制预取与梯度同步。内部实现分布在 `FSDPState`、`FSDPParamGroup`、`FSDPParam` 和 collective 函数中：它们分别负责安装 Hook、划定通信组、切换参数表示、发起 all-gather 与 reduce-scatter。本节先说明配置入口，再沿源码追踪一个 `reshard_after_forward=True` 的 FSDP unit 如何完成初始化、前向和反向，并解释精度策略在各阶段如何生效。
 
 </div>
 
@@ -87,7 +87,20 @@ classDiagram
 
 这里的“参数组”不是优化器的 `optimizer.param_groups`，而是**一次 all-gather 和一次 reduce-scatter 一起处理的通信组**。
 
-## 02 · `fully_shard()` 初始化流程 { #init }
+## 02 · `fully_shard()` 的配置与初始化流程 { #init }
+
+分片决定每张卡负责哪些参数；实际训练还需要决定参数何时恢复、计算和通信使用什么数据类型，以及模型状态放在 GPU 还是 CPU。这些策略都可以通过 `fully_shard()` 配置：
+
+| 配置入口 | 控制对象 | 作用 |
+| --- | --- | --- |
+| `mesh` | 分片与复制通信域 | 选择 FSDP / HSDP 的设备与进程组 |
+| `reshard_after_forward` | 完整参数的保留时间 | 在显存占用与反向前再次 all-gather 之间取舍 |
+| `shard_placement_fn` | 单个参数的分片布局 | 调整默认分片维度；本文源码版本还支持为参数指定不同通信域 |
+| `mp_policy=MixedPrecisionPolicy(...)` | 计算参数、梯度归约及模块输入输出的 dtype | 配置混合精度；参数通信和梯度通信可以采用不同 dtype |
+| `offload_policy=CPUOffloadPolicy(...)` | 参数、梯度和优化器状态分片 | 卸载到 CPU，以主机内存和数据搬运开销换 GPU 显存；默认不卸载 |
+| `ignored_params` | 不交给 FSDP 管理的参数 | 跳过这些参数的分片与梯度归约，其同步由调用方负责 |
+
+其中 `dtype` 表示张量的数据类型，例如 FP32（`torch.float32`）和 BF16（`torch.bfloat16`）。`mp_policy` 的具体字段及其在参数生命周期中的作用见[第 8 节的精度配置](#mixed-precision)。预取与梯度同步则通过分片后模块的 `set_modules_to_forward_prefetch()`、`set_modules_to_backward_prefetch()` 和 `set_requires_gradient_sync()` 等方法控制，不是 `fully_shard()` 的同名构造参数。[公开 API 文档](https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html)
 
 公开函数 `fully_shard()` 被 `@contract(state_cls=FSDPState)` 装饰。这个 composable contract（可组合 API 契约）为调用创建 `FSDPState`，后续可通过 `fully_shard.state(module)` 取回；普通单模块路径是一模块一 state，`fully_shard([a, b])` 则让列表中的模块共享同一 state。删去校验和少数分支后，源码主线可以压缩成：
 
@@ -111,7 +124,7 @@ _apply_to_module(modules, cls_to_fsdp_cls, FSDPModule, "FSDP", ...)
 return arg_module
 ```
 
-这段代码完成四件事。
+初始化主线和首次执行时的补充工作如下。
 
 ### 2.1 收集“本次调用”负责的参数
 
@@ -398,7 +411,7 @@ RegisterPostBackwardFunction.backward()
 
 `foreach_reduce()` 先根据每个完整梯度的 padded size 计算 flat input 大小，再由 `fsdp.chunk_cat` 按 reduce-scatter 所需布局复制进去。copy-in 完成后，保存完整梯度引用的 `unsharded_grads` 列表立刻清空；reduce-scatter stream 等待默认 stream，随后发起 collective。
 
-通信输出是一维本地 shard。源码用 `as_strided()` 切出各参数的 local grad view，再通过 `to_sharded_dtensor()` 恢复 DTensor placement，最终赋给 `fsdp_param.sharded_param.grad`。这一步完成后，普通 AdamW 看到的是：
+`reduce_scatter_input` 与 `reduce_output` 是独立分配的：前者容纳打包后的完整梯度，后者是一维本地 shard，元素数为前者的 `1 / shard_world_size`。HSDP 的 AR 原地读写 `reduce_output`，不再使用 RS input。AR 后按需将结果转回原始 dtype，再用 `as_strided()` 切出各参数的 local grad view，通过 `to_sharded_dtensor()` 恢复 DTensor placement，最终赋给 `fsdp_param.sharded_param.grad`。在没有 dtype 转换、CPU offload 或已有梯度累加的普通路径中，这一步是共享结果存储的 view-out，不是逐参数复制一次完整结果。普通 AdamW 看到的是：
 
 ```text
 parameter   = sharded_param: DTensor
@@ -455,6 +468,8 @@ all-gather 的 flat output 在 copy-out 结束后不能立即任意复用。隐�
 
 reduce-scatter input 同样由 `ReduceScatterState(input, event)` 保持引用。默认 `reduce_scatter_max_input_buffers=1`：下一组需要加入新 input 前，先让默认 stream 等待最旧 RS event，再删除其 keepalive 引用。这个显式上限把“可以有多少个 RS input 同时在 flight”变成调度参数；调大可增加重叠，瞬时显存也会随被保留的 input 数量与各 unit 大小增长。
 
+这一回收只涉及 RS **输入**。HSDP 中，RS **输出**还要交给 AR，源码用各组自己的 `_all_reduce_state = AllReduceState(all_reduce_input, all_reduce_event)` 保留它；反向收尾在建立对最终归约及后处理 event 的等待后清理该状态。若最终梯度直接使用输出的 view，`.grad` 还会继续持有其存储。因此下一层回收旧 RS input 时，旧 AR 完全可以继续运行；输入和输出的释放条件不同。`wait_event()` 在这里设置的是 GPU stream 的执行依赖，删除 Python 引用不等于立即把显存交还给驱动，也不保证下一次分配一定使用同一地址。[源码](https://github.com/pytorch/pytorch/blob/main/torch/distributed/fsdp/_fully_shard/_fsdp_param_group.py)
+
 这里的“确定性”是**buffer 生命周期与峰值更可预测**，不是浮点计算结果的确定性。正确性依赖两部分同时成立：event 规定不同 stream 的使用顺序，Python 引用确保 allocator 在通信结束前看不到可复用的存储。
 
 !!! note "源码中的三个直接证据"
@@ -473,7 +488,7 @@ FSDP2 的主要优化可以落到具体函数，而不是笼统归结为“异�
 | 通信计算重叠 | `FSDPCommContext` 与各类 event | 下一单元 AG 可与当前单元计算重叠；反向 AG、RS 和 HSDP AR 使用不同流水 |
 | 隐式 / 显式预取 | `_prefetch_unshard()`、`set_modules_to_*_prefetch()` | 提前发起下一 unit 的 AG；用额外瞬时显存换隐藏通信延迟 |
 | 根单元智能 reshard | `FSDPState._lazy_init()` | `reshard_after_forward=None` 时根单元保留完整参数，避免 forward 尾部释放后在 backward 开头立刻重聚合 |
-| 通信混合精度 | `FSDPParam.all_gather_inputs`、`foreach_reduce()` | 参数可按 `param_dtype` all-gather，梯度可按 `reduce_dtype` reduce-scatter，降低带宽与 buffer 体积 |
+| 通信混合精度 | `FSDPParam.all_gather_inputs`、`foreach_reduce()` | 分别选择参数 AG 与梯度归约的 dtype；低精度可降低通信字节数和 buffer 体积，也可保留 FP32 梯度归约 |
 | storage 复用 | `alloc_storage()` / `free_storage()` | 保留 autograd alias 所需对象身份，只动态扩缩底层存储 |
 | RS input 数量上限 | `reduce_scatter_max_input_buffers` | 明确限定跨层仍在 flight 的输入 buffer 数，控制显存与 overlap 的交换 |
 | HSDP 两级归约 | `foreach_reduce()` | shard 组内 RS 与 replicate 组间 AR 分开，可让节点内、节点间通信使用不同拓扑 |
@@ -489,23 +504,119 @@ FSDP2 的主要优化可以落到具体函数，而不是笼统归结为“异�
 
 TorchTitan 还在框架默认值之上做了模型级调度：无 PP 时 `default` 通常 reshard；有 PP 时默认不 reshard，避免每个 micro-batch 重复 AG；末尾的 norm/head 默认也不立即 reshard，因为 backward 很快就会使用它们。这些是调用方对模型执行顺序的利用，不属于 FSDP 算法本身。
 
-### 混合精度口径
+参数是否保留决定通信发生几次，精度策略则决定每次通信搬运多少字节。前面调用示例中的 `MixedPrecisionPolicy` 正是这一策略的配置对象。
 
-`MixedPrecisionPolicy.param_dtype` 控制的是 all-gather 后计算参数的 dtype，不足以证明常驻 shard 也是该 dtype。以 FP32 常驻参数、BF16 `param_dtype`、FP32 `reduce_dtype` 为例：
+### 混合精度配置：计算、通信与模块边界 { #mixed-precision }
 
-- `sharded_param` 与 Adam 状态按 FP32 常驻；
-- `all_gather_inputs` 转为 BF16，完整计算参数为 BF16；
-- 完整梯度按 FP32 装入 reduce-scatter buffer；
-- 归约结果写回 FP32 `sharded_param.grad`。
+FSDP2 通过 `fully_shard(..., mp_policy=...)` 接收 `MixedPrecisionPolicy`。理解它时，需要区分常驻参数分片、临时完整计算参数、梯度归约 buffer，以及模块之间传递的激活。四个公开字段分别作用于这些生命周期中的不同位置：
 
-若参数、梯度和 Adam 一阶/二阶状态都为 FP32，静态模型状态约为：
+| 字段 | 默认值 | 控制范围与默认行为 |
+| --- | --- | --- |
+| `param_dtype` | `None` | 完整计算参数的 dtype，同时决定普通 Tensor 路径的参数 all-gather dtype；`None` 表示沿用参数原始 dtype，优化器持有的常驻 shard 仍使用原始 dtype |
+| `reduce_dtype` | `None` | 梯度 reduce-scatter，以及原生 HSDP 中梯度 all-reduce 的 dtype；未指定时跟随计算参数 dtype，**不会因为常驻 shard 是 FP32 就自动使用 FP32 归约** |
+| `output_dtype` | `None` | 将模块的浮点 forward 输出转换到指定 dtype；`None` 表示不额外转换，不决定参数或梯度通信的 dtype |
+| `cast_forward_inputs` | `True` | 设置 `param_dtype` 时，将模块的浮点输入转成该 dtype；整数 token ID 等非浮点输入不受影响 |
+
+例如，`MixedPrecisionPolicy(param_dtype=torch.bfloat16)` 会让参数 AG 和梯度归约都使用 BF16。若希望计算与参数 AG 使用 BF16、梯度归约使用 FP32，就必须显式设置 `reduce_dtype=torch.float32`。这里没有一个统一的“通信精度”开关：**参数 AG 跟随 `param_dtype`，梯度 RS / AR 跟随 `reduce_dtype`。** 这些字段描述通信张量的 dtype，不是对所有算子内部累加精度的统一规定。[MixedPrecisionPolicy 文档](https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html#torch.distributed.fsdp.MixedPrecisionPolicy)
+
+下面给出一个配置片段。假定分布式进程组、CUDA 设备与 `mesh` 已初始化，模型参数以 FP32 创建，且 `model.layers` 是一个 `ModuleList`：
+
+```python
+import torch
+from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
+
+mp_policy = MixedPrecisionPolicy(
+    param_dtype=torch.bfloat16,   # 完整计算参数与参数 all-gather
+    reduce_dtype=torch.float32,  # 梯度 reduce-scatter / HSDP all-reduce
+    output_dtype=None,           # 保留 forward 自身产生的输出 dtype
+    cast_forward_inputs=True,   # 浮点输入在模块边界转换到 BF16
+)
+
+for block in model.layers:
+    fully_shard(
+        block, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=True
+    )
+fully_shard(model, mesh=mesh, mp_policy=mp_policy, reshard_after_forward=True)
+
+# 在 fully_shard 之后创建，优化器持有 FP32 参数分片
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+```
+
+策略应传给每个需要该精度配置的 FSDP unit。只给根模块传 `mp_policy`，不会改写已经单独 `fully_shard()` 的子单元策略。前面 TorchTitan 示例显式使用了 `cast_forward_inputs=False`，这是调用方的选择；采用这种配置时，需要由模型代码或其他精度机制保证输入与算子要求兼容，不能将其视为 PyTorch 默认值。
+
+沿前面第 5、6 节的执行路径，上述配置对应如下数据变化：
+
+| 阶段 | 本例 dtype | 发生的动作 |
+| --- | --- | --- |
+| 计算前的常驻状态 | FP32 | `sharded_param` 保存原始精度的本地参数分片 |
+| 参数 all-gather | BF16 | 本地 shard 在通信前转换；AG 输出组成 BF16 完整计算参数 |
+| forward / backward | 参数为 BF16 | 模块使用完整参数计算；其浮点输入按策略转换，完整参数梯度通常也为 BF16 |
+| 梯度归约 | FP32 | 完整梯度转换后装入 RS buffer；HSDP 的后续 AR 也使用 FP32 |
+| 归约完成与 optimizer step | FP32 | 梯度分片转回参数原始 dtype，写入 `sharded_param.grad`，优化器更新 FP32 shard |
+
+将 `reduce_dtype` 改成 BF16，只会降低这里梯度归约的精度及通信 buffer 字节数；在这个 FP32 原始参数的例子中，最终 `.grad` 仍转回 FP32。反过来，BF16 梯度转换到 FP32 后归约，只能减少后续归约阶段的舍入误差，不能恢复低精度计算中已经丢失的信息。关闭梯度同步、进行多个 micro-batch 累积时，`reduce_dtype` 还决定 FSDP 保存的未归约梯度的累积 dtype。[策略定义与说明](https://github.com/pytorch/pytorch/blob/main/torch/distributed/fsdp/_fully_shard/_fsdp_api.py)
+
+FSDP 不会仅凭 `param_dtype=BF16` 就把常驻 shard 改成 BF16，也不会把原本以 BF16 创建的模型自动升级为 FP32 主权重。优化器状态的 dtype 由优化器实现决定，`MixedPrecisionPolicy` 没有单独设置 Adam 状态精度的字段。对于本例中参数、梯度和 Adam 一阶/二阶状态均为 FP32 的情况，令 $P$ 为参数元素总数、$N$ 为分片组大小，静态模型状态约为：
 
 $$
 \frac{4P_{param} + 4P_{grad} + 8P_{Adam}}{N}
 = \frac{16P}{N}\ \text{bytes}.
 $$
 
-这不包含当前与预取 unit 的完整计算参数、激活、AG/RS flat buffer 和 allocator 碎片。
+这不包含当前与预取 unit 的完整计算参数、激活、AG/RS flat buffer 和 allocator 碎片。精度配置还有一个常见入口：PyTorch 的 `torch.autocast`，它按算子规则选择执行 dtype。它与 FSDP 的模块级策略作用于不同边界。
+
+### 模块精度策略与 `autocast` 的分工
+
+FSDP2 在通信前转换参数或梯度，并在模块边界转换浮点输入输出；`autocast` 则根据即将执行的算子决定是否转换其输入。配置了 `mp_policy` 后，普通混合精度路径可以直接工作，无需仅为了启用 BF16 计算再套一层 `autocast`；如果模型仍需算子级精度选择，两者也可以配合，但实际算子 dtype 要结合两套规则判断。仅使用 `autocast` 则不能代替 FSDP 的参数 AG、梯度 RS / AR 精度配置。
+
+不同 unit 可以使用不同策略，`cast_forward_inputs` 和 `output_dtype` 用来衔接它们的浮点激活。例如，把一个 BF16 unit 的 `output_dtype` 设为 FP32，可以向后续模块提供 FP32 输出，但这不会使该 unit 内部已经完成的计算变为 FP32。FSDP2 的 `MixedPrecisionPolicy` 也没有 FSDP1 `MixedPrecision` 的 `buffer_dtype` 字段，模型注册 buffer 的 dtype 需要另外管理。[FSDP2 迁移说明](https://docs.pytorch.org/tutorials/intermediate/FSDP_tutorial.html)
+
+模型中的一个 Transformer block 可以包含多个 FSDP unit，也可以在自己的 `forward` 中显式切换部分运算的 dtype。因此，block 内混用 FP32 与 BF16 时，需要先确定希望改变的是参数及其通信精度，还是局部运算精度。
+
+### 同一 Block 内的不同精度区域 { #mixed-precision-within-block }
+
+如果希望 Norm 的完整参数和参数 AG 使用 FP32，而 Attention、MLP 的完整参数和参数 AG 使用 BF16，可以先把 Norm 划成独立 FSDP unit，再对 block 剩余参数应用 BF16 策略。下面假定参数均以 FP32 创建，`block.norm1`、`block.norm2` 是普通 `nn.LayerNorm`，模型通过 `self.norm1(x)` 这样的模块调用执行它们，并且没有额外的 autocast 或自定义转换改变内部算子行为：
+
+```python
+fp32_norm = MixedPrecisionPolicy(
+    param_dtype=torch.float32,
+    reduce_dtype=torch.float32,
+    cast_forward_inputs=True,
+    output_dtype=torch.bfloat16,  # Norm 算完后转回 BF16，交给后续计算
+)
+bf16_block = MixedPrecisionPolicy(
+    param_dtype=torch.bfloat16,
+    reduce_dtype=torch.float32,
+    cast_forward_inputs=True,
+)
+
+# 从子模块到父模块应用；沿用前例已经初始化的 mesh
+for norm in (block.norm1, block.norm2):
+    fully_shard(norm, mesh=mesh, mp_policy=fp32_norm)
+fully_shard(block, mesh=mesh, mp_policy=bf16_block)
+```
+
+父 block 收集参数时会跳过已经应用 `fully_shard()` 的 Norm，因而不会再把它们的完整参数转成 BF16。Norm 的输入转换路径是 **BF16 激活 → FP32 Norm 计算 → BF16 输出**；Attention、MLP 则由父单元的 BF16 策略管理。本例中所有常驻参数分片仍为 FP32，所有单元的梯度归约也都为 FP32。一个模型 block 因此对应三个 FSDP unit，而不是一个统一的精度区域。[参数收集源码](https://github.com/pytorch/pytorch/blob/main/torch/distributed/fsdp/_fully_shard/_fsdp_init.py)
+
+这种划分会为小 Norm 引入独立的 AG / RS，增加小 collective 和调度开销。如果目的只是让归一化的统计计算使用 FP32，可以保留整个 block 为一个 BF16 FSDP unit，在模型代码中对局部计算显式升精度。例如，RMS 归一化中不含可学习缩放参数的核心计算可以写成：
+
+```python
+def rms_normalize(x, eps=1e-6):
+    with torch.autocast(device_type=x.device.type, enabled=False):
+        x_fp32 = x.float()
+        inv_rms = torch.rsqrt(x_fp32.square().mean(dim=-1, keepdim=True) + eps)
+        return (x_fp32 * inv_rms).to(x.dtype)
+```
+
+这里均方值、逆平方根与归一化乘法使用 FP32，返回时恢复输入 dtype；后续可学习缩放参数的乘法由模型另行执行。局部升精度不会改变 FSDP 的参数 AG 或梯度归约配置。如果局部 FP32 运算还需要权重，也要按算子要求转换参与计算的权重；把已经转换过的 BF16 权重再 `.float()`，不能恢复原始 FP32 权重的精度。仅关闭 autocast 也不会自动把已有 BF16 张量转成 FP32。
+
+**单次 `fully_shard(block, mp_policy=...)` 没有按参数名分配不同策略的接口。** 显式设置 `param_dtype=BF16` 时，本次管理的普通浮点计算参数会统一按该配置转换。也不能简单地先把部分可训练参数 `.float()`、另一部分 `.bfloat16()`，再期待一个通信组自动分别处理：2026-09-18 核对的 PyTorch `main` 实现仍在 `FSDPParamGroup._init_mp_dtypes()` 中检查同组可训练参数的原始 dtype 与归约 dtype 是否一致。需要分别控制参数精度时，应划分 FSDP unit；只需要部分数值运算使用 FP32 时，可以在 `forward` 内控制。[dtype 检查源码](https://github.com/pytorch/pytorch/blob/main/torch/distributed/fsdp/_fully_shard/_fsdp_param_group.py)
+
+### CPU 卸载与精度策略的组合
+
+`offload_policy` 控制存储位置，可与 `mp_policy` 同时传入。例如 `offload_policy=CPUOffloadPolicy(pin_memory=True)` 会把参数分片、梯度分片和优化器状态放到 CPU：AG 前先将参数 shard 搬到 GPU，反向归约后将梯度 shard 搬回 CPU，优化器在 CPU 上更新。完整计算参数仍在 GPU 上按 `param_dtype` 使用。
+
+`pin_memory=True` 使用页锁定主机内存，以便提高 CPU/GPU 传输效率并支持与计算重叠；代价是占用不能随意换出的主机内存。卸载改变的是数据所在位置，不会替代精度策略，也不意味着整轮训练都在 CPU 上执行。[CPUOffloadPolicy 文档](https://docs.pytorch.org/docs/stable/distributed.fsdp.fully_shard.html#torch.distributed.fsdp.CPUOffloadPolicy)
 
 ## 09 · optimizer 与 checkpoint 的原生接口 { #optimizer }
 
@@ -570,5 +681,6 @@ FSDPState._pre_forward
     4. 一次 FSDP unit 的 all-gather 为什么仍会使用 flat buffer，但不等于 FSDP1 的 FlatParameter？
     5. `ReduceScatterState` 为什么必须同时持有 input Tensor 和 event？
     6. 普通 AdamW 为什么只更新参数 shard，从不持有计算期 `_unsharded_param`？
+    7. FP32 模型只设置 `param_dtype=torch.bfloat16` 时，参数 AG、梯度 RS 与 optimizer step 分别采用什么 dtype？要保留 FP32 梯度归约，应再设置哪个字段？
 
 [→ 继续阅读 3.5 · HyperParallel 性能优化](02-hyper-fsdp.md)
