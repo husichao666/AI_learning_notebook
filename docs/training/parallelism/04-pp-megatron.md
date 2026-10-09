@@ -4,7 +4,7 @@ description: "围绕 Megatron 的 PP 调度，解释 VPP 粒度、P2P 与 MoE �
 type: engineering-note
 status: stable
 level: advanced
-updated: 2026-09-15
+updated: 2026-10-08
 tags: [distributed-training, pipeline-parallel, megatron, performance]
 ---
 
@@ -58,37 +58,53 @@ $$
 
 此外，首部的 embedding、尾部的词表输出投影与 loss，以及不同层的 MoE 开销，会使“等层数”不等于“等耗时”。Megatron 支持用 `num_layers_in_first_pipeline_stage` / `num_layers_in_last_pipeline_stage` 调整首尾层数，或通过 `pipeline_model_parallel_layout` 指定更细的布局。应依据各 stage 的实测时间移动层；这两种布局配置在当前实现中不能同时指定。[层划分配置](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/transformer/transformer_config.py)
 
-## 03 · P2P 重叠：提前收发，使用前再等待 { #p2p-overlap }
+## 03 · P2P 重叠：通信与独立计算的交错 { #p2p-overlap }
 
-观察 [四卡 VPP 示例](04-pp.md#advanced) **稳态阶段的 GPU1**。它的两个 chunk 都按以下方向收发：
+上一节提到，切小 chunk 会增加 stage 之间的通信次数。每次前向都要先拿到上一 stage 的激活，每次反向都要先拿到下一 stage 传回的梯度。如果每轮收发都等到全部完成后才继续计算，通信时间就会直接拉长 GPU 的空闲时间。
 
-- **激活：GPU0 → GPU1 → GPU2**，GPU1 收到输入后做前向，再发送输出。
-- **梯度：GPU2 → GPU1 → GPU0**，GPU1 收到输出梯度后做反向，再发送自己算出的输入梯度 DX。
+交错 1F1B 提供了一个可以利用的条件：**某个任务正在等待数据时，同一张卡上可能还有另一个输入已经就绪的任务。** 例如，下一次反向还缺梯度，但当前前向的输入已经收到，就可以一边接收反向梯度，一边执行前向。P2P 重叠据此把“发起通信”与“等待通信完成”分开，在两者之间安排不依赖这份数据的计算。
 
-以下数字是 micro-batch 编号；前向处理 chunk 0，反向处理 chunk 1。
+### 稳态：用前向覆盖梯度传输，用反向覆盖激活传输
 
-1. **B1 结束 → F6**：向 GPU0 发 DX1，同时从 GPU2 预接收 B2 的梯度；随后计算输入已收齐的 F6，利用这段时间传输梯度。
-2. **F6 结束 → B2**：向 GPU2 发激活6，同时从 GPU0 预接收激活7；确认第 1 步的梯度收齐后计算 B2，利用反向计算传输激活。
-3. **B2 结束 → F7**：向 GPU0 发 DX2，同时从 GPU2 预接收 B3 的梯度；确认激活7收齐后计算 F7，继续覆盖梯度传输。
+沿用 [四卡 VPP 示例](04-pp.md#advanced)，只观察中间的 GPU1。它的两个 chunk 在前向时都从 GPU0 接收输入激活，计算后向 GPU2 发送输出激活；在反向时都从 GPU2 接收输出梯度，计算后向 GPU0 发送输入梯度，记为 DX。这里的梯度是 stage 边界上激活的梯度，供相邻 stage 继续反向使用。
 
-![GPU1 的 VPP 稳态收发：标明通信对端、梯度预接收和数据使用前的检查点](assets/04-pp-p2p-overlap.svg){ style="max-width: 780px;" }
+取稳态中的一段计算顺序：**B1 → F6 → B2 → F7**。F、B 分别表示前向和反向，数字是 micro-batch 编号；这段时间的前向运行在 chunk 0，反向运行在 chunk 1。因此 F6 与 B2 属于不同 micro-batch、不同 chunk，B2 不需要 F6 的结果。B2 需要的是 micro-batch 2 先前前向留下的激活，以及 GPU2 传回的对应梯度。
 
-*所有行都属于 GPU1；图从 B1 结束后开始，F6 的输入此前已收齐。虚线处检查接收是否完成，块宽仅为示意。*
+先看 B1 结束后的时刻：GPU1 已经算出要传给 GPU0 的 DX1，F6 的输入也已收齐；稍后要执行的 B2 则需要从 GPU2 接收梯度。若现在等待这轮梯度收发全部完成，再开始 F6，就会推迟一个本来可以执行的前向任务。重叠调度改为以下顺序：
 
-**B2 的梯度接收在 F6 开始前就已发起，因此可能被 F6 的计算覆盖；若 GPU2 尚未算完或传输未结束，B2 仍须等待。** Megatron 通过异步收发句柄，将等待推迟到数据使用前；发送 buffer 则必须保留到发送完成。[收发实现](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/p2p_communication.py)、[调度与等待位置](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py)
+1. **发起梯度收发，然后执行 F6。** GPU1 向 GPU0 异步发送 DX1，同时向 GPU2 发起 B2 所需梯度的接收请求，随后开始 F6。F6 不使用这两份梯度，所以梯度传输可以与它并行推进。
+2. **F6 结束后，发起激活收发，再进入 B2。** 此时 GPU1 已得到 F6 的输出，可以向 GPU2 发送这份激活，并从 GPU0 提前接收 F7 的输入。接着确认第 1 步请求的梯度已经收到，才开始 B2；如果还没收到，就在这里等待。B2 计算期间，F6 输出的发送和 F7 输入的接收可以继续推进。
+3. **B2 结束后，继续为后续任务准备数据。** GPU1 发出刚算好的 DX2，并提前接收 B3 的梯度。确认第 2 步请求的 F7 输入已收到后，开始 F7，于是又有一段前向计算可以覆盖梯度传输。
 
-配置上，当前常规 PP 路径需启用 VPP，并设置 `overlap_p2p_comm=True`、`batch_p2p_comm=False`；`overlap_p2p_comm_warmup_flush=True` 可将重叠扩展到预热和排空。实际可覆盖的时间仍取决于独立计算和 buffer 的释放时机。[配置定义](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/model_parallel_config.py)
+![GPU1 的 VPP 稳态收发：前向期间传输梯度，反向期间传输激活，使用数据前等待对应接收完成](assets/04-pp-p2p-overlap.svg){ style="max-width: 780px;" }
 
-### 预热与排空：在本次计算前预接收下一份数据
+*所有行都属于 GPU1，并共用同一条时间轴；图从 B1 结束后开始，F6 的输入此前已收齐。虚线表示接收数据的使用边界，图中画的是数据在边界前已收齐的情况，块宽不是实测耗时。发送和接收行的“激活7”分别是 F7 的输出与输入，是经过本 chunk 计算前后的不同张量。*
 
-`overlap_p2p_comm_warmup_flush` 在预热时用前向覆盖前向通信，在排空时用反向覆盖反向通信。仍以 GPU1 为例，当前任务的输入已收齐后：
+沿图中的“接收梯度”一行看，B2 的梯度在 F6 期间传入，到 B2 开始时才被使用；再沿“接收激活”一行看，F7 的输入在 B2 期间传入，到 F7 开始时才被使用。**能够隐藏多少通信时间，取决于发起通信后、使用数据前有多长的独立计算窗口。** 如果 GPU2 很晚才算出 B2 所需的梯度，或者传输耗时超过了 F6 的计算时间，剩余等待仍会出现在 B2 前。
 
-- **预热**：先从 GPU0 预接收下一次前向的输入 → 计算当前前向，同时接收 → 向 GPU2 发送当前输出，确认下一份输入收齐后继续前向。
-- **排空**：先从 GPU2 预接收下一次反向的梯度 → 计算当前反向，同时接收 → 向 GPU0 发送当前 DX，确认下一份梯度收齐后继续反向。
+### 异步收发：请求返回与数据可用的区别
 
-![GPU1 在预热时从 GPU0 预接收下一份激活，在排空时从 GPU2 预接收下一份梯度](assets/04-pp-p2p-warmup-flush.svg){ style="max-width: 780px;" }
+上述顺序依靠异步通信实现：发起收发后，调度器拿到一个通信句柄，用它在稍后等待对应操作完成。此时程序可以继续安排其他工作，但接收缓冲区中的数据还不一定可用。所谓“预接收”，就是提前准备接收缓冲区并发起请求；实际传输仍要等对端算出数据并发起匹配的发送。
 
-关键是把**下一次接收提前到本次计算之前发起**。计算结束时若数据还没收齐，仍需等待。[预热与排空的预接收实现](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py)
+因此，调度器需要守住两个边界：接收的数据在计算读取前必须完成传输；发送的数据在发送完成前必须保留，不能覆盖或释放其存储。前者决定 B2、F7 何时能够开始，后者决定 DX1、F6 的输出等通信缓冲区何时能够回收。Megatron 用收发句柄维护这些依赖；若发起异步请求后立即等待，就没有给独立计算留下重叠的机会。[P2P 收发实现](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/p2p_communication.py)、[调度中的等待位置](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py)
+
+### 预热与排空：用当前计算覆盖下一次接收
+
+稳态中，前向与反向轮流提供重叠窗口。预热阶段连续执行前向，排空阶段连续执行反向，也可以利用相邻任务之间的独立性：当前任务的数据已经就绪时，先发起下一次任务的接收，再执行当前任务。
+
+仍以 GPU1 为例。预热时，假设 F1 的输入已经收到，调度器可以先从 GPU0 请求 F2 的输入，然后执行 F1。F1 完成后才有输出可发给 GPU2，而 F2 的输入接收已经推进了一段时间；确认该输入收齐后，就可以开始 F2。
+
+排空时采用相同顺序。假设 B7 所需的梯度已经收到，且反向所需的前向激活仍被保留，调度器先从 GPU2 请求 B8 的梯度，再执行 B7。B7 完成后向 GPU0 发送 DX7，等 B8 的梯度收齐后继续反向。
+
+![GPU1 在预热时用 F1 覆盖 F2 的输入接收，在排空时用 B7 覆盖 B8 的梯度接收](assets/04-pp-p2p-warmup-flush.svg){ style="max-width: 780px;" }
+
+*图中仅展示 GPU1 的局部收发，省略后续预接收；当前任务的输入或梯度已就绪。发送行的激活是当前前向的输出，接收行的激活是下一次前向的输入。若下一份数据未及时收齐，后续计算仍须在虚线处等待。*
+
+这两个阶段的共同点是：**下一次接收在本次计算开始前就已发起，而本次计算的结果只能在算完后发送。** 首尾 stage 和 chunk 切换处还要按实际依赖调整收发，不能把这个中间 GPU 的局部顺序直接套到所有位置。[预热与排空的预接收实现](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py)
+
+在本文讨论的 Megatron 常规 PP 路径中，稳态 P2P 重叠需要启用 VPP，并设置 `overlap_p2p_comm=True`、`batch_p2p_comm=False`；在此基础上，`overlap_p2p_comm_warmup_flush=True` 将重叠扩展到预热与排空。[配置定义](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/model_parallel_config.py)
+
+这些配置提供了交错安排通信与计算的执行路径，实际收益还取决于对端数据何时就绪、独立计算窗口有多长，以及发送缓冲区是否需要提前回收。结合上一节的 chunk 粒度来看，chunk 越小，每段计算可覆盖的通信时间也越短；应在时间线上检查数据使用前剩余的等待，并以迭代时间确认收益。
 
 ## 04 · MoE 重叠：把一对前后向拆到层内调度 { #moe-overlap }
 

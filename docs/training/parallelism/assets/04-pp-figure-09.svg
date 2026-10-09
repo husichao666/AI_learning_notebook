@@ -1,20 +1,87 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 650 191" role="img" aria-label="不同 micro-batch 的计算与 A2A 通信交替重叠的局部片段">
-<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#64748b"/></marker></defs>
-<g font-family="system-ui, sans-serif" fill="#334155" font-size="13">
-<text x="31" y="26" font-size="12" fill="#64748b" font-weight="400" text-anchor="start">局部时间 →</text>
-<text x="65" y="78" font-size="13" fill="#334155" font-weight="600" text-anchor="middle">计算</text>
-<text x="65" y="133" font-size="13" fill="#334155" font-weight="600" text-anchor="middle">通信</text>
-<rect x="117" y="47" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
-<text x="195" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的计算片段</text>
-<rect x="117" y="103" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
-<text x="195" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的 A2A</text>
-<rect x="288" y="47" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
-<text x="366" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的计算片段</text>
-<rect x="288" y="103" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
-<text x="366" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的 A2A</text>
-<rect x="459" y="47" width="156" height="48" rx="5" fill="#e5f2eb" stroke="#cbd5e1"/>
-<text x="537" y="76" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Bⱼ 的计算片段</text>
-<rect x="459" y="103" width="156" height="48" rx="5" fill="#e5ebfc" stroke="#cbd5e1"/>
-<text x="537" y="132" font-size="13" fill="#334155" font-weight="400" text-anchor="middle">Fᵢ 的 A2A</text>
-<text x="330" y="177" font-size="12" fill="#64748b" font-weight="400" text-anchor="middle">i ≠ j · 每项工作先满足自身依赖，再与另一任务重叠</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 640" role="img" aria-labelledby="title desc">
+<title id="title">DualPipe：Attention、MLP 与 All-to-All 的前后向依赖及重叠</title>
+<desc id="desc">上半图展示前向 Attention、token 分发 A2A、专家 MLP、输出汇合 A2A，以及反向输出梯度送往专家的 A2A、MLP 反向、输入梯度回传 A2A、Attention 反向。下半图把两条路径排在同一张 GPU 的计算和通信时间线上：前向 Attention 与反向输出梯度传输重叠，MLP dX 与前向分发重叠，MLP dW 和前向 MLP 与反向梯度回传重叠，Attention dX 和 dW 与前向输出汇合重叠。</desc>
+<defs><marker id="arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="#94a3b8"/></marker></defs>
+<rect width="1100" height="640" rx="8" fill="#fff"/>
+<g font-family="system-ui, sans-serif">
+<text x="24" y="32" font-size="18" font-weight="600" text-anchor="start" fill="#334155">两个 micro-batch 的前后向任务</text>
+<text x="24" y="57" font-size="13" font-weight="400" text-anchor="start" fill="#64748b">先看各自的依赖，再看同一 GPU 上如何交错执行</text>
+<text x="1060" y="32" font-size="12" font-weight="400" text-anchor="end" fill="#64748b">实框：计算　虚框：All-to-All（A2A）</text>
+<text x="113" y="119" font-size="15" font-weight="600" text-anchor="end" fill="#334155">前向 i</text>
+<rect x="150" y="87" width="205" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3"/>
+<text x="252.5" y="113.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">Attention</text>
+<text x="252.5" y="133.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">前向计算</text>
+<path d="M357 118 H376" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="380" y="87" width="205" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="482.5" y="113.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">A2A 分发</text>
+<text x="482.5" y="133.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">token → 专家</text>
+<path d="M587 118 H606" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="610" y="87" width="205" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3"/>
+<text x="712.5" y="113.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">MLP</text>
+<text x="712.5" y="133.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">专家前向计算</text>
+<path d="M817 118 H836" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="840" y="87" width="205" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="942.5" y="113.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">A2A 汇合</text>
+<text x="942.5" y="133.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">专家输出 → token 所在设备</text>
+<text x="113" y="226" font-size="15" font-weight="600" text-anchor="end" fill="#334155">反向 j</text>
+<rect x="150" y="194" width="205" height="62" rx="6" fill="#e4f2e9" stroke="#247249" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="252.5" y="220.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">A2A 传输出梯度</text>
+<text x="252.5" y="240.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">输出梯度 → 专家</text>
+<path d="M357 225 H376" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="380" y="194" width="205" height="62" rx="6" fill="#c9e9f3" stroke="#236d83" stroke-width="1.3"/>
+<text x="482.5" y="220.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">MLP 反向</text>
+<text x="482.5" y="240.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">dX：输入梯度　dW：参数梯度</text>
+<path d="M587 225 H606" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="610" y="194" width="205" height="62" rx="6" fill="#e4f2e9" stroke="#247249" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="712.5" y="220.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">A2A 回传输入梯度</text>
+<text x="712.5" y="240.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">专家输入梯度 → token 所在设备</text>
+<path d="M817 225 H836" fill="none" stroke="#94a3b8" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="840" y="194" width="205" height="62" rx="6" fill="#c9e9f3" stroke="#236d83" stroke-width="1.3"/>
+<text x="942.5" y="220.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">Attention 反向</text>
+<text x="942.5" y="240.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">dX：输入梯度　dW：参数梯度</text>
+<text x="595" y="185" font-size="12" font-weight="600" text-anchor="middle" fill="#334155">dX 就绪即可推进</text>
+<path d="M485 191 V174 H713 V191" fill="none" stroke="#64748b" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="150" y="280" font-size="12" font-weight="400" text-anchor="start" fill="#64748b">j 的前向已在此前完成，反向所需状态仍保留；i 与 j 不必位于同一层。</text>
+<path d="M24 303 H1076" stroke="#e2e8f0"/>
+<text x="24" y="335" font-size="18" font-weight="600" text-anchor="start" fill="#334155">将两条路径排入计算与通信时间线</text>
+<text x="1060" y="358" font-size="12" font-weight="400" text-anchor="end" fill="#64748b">时间 →</text>
+<text x="112" y="414" font-size="15" font-weight="600" text-anchor="end" fill="#334155">计算</text>
+<rect x="150" y="383" width="150" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3"/>
+<text x="225.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">① Attention</text>
+<text x="225.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">i：前向</text>
+<rect x="300" y="383" width="150" height="62" rx="6" fill="#c9e9f3" stroke="#236d83" stroke-width="1.3"/>
+<text x="375.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">② MLP dX</text>
+<text x="375.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">j：输入梯度</text>
+<rect x="450" y="383" width="150" height="62" rx="6" fill="#ffebc4" stroke="#956a20" stroke-width="1.3"/>
+<text x="525.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">③ MLP dW</text>
+<text x="525.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">j：参数梯度</text>
+<rect x="600" y="383" width="150" height="62" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3"/>
+<text x="675.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">④ MLP</text>
+<text x="675.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">i：前向</text>
+<rect x="750" y="383" width="150" height="62" rx="6" fill="#c9e9f3" stroke="#236d83" stroke-width="1.3"/>
+<text x="825.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">⑤ Attention dX</text>
+<text x="825.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">j：输入梯度</text>
+<rect x="900" y="383" width="150" height="62" rx="6" fill="#ffebc4" stroke="#956a20" stroke-width="1.3"/>
+<text x="975.0" y="409.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">⑥ Attention dW</text>
+<text x="975.0" y="429.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">j：参数梯度</text>
+<text x="112" y="536" font-size="15" font-weight="600" text-anchor="end" fill="#334155">通信</text>
+<rect x="150" y="504" width="150" height="68" rx="6" fill="#e4f2e9" stroke="#247249" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="225.0" y="533.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">j：A2A</text>
+<text x="225.0" y="553.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">输出梯度 → 专家</text>
+<rect x="300" y="504" width="190" height="68" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="395.0" y="533.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">i：A2A 分发</text>
+<text x="395.0" y="553.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">token → 专家</text>
+<rect x="490" y="504" width="260" height="68" rx="6" fill="#e4f2e9" stroke="#247249" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="620.0" y="533.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">j：A2A 回传</text>
+<text x="620.0" y="553.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">专家输入梯度返回</text>
+<rect x="750" y="504" width="270" height="68" rx="6" fill="#dfe7ff" stroke="#3f56a4" stroke-width="1.3" stroke-dasharray="5 3"/>
+<text x="885.0" y="533.0" font-size="14" font-weight="600" text-anchor="middle" fill="#334155">i：A2A 汇合</text>
+<text x="885.0" y="553.0" font-size="12" font-weight="400" text-anchor="middle" fill="#334155">专家输出返回</text>
+<path d="M450 448 V470 H490 V500" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="437" y="488" font-size="12" font-weight="600" text-anchor="end" fill="#334155">MLP dX 就绪</text>
+<path d="M300 448 V499" stroke="#cbd5e1" stroke-dasharray="3 4"/>
+<path d="M600 448 V499" stroke="#cbd5e1" stroke-dasharray="3 4"/>
+<path d="M750 448 V499" stroke="#cbd5e1" stroke-dasharray="3 4"/>
+<text x="150" y="603" font-size="14" font-weight="600" text-anchor="start" fill="#334155">反向 A2A 无需等待 dW：先与③重叠，再由④继续覆盖。</text>
+<text x="150" y="625" font-size="12" font-weight="400" text-anchor="start" fill="#64748b">条宽仅作示意；②、④、⑤分别在其所需的 A2A 完成后开始。</text>
 </g></svg>
